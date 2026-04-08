@@ -15,7 +15,7 @@
 
 > **Goal**: Establish the design system, global navigation, layout structure, and Firebase infrastructure. Everything else builds on this.
 
-- [ ] **1.1 Design system — Tailwind theme configuration** (`app/globals.css`)
+- [x] **1.1 Design system — Tailwind theme configuration** (`app/globals.css`)
   - Color palette as CSS variables + Tailwind theme inline
     - Primary: Dark Maroon
     - Secondary: Grey
