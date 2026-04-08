@@ -50,7 +50,7 @@
   - `useAuth()` hook: user, loading, signIn, signOut, signUp
   - Wrap app in auth provider in `app/layout.tsx`
 
-- [ ] **1.5 Global navigation** (`components/layout/Navbar.tsx`)
+- [x] **1.5 Global navigation** (`components/layout/Navbar.tsx`)
   - Top nav: Home, Educators, Forums, Resources, Lesson Builder, Inspiration, Jobs
   - Universal search bar
   - Notifications icon, User avatar/dropdown (profile, settings, logout)
