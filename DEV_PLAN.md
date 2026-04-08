@@ -45,7 +45,7 @@
   - Initialize Firebase app, Auth, Firestore, Storage
   - Create `.env.example` with placeholder keys
 
-- [ ] **1.4 Firebase Auth context** (`lib/auth-context.tsx`)
+- [x] **1.4 Firebase Auth context** (`lib/auth-context.tsx`)
   - React context provider for auth state
   - `useAuth()` hook: user, loading, signIn, signOut, signUp
   - Wrap app in auth provider in `app/layout.tsx`
