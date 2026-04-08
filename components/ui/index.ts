@@ -8,3 +8,5 @@ export { default as Dropdown } from "./Dropdown";
 export { default as Tabs } from "./Tabs";
 export { default as SearchBar } from "./SearchBar";
 export { default as Tag } from "./Tag";
+export { default as Select } from "./Select";
+export { default as Textarea } from "./Textarea";

@@ -92,13 +92,13 @@
   - Redirect to profile creation on first signup
   - Error handling (duplicate emails, weak passwords, etc.)
 
-- [ ] **2.2 Profile creation flow** (`app/profile/edit/page.tsx`)
+- [x] **2.2 Profile creation flow** (`app/profile/edit/page.tsx`)
   - Profile photo upload (Firebase Storage)
   - Fields: name, grade level, subjects, location, school, years of experience, bio
   - Save to Firestore `users` collection
   - Grade level options: Kindergarten, Elementary, Middle School, High School, Higher Education
 
-- [ ] **2.3 Firestore data model — Users** (`lib/firestore/users.ts`)
+- [x] **2.3 Firestore data model — Users** (`lib/firestore/users.ts`)
   - Collection: `users`
   - Schema: uid, displayName, email, photoURL, gradeLevel, subjects[], location, school, yearsOfExperience, bio, isVerified, createdAt, badges[], followerCount, followingCount
   - Helpers: createUser, getUser, updateUser, followUser, unfollowUser
