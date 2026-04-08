@@ -86,7 +86,7 @@
 
 > **Goal**: Real authentication flow, educator profiles with Firestore, and the discovery/search page.
 
-- [ ] **2.1 Auth pages — Login & Signup**
+- [x] **2.1 Auth pages — Login & Signup**
   - Email/password signup + Google OAuth
   - Form validation
   - Redirect to profile creation on first signup
