@@ -29,6 +29,7 @@ export default function Navbar() {
   }
 
   return (
+    <>
     <header className="sticky top-0 z-50 border-b border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* Top row: Logo + Search + Actions */}
@@ -171,10 +172,20 @@ export default function Navbar() {
           ))}
         </nav>
       </div>
+    </header>
 
-      {/* Mobile menu */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-border bg-surface">
+    {/* Mobile menu — rendered outside header to avoid stacking context issues */}
+    {mobileMenuOpen && (
+      <div className="fixed inset-0 top-14 z-40 lg:hidden">
+        {/* Backdrop overlay — below header */}
+        <div
+          className="absolute inset-0 bg-black/40"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+
+        {/* Menu panel */}
+        <div className="absolute left-0 right-0 top-0 border-t border-border bg-surface shadow-lg">
           {/* Mobile search */}
           <div className="px-4 py-3 md:hidden">
             <SearchBar placeholder="Search..." />
@@ -197,7 +208,8 @@ export default function Navbar() {
             ))}
           </nav>
         </div>
-      )}
-    </header>
+      </div>
+    )}
+    </>
   );
 }
