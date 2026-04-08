@@ -39,7 +39,7 @@
   - `SearchBar` — universal search input
   - `Tag` — filterable tag/chip component
 
-- [ ] **1.3 Firebase setup** (`lib/firebase.ts`)
+- [x] **1.3 Firebase setup** (`lib/firebase.ts`)
   - Install `firebase` package
   - Firebase config with environment variables (`.env.local`)
   - Initialize Firebase app, Auth, Firestore, Storage
