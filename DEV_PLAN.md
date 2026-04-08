@@ -27,7 +27,7 @@
   - Border radius tokens
   - Shadow tokens
 
-- [ ] **1.2 Reusable base components** (`components/ui/`)
+- [x] **1.2 Reusable base components** (`components/ui/`)
   - `Button` — variants: primary, secondary, outline, ghost; sizes: sm, md, lg
   - `Input` — text input with label, error state, optional icon
   - `Card` — container with soft shadow, rounded corners, padding variants
