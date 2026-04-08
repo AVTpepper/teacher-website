@@ -57,7 +57,7 @@
   - Responsive hamburger menu on mobile
   - Active route indicator
 
-- [ ] **1.6 Layout shell** (`app/layout.tsx`)
+- [x] **1.6 Layout shell** (`app/layout.tsx`)
   - Integrate Navbar
   - Sidebar layout wrapper for desktop
   - Footer component
