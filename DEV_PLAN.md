@@ -64,7 +64,7 @@
   - Route groups `(auth)` and `(main)` for different layouts
   - Responsive container widths
 
-- [ ] **1.7 Route scaffolding** — placeholder pages for all routes
+- [x] **1.7 Route scaffolding** — placeholder pages for all routes
   - `app/page.tsx` — Home feed
   - `app/educators/page.tsx` — Educator discovery
   - `app/educators/[id]/page.tsx` — Educator profile
