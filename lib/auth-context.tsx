@@ -33,11 +33,10 @@ const googleProvider = new GoogleAuthProvider();
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !!auth);
 
   useEffect(() => {
     if (!auth) {
-      setLoading(false);
       return;
     }
 
