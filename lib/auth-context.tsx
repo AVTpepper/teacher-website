@@ -44,6 +44,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
+
+      // Sync a thin session cookie for proxy-level route protection
+      if (firebaseUser) {
+        document.cookie = `__session=1; path=/; max-age=${60 * 60 * 24 * 14}; SameSite=Lax`;
+      } else {
+        document.cookie = "__session=; path=/; max-age=0";
+      }
     });
 
     return unsubscribe;

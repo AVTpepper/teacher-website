@@ -116,7 +116,7 @@
   - Educator cards grid: photo, name, grade level, subjects, location, Follow/Message, verified badge
   - Firestore composite queries + pagination
 
-- [ ] **2.6 Route protection middleware** (`middleware.ts`)
+- [x] **2.6 Route protection middleware** (`middleware.ts`)
   - Protect authenticated routes (profile, lesson builder, etc.)
   - Redirect unauthenticated users to login
   - Redirect authenticated users away from auth pages

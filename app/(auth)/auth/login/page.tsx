@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import Button from "@/components/ui/Button";
@@ -18,7 +18,17 @@ const firebaseErrorMessages: Record<string, string> = {
 };
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/";
   const { signIn, signInWithGoogle } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -38,7 +48,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signIn(email, password);
-      router.push("/");
+      router.push(redirectTo);
     } catch (err: unknown) {
       const code =
         err instanceof Error && "code" in err
@@ -55,7 +65,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithGoogle();
-      router.push("/");
+      router.push(redirectTo);
     } catch (err: unknown) {
       const code =
         err instanceof Error && "code" in err
