@@ -254,12 +254,12 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 
 > **Goal**: Personalized home dashboard and a full discussion forum system.
 
-- [ ] **3.1 Firestore data model — Posts** (`lib/firestore/posts.ts`)
+- [x] **3.1 Firestore data model — Posts** (`lib/firestore/posts.ts`)
   - Collection: `posts` with `comments` sub-collection
   - Schema: id, authorId, content, type (idea/resource/discussion), tags[], gradeLevel, createdAt, updatedAt, likesCount, commentsCount
   - Helpers: createPost, getPosts (paginated), likePost, commentOnPost
 
-- [ ] **3.2 Home feed** (`app/page.tsx`)
+- [x] **3.2 Home feed** (`app/page.tsx`)
   - Create post component
   - Educator Feed — posts from followed educators + general
   - Trending Discussions widget (sidebar)

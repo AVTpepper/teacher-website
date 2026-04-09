@@ -1,0 +1,202 @@
+"use client";
+
+import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { createPost, type PostType } from "@/lib/firestore/posts";
+import Avatar from "@/components/ui/Avatar";
+import Button from "@/components/ui/Button";
+import Tag from "@/components/ui/Tag";
+
+const POST_TYPES: { value: PostType; label: string }[] = [
+  { value: "idea", label: "💡 Idea" },
+  { value: "resource", label: "📚 Resource" },
+  { value: "discussion", label: "💬 Discussion" },
+];
+
+const TAG_OPTIONS = [
+  "Classroom Management",
+  "Lesson Planning",
+  "Student Engagement",
+  "Technology",
+  "Assessment",
+  "Differentiation",
+  "SEL",
+  "STEM",
+  "Literacy",
+  "Professional Development",
+];
+
+const GRADE_OPTIONS = [
+  "Kindergarten",
+  "Elementary",
+  "Middle School",
+  "High School",
+  "Higher Education",
+];
+
+interface CreatePostProps {
+  onPostCreated?: () => void;
+}
+
+export default function CreatePost({ onPostCreated }: CreatePostProps) {
+  const { user } = useAuth();
+  const [content, setContent] = useState("");
+  const [type, setType] = useState<PostType>("idea");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [gradeLevel, setGradeLevel] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!user) return null;
+
+  function toggleTag(tag: string) {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  }
+
+  async function handleSubmit() {
+    const trimmed = content.trim();
+    if (!trimmed) {
+      setError("Post content cannot be empty.");
+      return;
+    }
+
+    setError("");
+    setSubmitting(true);
+    try {
+      await createPost({
+        authorId: user!.uid,
+        authorName: user!.displayName || "Anonymous",
+        authorPhotoURL: user!.photoURL,
+        content: trimmed,
+        type,
+        tags: selectedTags,
+        gradeLevel,
+      });
+      setContent("");
+      setType("idea");
+      setSelectedTags([]);
+      setGradeLevel("");
+      setExpanded(false);
+      onPostCreated?.();
+    } catch {
+      setError("Failed to create post. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-surface shadow-card p-4">
+      <div className="flex gap-3">
+        <Avatar
+          src={user.photoURL}
+          alt={user.displayName || "You"}
+          size="md"
+        />
+        <div className="flex-1 min-w-0">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onFocus={() => setExpanded(true)}
+            placeholder="Share an idea, resource, or start a discussion..."
+            rows={expanded ? 4 : 2}
+            className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-ring hover:border-border-strong"
+          />
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="mt-3 space-y-3">
+          {/* Post type selector */}
+          <div className="flex gap-2">
+            {POST_TYPES.map((pt) => (
+              <button
+                key={pt.value}
+                type="button"
+                onClick={() => setType(pt.value)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors cursor-pointer ${
+                  type === pt.value
+                    ? "bg-primary-900 text-white"
+                    : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
+                }`}
+              >
+                {pt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Grade level */}
+          <div>
+            <label className="text-xs font-medium text-muted mb-1 block">
+              Grade Level (optional)
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {GRADE_OPTIONS.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGradeLevel(gradeLevel === g ? "" : g)}
+                  className={`px-2.5 py-1 text-xs rounded-full transition-colors cursor-pointer ${
+                    gradeLevel === g
+                      ? "bg-primary-900 text-white"
+                      : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="text-xs font-medium text-muted mb-1 block">
+              Tags (optional)
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {TAG_OPTIONS.map((tag) => (
+                <Tag
+                  key={tag}
+                  label={tag}
+                  selected={selectedTags.includes(tag)}
+                  onToggle={() => toggleTag(tag)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Error + submit */}
+          {error && <p className="text-xs text-error-500">{error}</p>}
+
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setExpanded(false);
+                setContent("");
+                setSelectedTags([]);
+                setGradeLevel("");
+                setType("idea");
+                setError("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSubmit}
+              isLoading={submitting}
+              disabled={!content.trim()}
+            >
+              Post
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
