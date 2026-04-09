@@ -269,7 +269,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Like, comment, share actions on posts
   - Paginated feed
 
-- [ ] **3.3 Firestore data model — Forums** (`lib/firestore/forums.ts`)
+- [x] **3.3 Firestore data model — Forums** (`lib/firestore/forums.ts`)
   - Collection: `forums` (categories) → sub-collection: `threads` → sub-collection: `comments`
   - Thread schema: id, title, authorId, content, tags[], gradeLevel, subject, createdAt, upvotes, commentCount
   - Upvote/downvote system
