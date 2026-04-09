@@ -279,7 +279,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Category cards with thread count and latest activity
   - "New Discussion" button
 
-- [ ] **3.5 Forum thread page** (`app/forums/[id]/page.tsx`)
+- [x] **3.5 Forum thread page** (`app/forums/[id]/page.tsx`)
   - Thread detail: title, author, content, tags
   - Comment thread with nested replies
   - Upvote system
