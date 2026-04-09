@@ -103,13 +103,13 @@
   - Schema: uid, displayName, email, photoURL, gradeLevel, subjects[], location, school, yearsOfExperience, bio, isVerified, createdAt, badges[], followerCount, followingCount
   - Helpers: createUser, getUser, updateUser, followUser, unfollowUser
 
-- [ ] **2.4 Educator profile page** (`app/educators/[id]/page.tsx`)
+- [x] **2.4 Educator profile page** (`app/educators/[id]/page.tsx`)
   - Header: photo, name, grade level, subjects, location, school, experience, verified badge
   - Follow / Message buttons
   - Tabs: Posts, Resources Shared, Lessons Created, Discussions, Saved Content
   - Achievements / badges section
 
-- [ ] **2.5 Educator discovery page** (`app/educators/page.tsx`)
+- [x] **2.5 Educator discovery page** (`app/educators/page.tsx`)
   - Filter sidebar/bar
     - Required: Grade Level (Kindergarten–Higher Ed)
     - Optional: Subject, Country, City, School, Years of Experience

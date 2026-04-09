@@ -6,6 +6,14 @@ import {
   serverTimestamp,
   increment,
   writeBatch,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getDocs,
+  type DocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -148,4 +156,53 @@ export async function isFollowing(
     doc(db, "users", currentUid, "following", targetUid)
   );
   return snap.exists();
+}
+
+// --- Educator discovery ---
+
+export interface SearchEducatorsFilters {
+  gradeLevel?: string;
+  subject?: string;
+}
+
+export interface SearchEducatorsResult {
+  educators: UserProfile[];
+  lastDoc: DocumentSnapshot | null;
+}
+
+const PAGE_SIZE = 12;
+
+export async function searchEducators(
+  filters: SearchEducatorsFilters,
+  cursor?: DocumentSnapshot | null
+): Promise<SearchEducatorsResult> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const constraints = [];
+
+  if (filters.gradeLevel) {
+    constraints.push(where("gradeLevel", "==", filters.gradeLevel));
+  }
+
+  if (filters.subject) {
+    constraints.push(where("subjects", "array-contains", filters.subject));
+  }
+
+  constraints.push(orderBy("createdAt", "desc"));
+  constraints.push(limit(PAGE_SIZE));
+
+  if (cursor) {
+    constraints.push(startAfter(cursor));
+  }
+
+  const q = query(collection(db, "users"), ...constraints);
+  const snapshot = await getDocs(q);
+
+  const educators = snapshot.docs.map((d) => d.data() as UserProfile);
+  const lastDoc =
+    snapshot.docs.length === PAGE_SIZE
+      ? snapshot.docs[snapshot.docs.length - 1]
+      : null;
+
+  return { educators, lastDoc };
 }
