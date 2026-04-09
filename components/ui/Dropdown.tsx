@@ -51,7 +51,7 @@ export default function Dropdown({
 
       {open && (
         <div
-          className={`absolute z-40 mt-1.5 min-w-[180px] rounded-lg border border-border bg-surface shadow-lg py-1 ${
+          className={`absolute z-40 mt-1.5 min-w-45 rounded-lg border border-border bg-surface shadow-lg py-1 ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >
@@ -70,7 +70,7 @@ export default function Dropdown({
               }`}
             >
               {item.icon && (
-                <span className="flex-shrink-0 w-4 h-4">{item.icon}</span>
+                <span className="shrink-0 w-4 h-4">{item.icon}</span>
               )}
               {item.label}
             </button>

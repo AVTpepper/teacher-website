@@ -40,7 +40,7 @@ export default function Avatar({
 }: AvatarProps) {
   return (
     <div
-      className={`relative rounded-full overflow-hidden flex-shrink-0 ${sizeClasses[size]} ${className}`}
+      className={`relative rounded-full overflow-hidden shrink-0 ${sizeClasses[size]} ${className}`}
     >
       {src ? (
         <Image

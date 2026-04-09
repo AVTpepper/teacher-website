@@ -30,14 +30,14 @@ export default function Navbar() {
 
   return (
     <>
-    <header className="sticky top-0 z-50 border-b border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
+    <header className="sticky top-0 z-50 border-b border-border bg-surface/95 backdrop-blur supports-backdrop-filter:bg-surface/80">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* Top row: Logo + Search + Actions */}
         <div className="flex h-14 items-center justify-between gap-4">
           {/* Logo */}
           <Link
             href="/"
-            className="flex-shrink-0 text-lg font-bold text-primary-900"
+            className="shrink-0 text-lg font-bold text-primary-900"
           >
             EduConnect
           </Link>

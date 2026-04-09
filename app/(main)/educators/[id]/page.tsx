@@ -124,7 +124,7 @@ export default function EducatorProfilePage({
             src={profile.photoURL}
             alt={profile.displayName}
             size="xl"
-            className="!h-24 !w-24 !text-2xl"
+            className="h-24! w-24! text-2xl!"
           />
 
           {/* Info */}
@@ -319,7 +319,7 @@ export default function EducatorProfilePage({
           defaultValue="posts"
           onChange={setActiveTab}
         />
-        <Card className="mt-4 min-h-[200px]" padding="lg">
+        <Card className="mt-4 min-h-50" padding="lg">
           {activeTab === "posts" && (
             <EmptyTabContent
               title="No Posts Yet"

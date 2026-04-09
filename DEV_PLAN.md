@@ -80,6 +80,62 @@
   - `app/profile/edit/page.tsx` — Edit profile
   - `app/search/page.tsx` — Search results
 
+### Phase 1 — Manual Test Checklist
+
+#### 1. Functionality Tests
+
+Run `npm run dev` and verify:
+
+1. Visit `/` — home page renders with heading and description
+2. Click each nav link (Home, Educators, Forums, Resources, Lesson Builder, Inspiration, Jobs) — each should navigate to its page with heading text
+3. Resize browser to mobile width (<768px) — hamburger menu icon should appear, nav links should hide
+4. Click hamburger — mobile menu overlay should appear covering the page but NOT the header
+5. Click a link in mobile menu — should navigate and close menu
+6. Click outside the mobile menu panel — should close
+7. Visit `/educators/test-id` — should show "Educator Not Found" (placeholder was replaced in Phase 2)
+8. Visit `/forums/test-id` — should show "Discussion Thread" heading with description text (this is the placeholder)
+9. Content sidebar (right-side widget boxes: Trending, Resources, Educators, Quick Links) should only be visible at xl breakpoint (1280px+)
+10. Footer should show 4 columns on desktop, stack on mobile
+
+#### 2. Screenshots to Take
+
+Take each at **desktop (1280px+)** and **mobile (375px)**:
+
+| Page | URL | What to verify |
+|---|---|---|
+| Home | `/` | Navbar, sidebar (desktop), footer, main content area |
+| Any content page | `/forums` | Layout structure, spacing, typography |
+| Mobile nav open | Any page (mobile) | Overlay covers content but not header bar |
+| Auth layout | `/auth/login` | Minimal centered layout, logo, no sidebar/footer |
+
+#### 3. Code Validation — Files Worked On
+
+| File | Type |
+|---|---|
+| `app/globals.css` | Modified — full design system (colors, typography, shadows, radii) |
+| `components/ui/Button.tsx` | Created — 4 variants, 3 sizes, loading state |
+| `components/ui/Input.tsx` | Created — label, error, icon support |
+| `components/ui/Card.tsx` | Created — padding variants, hoverable |
+| `components/ui/Badge.tsx` | Created — 6 color variants |
+| `components/ui/Avatar.tsx` | Created — image + initials fallback, 4 sizes |
+| `components/ui/Modal.tsx` | Created — overlay, escape, click-outside |
+| `components/ui/Dropdown.tsx` | Created — click trigger, alignment |
+| `components/ui/Tabs.tsx` | Created — underline style, ARIA roles |
+| `components/ui/SearchBar.tsx` | Created — search icon, Enter callback |
+| `components/ui/Tag.tsx` | Created — selectable, removable |
+| `components/ui/index.ts` | Created — barrel export |
+| `lib/firebase.ts` | Created — guarded Firebase init |
+| `lib/auth-context.tsx` | Created — AuthProvider + useAuth hook |
+| `components/layout/Navbar.tsx` | Created — responsive nav, mobile overlay |
+| `components/layout/Footer.tsx` | Created — 4-column footer |
+| `components/layout/Sidebar.tsx` | Created — right sidebar widgets |
+| `app/layout.tsx` | Modified — AuthProvider shell |
+| `app/(main)/layout.tsx` | Created — Navbar + Sidebar + Footer |
+| `app/(auth)/layout.tsx` | Created — minimal centered layout |
+| `app/(main)/page.tsx` | Created — home placeholder |
+| `.env.example` | Created — Firebase env placeholder keys |
+| 13 placeholder pages | Created — all route scaffolding |
+
 ---
 
 ## Phase 2: Auth + Educator Profiles + Educator Discovery
@@ -120,6 +176,77 @@
   - Protect authenticated routes (profile, lesson builder, etc.)
   - Redirect unauthenticated users to login
   - Redirect authenticated users away from auth pages
+
+### Phase 2 — Manual Test Checklist
+
+#### 1. Functionality Tests
+
+Requires Firebase configured (`.env.local` with real credentials) and `npm run dev` running.
+
+**Auth (2.1 + 2.6)**
+1. Visit `/profile/edit` while logged out — should redirect to `/auth/login?redirect=/profile/edit`
+2. Visit `/lesson-builder` while logged out — should redirect to login
+3. Sign up with email/password at `/auth/signup` — should redirect to `/profile/edit`
+4. Sign up with a duplicate email — should show error message
+5. Sign out, then sign in at `/auth/login` — should redirect to `/`
+6. Sign in with Google OAuth — should work and redirect home
+7. While logged in, visit `/auth/login` — should redirect to `/`
+8. While logged in, visit `/auth/signup` — should redirect to `/`
+
+**Profile (2.2 + 2.3)**
+9. After signup, fill out the profile form — name, grade level, subjects (toggle multiple), school, location, years, bio
+10. Upload a profile photo (under 5 MB) — preview should appear
+11. Try uploading a file over 5 MB — should show error
+12. Submit the form — should save to Firestore and redirect to `/profile`
+13. Go back to `/profile/edit` — all fields should be pre-filled with saved data
+14. Change a field and save — should update (not create duplicate)
+
+**Educator Profile (2.4)**
+15. Visit `/educators/{your-uid}` — should show your full profile with "Edit Profile" button
+16. Visit `/profile` — should redirect to `/educators/{your-uid}`
+17. Visit `/educators/nonexistent-id` — should show "Educator Not Found" state
+
+**Educator Discovery (2.5)**
+18. Visit `/educators` — should show educator cards (or empty state if no users yet)
+19. Filter by grade level — results should update
+20. Filter by subject — results should update
+21. Click "Clear Filters" — should reset and show all
+22. Click an educator card — should navigate to their profile
+
+**Follow System (2.4)**
+23. Create a second test account, visit first user's profile, click "Follow" — follower count should increment
+24. Click "Following" to unfollow — count should decrement
+
+#### 2. Screenshots to Take
+
+Take each at **desktop (1280px+)** and **mobile (375px)**:
+
+| Page | URL | What to verify |
+|---|---|---|
+| Login | `/auth/login` | Form centered, Google button, link to signup |
+| Signup | `/auth/signup` | All fields, Google button, link to login |
+| Profile Edit (empty) | `/profile/edit` | Photo upload area, all form fields, subject tags |
+| Profile Edit (filled) | `/profile/edit` | Pre-filled fields, selected subjects highlighted |
+| Educator Profile | `/educators/{uid}` | Avatar, meta info, subject badges, tabs, action buttons |
+| Educator Discovery | `/educators` | Filter bar, card grid layout, responsive columns |
+| Educator Discovery (empty) | `/educators` with filter yielding 0 | Empty state illustration |
+
+#### 3. Code Validation — Files Worked On
+
+| File | Type |
+|---|---|
+| `lib/firestore/users.ts` | Created — Firestore user model + search helper |
+| `lib/auth-context.tsx` | Modified — added session cookie sync |
+| `proxy.ts` | Created — route protection (Next.js 16 proxy) |
+| `app/(auth)/auth/login/page.tsx` | Replaced — login page + redirect param + Suspense |
+| `app/(auth)/auth/signup/page.tsx` | Replaced — signup page with validation |
+| `app/(main)/profile/edit/page.tsx` | Replaced — full profile creation/edit form |
+| `app/(main)/profile/page.tsx` | Replaced — redirect to educator profile |
+| `app/(main)/educators/[id]/page.tsx` | Replaced — full educator profile page |
+| `app/(main)/educators/page.tsx` | Replaced — discovery page with filters + pagination |
+| `components/ui/Select.tsx` | Created — select dropdown component |
+| `components/ui/Textarea.tsx` | Created — textarea component |
+| `components/ui/index.ts` | Modified — added Select, Textarea exports |
 
 ---
 

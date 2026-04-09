@@ -198,7 +198,7 @@ export default function EditProfilePage() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full bg-secondary-100 transition-opacity hover:opacity-80"
+            className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-secondary-100 transition-opacity hover:opacity-80"
           >
             {currentPhoto ? (
               <Image
