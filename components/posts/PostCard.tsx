@@ -15,6 +15,7 @@ import {
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
 
 function timeAgo(timestamp: { seconds: number } | null): string {
   if (!timestamp) return "just now";
@@ -47,9 +48,7 @@ export default function PostCard({ post }: PostCardProps) {
   const [commentsCount, setCommentsCount] = useState(post.commentsCount);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
-  const [commentText, setCommentText] = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
-  const [submittingComment, setSubmittingComment] = useState(false);
   const [likeLoading, setLikeLoading] = useState(false);
 
   useEffect(() => {
@@ -92,28 +91,6 @@ export default function PostCard({ post }: PostCardProps) {
       // ignore
     } finally {
       setLoadingComments(false);
-    }
-  }
-
-  async function handleComment() {
-    if (!user || !commentText.trim()) return;
-    setSubmittingComment(true);
-    try {
-      await commentOnPost(post.id, {
-        authorId: user.uid,
-        authorName: user.displayName || "Anonymous",
-        authorPhotoURL: user.photoURL,
-        content: commentText.trim(),
-      });
-      setCommentText("");
-      setCommentsCount((c) => c + 1);
-      // Reload comments
-      const result = await getPostComments(post.id);
-      setComments(result);
-    } catch {
-      // ignore
-    } finally {
-      setSubmittingComment(false);
     }
   }
 
@@ -268,78 +245,36 @@ export default function PostCard({ post }: PostCardProps) {
 
       {/* Comments section */}
       {showComments && (
-        <div className="mt-3 pt-3 border-t border-border space-y-3">
-          {loadingComments ? (
-            <p className="text-xs text-muted">Loading comments...</p>
-          ) : comments.length === 0 ? (
-            <p className="text-xs text-muted">No comments yet. Be the first!</p>
-          ) : (
-            <div className="space-y-3">
-              {comments.map((comment) => (
-                <div key={comment.id} className="flex gap-2">
-                  <Link href={`/educators/${comment.authorId}`}>
-                    <Avatar
-                      src={comment.authorPhotoURL}
-                      alt={comment.authorName}
-                      size="sm"
-                    />
-                  </Link>
-                  <div className="flex-1 min-w-0">
-                    <div className="bg-background rounded-lg px-3 py-2">
-                      <Link
-                        href={`/educators/${comment.authorId}`}
-                        className="text-xs font-semibold text-foreground hover:underline"
-                      >
-                        {comment.authorName}
-                      </Link>
-                      <p className="text-sm text-foreground mt-0.5">
-                        {comment.content}
-                      </p>
-                    </div>
-                    <p className="text-xs text-muted mt-1 px-1">
-                      {timeAgo(
-                        comment.createdAt as { seconds: number } | null
-                      )}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Comment input */}
-          {user && (
-            <div className="flex gap-2">
-              <Avatar
-                src={user.photoURL}
-                alt={user.displayName || "You"}
-                size="sm"
-              />
-              <div className="flex-1 flex gap-2">
-                <input
-                  type="text"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleComment();
-                    }
-                  }}
-                  placeholder="Write a comment..."
-                  className="flex-1 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
-                />
-                <Button
-                  size="sm"
-                  onClick={handleComment}
-                  disabled={!commentText.trim()}
-                  isLoading={submittingComment}
-                >
-                  Post
-                </Button>
-              </div>
-            </div>
-          )}
+        <div className="mt-3 pt-3 border-t border-border">
+          <CommentThread
+            comments={comments.map(
+              (c): CommentData => ({
+                id: c.id,
+                parentId: null,
+                authorId: c.authorId,
+                authorName: c.authorName,
+                authorPhotoURL: c.authorPhotoURL,
+                content: c.content,
+                createdAt: c.createdAt as { seconds: number } | null,
+              })
+            )}
+            loading={loadingComments}
+            maxDepth={0}
+            mode="like"
+            onAddComment={async (content) => {
+              if (!user) throw new Error("Not authenticated");
+              await commentOnPost(post.id, {
+                authorId: user.uid,
+                authorName: user.displayName || "Anonymous",
+                authorPhotoURL: user.photoURL,
+                content,
+              });
+              setCommentsCount((c) => c + 1);
+              const result = await getPostComments(post.id);
+              setComments(result);
+              return result[result.length - 1]?.id || "temp";
+            }}
+          />
         </div>
       )}
     </div>

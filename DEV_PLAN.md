@@ -285,7 +285,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Upvote system
   - Reply form
 
-- [ ] **3.6 Reusable comment component** (`components/comments/CommentThread.tsx`)
+- [x] **3.6 Reusable comment component** (`components/comments/CommentThread.tsx`)
   - Used across forums, posts, resources
   - Nested replies (1–2 levels)
   - Author avatar, name, timestamp

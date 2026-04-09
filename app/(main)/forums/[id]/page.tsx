@@ -19,6 +19,7 @@ import {
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
 
 function timeAgo(timestamp: { seconds: number } | null): string {
   if (!timestamp) return "just now";
@@ -32,212 +33,6 @@ function timeAgo(timestamp: { seconds: number } | null): string {
   if (days < 30) return `${days}d ago`;
   const months = Math.floor(days / 30);
   return `${months}mo ago`;
-}
-
-// ─── Nested comment component ───
-
-interface CommentItemProps {
-  comment: ThreadComment;
-  replies: ThreadComment[];
-  allComments: ThreadComment[];
-  categoryId: string;
-  threadId: string;
-  depth: number;
-}
-
-function CommentItem({
-  comment,
-  replies,
-  allComments,
-  categoryId,
-  threadId,
-  depth,
-}: CommentItemProps) {
-  const { user } = useAuth();
-  const [vote, setVote] = useState<"up" | "down" | null>(null);
-  const [upvotes, setUpvotes] = useState(comment.upvotes);
-  const [downvotes, setDownvotes] = useState(comment.downvotes);
-  const [voteLoading, setVoteLoading] = useState(false);
-  const [showReply, setShowReply] = useState(false);
-  const [replyText, setReplyText] = useState("");
-  const [submittingReply, setSubmittingReply] = useState(false);
-  const [localReplies, setLocalReplies] = useState<ThreadComment[]>(replies);
-
-  useEffect(() => {
-    if (user) {
-      getUserCommentVote(categoryId, threadId, comment.id, user.uid)
-        .then(setVote)
-        .catch(() => {});
-    }
-  }, [categoryId, threadId, comment.id, user]);
-
-  // Sync replies from parent
-  useEffect(() => {
-    setLocalReplies(replies);
-  }, [replies]);
-
-  async function handleUpvote() {
-    if (!user || voteLoading) return;
-    setVoteLoading(true);
-    try {
-      await upvoteComment(categoryId, threadId, comment.id, user.uid);
-      if (vote === "up") {
-        setVote(null);
-        setUpvotes((c) => c - 1);
-      } else if (vote === "down") {
-        setVote("up");
-        setUpvotes((c) => c + 1);
-        setDownvotes((c) => c - 1);
-      } else {
-        setVote("up");
-        setUpvotes((c) => c + 1);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setVoteLoading(false);
-    }
-  }
-
-  async function handleReply() {
-    if (!user || !replyText.trim()) return;
-    setSubmittingReply(true);
-    try {
-      const newId = await addThreadComment(categoryId, threadId, {
-        parentId: comment.id,
-        authorId: user.uid,
-        authorName: user.displayName || "Anonymous",
-        authorPhotoURL: user.photoURL,
-        content: replyText.trim(),
-      });
-      setLocalReplies((prev) => [
-        ...prev,
-        {
-          id: newId,
-          threadId,
-          parentId: comment.id,
-          authorId: user.uid,
-          authorName: user.displayName || "Anonymous",
-          authorPhotoURL: user.photoURL,
-          content: replyText.trim(),
-          createdAt: { seconds: Date.now() / 1000 } as ThreadComment["createdAt"],
-          upvotes: 0,
-          downvotes: 0,
-        },
-      ]);
-      setReplyText("");
-      setShowReply(false);
-    } catch {
-      // ignore
-    } finally {
-      setSubmittingReply(false);
-    }
-  }
-
-  const score = upvotes - downvotes;
-  const canNest = depth < 2;
-
-  return (
-    <div className={depth > 0 ? "ml-6 sm:ml-10 border-l-2 border-border pl-4" : ""}>
-      <div className="flex gap-3 py-3">
-        <Link href={`/educators/${comment.authorId}`} className="shrink-0">
-          <Avatar
-            src={comment.authorPhotoURL}
-            alt={comment.authorName}
-            size="sm"
-          />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/educators/${comment.authorId}`}
-              className="text-sm font-semibold text-foreground hover:underline"
-            >
-              {comment.authorName}
-            </Link>
-            <span className="text-xs text-muted">
-              {timeAgo(comment.createdAt as { seconds: number } | null)}
-            </span>
-          </div>
-          <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">
-            {comment.content}
-          </p>
-
-          {/* Comment actions */}
-          <div className="flex items-center gap-3 mt-2">
-            <button
-              type="button"
-              onClick={handleUpvote}
-              disabled={!user}
-              className={`flex items-center gap-1 text-xs font-medium transition-colors cursor-pointer disabled:cursor-not-allowed ${
-                vote === "up"
-                  ? "text-primary-900"
-                  : "text-muted hover:text-foreground"
-              }`}
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-              </svg>
-              {score !== 0 && score}
-            </button>
-            {user && canNest && (
-              <button
-                type="button"
-                onClick={() => setShowReply(!showReply)}
-                className="text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer"
-              >
-                Reply
-              </button>
-            )}
-          </div>
-
-          {/* Reply input */}
-          {showReply && (
-            <div className="mt-2 flex gap-2">
-              <input
-                type="text"
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleReply();
-                  }
-                }}
-                placeholder="Write a reply..."
-                className="flex-1 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
-              />
-              <Button
-                size="sm"
-                onClick={handleReply}
-                disabled={!replyText.trim()}
-                isLoading={submittingReply}
-              >
-                Reply
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Nested replies */}
-      {canNest && localReplies.length > 0 && (
-        <div>
-          {localReplies.map((reply) => (
-            <CommentItem
-              key={reply.id}
-              comment={reply}
-              replies={allComments.filter((c) => c.parentId === reply.id)}
-              allComments={allComments}
-              categoryId={categoryId}
-              threadId={threadId}
-              depth={depth + 1}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 // ─── Main page component ───
@@ -264,8 +59,6 @@ export default function ForumThreadPage({
   // Comments
   const [comments, setComments] = useState<ThreadComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
-  const [replyText, setReplyText] = useState("");
-  const [submittingReply, setSubmittingReply] = useState(false);
 
   const loadComments = useCallback(
     async (catId: string) => {
@@ -359,26 +152,6 @@ export default function ForumThreadPage({
     }
   }
 
-  async function handleTopLevelReply() {
-    if (!user || !categoryId || !replyText.trim()) return;
-    setSubmittingReply(true);
-    try {
-      await addThreadComment(categoryId, threadId, {
-        parentId: null,
-        authorId: user.uid,
-        authorName: user.displayName || "Anonymous",
-        authorPhotoURL: user.photoURL,
-        content: replyText.trim(),
-      });
-      setReplyText("");
-      loadComments(categoryId);
-    } catch {
-      // ignore
-    } finally {
-      setSubmittingReply(false);
-    }
-  }
-
   // ─── Loading state ───
   if (loading) {
     return (
@@ -420,7 +193,6 @@ export default function ForumThreadPage({
 
   const categoryData = FORUM_CATEGORIES.find((c) => c.id === categoryId);
   const score = upvotes - downvotes;
-  const topLevelComments = comments.filter((c) => !c.parentId);
 
   return (
     <div className="space-y-6">
@@ -543,82 +315,51 @@ export default function ForumThreadPage({
         </div>
       </div>
 
-      {/* Reply form (top-level) */}
-      {user && (
-        <div className="rounded-xl border border-border bg-surface shadow-card p-4">
-          <div className="flex gap-3">
-            <Avatar
-              src={user.photoURL}
-              alt={user.displayName || "You"}
-              size="md"
-            />
-            <div className="flex-1">
-              <textarea
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder="Write a reply..."
-                rows={3}
-                className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong min-h-16"
-              />
-              <div className="flex justify-end mt-2">
-                <Button
-                  size="sm"
-                  onClick={handleTopLevelReply}
-                  disabled={!replyText.trim()}
-                  isLoading={submittingReply}
-                >
-                  Reply
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Comments section */}
       <div>
         <h2 className="text-lg font-semibold text-foreground mb-4">
           Replies ({comments.length})
         </h2>
 
-        {loadingComments ? (
-          <div className="space-y-3 animate-pulse">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex gap-3 py-3">
-                <div className="h-8 w-8 rounded-full bg-secondary-100" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 w-24 bg-secondary-100 rounded" />
-                  <div className="h-3 w-full bg-secondary-100 rounded" />
-                  <div className="h-3 w-2/3 bg-secondary-100 rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : topLevelComments.length === 0 ? (
-          <div className="rounded-xl border border-border bg-surface p-6 text-center">
-            <p className="text-sm text-muted">
-              {user
-                ? "No replies yet. Be the first to respond!"
-                : "No replies yet. Sign in to join the conversation."}
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-border bg-surface divide-y divide-border">
-            <div className="px-4">
-              {topLevelComments.map((comment) => (
-                <CommentItem
-                  key={comment.id}
-                  comment={comment}
-                  replies={comments.filter((c) => c.parentId === comment.id)}
-                  allComments={comments}
-                  categoryId={categoryId}
-                  threadId={threadId}
-                  depth={0}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <CommentThread
+            comments={comments.map(
+              (c): CommentData => ({
+                id: c.id,
+                parentId: c.parentId,
+                authorId: c.authorId,
+                authorName: c.authorName,
+                authorPhotoURL: c.authorPhotoURL,
+                content: c.content,
+                createdAt: c.createdAt as { seconds: number } | null,
+                upvotes: c.upvotes,
+                downvotes: c.downvotes,
+              })
+            )}
+            loading={loadingComments}
+            maxDepth={2}
+            mode="upvote"
+            onAddComment={async (content, parentId) => {
+              if (!categoryId) throw new Error("No category");
+              const newId = await addThreadComment(categoryId, threadId, {
+                parentId,
+                authorId: user!.uid,
+                authorName: user!.displayName || "Anonymous",
+                authorPhotoURL: user!.photoURL,
+                content,
+              });
+              return newId;
+            }}
+            onUpvote={async (commentId) => {
+              if (!categoryId || !user) return;
+              await upvoteComment(categoryId, threadId, commentId, user.uid);
+            }}
+            getUserVote={async (commentId) => {
+              if (!categoryId || !user) return null;
+              return getUserCommentVote(categoryId, threadId, commentId, user.uid);
+            }}
+          />
+        </div>
       </div>
     </div>
   );
