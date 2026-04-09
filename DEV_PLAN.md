@@ -203,7 +203,7 @@ Requires Firebase configured (`.env.local` with real credentials) and `npm run d
 
 **Educator Profile (2.4)**
 15. Visit `/educators/{your-uid}` — should show your full profile with "Edit Profile" button
-16. Visit `/profile` — should redirect to `/educators/{your-uid}`
+16. Visit `/profile` — should show your profile at the `/profile` URL (no redirect)
 17. Visit `/educators/nonexistent-id` — should show "Educator Not Found" state
 
 **Educator Discovery (2.5)**

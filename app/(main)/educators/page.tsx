@@ -49,8 +49,8 @@ export default function EducatorsPage() {
         );
         setCursor(result.lastDoc);
         setHasMore(result.lastDoc !== null);
-      } catch {
-        // Firestore not configured — show empty state
+      } catch (err) {
+        console.error("searchEducators error:", err);
         setEducators([]);
         setHasMore(false);
       } finally {

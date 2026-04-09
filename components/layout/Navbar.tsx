@@ -98,7 +98,10 @@ export default function Navbar() {
                       },
                       {
                         label: "Sign out",
-                        onClick: () => signOut(),
+                        onClick: async () => {
+                          await signOut();
+                          window.location.href = "/";
+                        },
                         destructive: true,
                       },
                     ]}
