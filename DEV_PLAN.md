@@ -291,6 +291,72 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Author avatar, name, timestamp
   - Upvote/like action
 
+### Phase 3 — Manual Test Checklist
+
+#### 1. Functionality Tests
+
+Requires logged-in account with completed profile.
+
+**Home Feed — Post Creation (3.1 + 3.2)**
+1. Visit `/` while logged in — should show "Create Post" form at top of feed
+2. Write a post with content and select a type (idea/resource/discussion) — submit should succeed
+3. Select tags and grade level on the post — should save correctly
+4. After posting, the new post should appear at the top of the feed
+5. Submit an empty post — should show validation error / disabled submit
+6. Visit `/` while logged out — should show feed (read-only), no create post form
+
+**Home Feed — Interactions (3.2)**
+7. Click "Like" on a post — like count should increment, button should toggle to liked state
+8. Click "Like" again — should unlike, count should decrement
+9. Click "Comment" on a post — comment form should appear
+10. Submit a comment — comment count should increment, comment should appear
+11. Scroll to bottom of feed — "Load More" should fetch next page of posts
+12. Sidebar widgets (Trending, Resources, Lessons, Inspiration) should display on xl+ screens
+
+**Forums Listing (3.3 + 3.4)**
+13. Visit `/forums` — should show 6 category cards (Classroom Management, Lesson Planning, Student Engagement, Technology in Education, Teacher Support, Grade-Level Discussions)
+14. Each category card should show thread count and latest activity timestamp
+15. Click "New Discussion" — should open a form/modal to create a thread (requires login)
+16. Create a new thread with title, content, tags, grade level, subject — should save and redirect to thread page
+17. Click a category card — should navigate to that category's thread listing
+
+**Forum Thread (3.5 + 3.6)**
+18. Visit `/forums/{thread-id}` — should show thread title, author avatar/name, content, tags
+19. Click upvote on the thread — upvote count should increment
+20. Click upvote again — should toggle off, count should decrement
+21. Submit a reply — comment should appear below the thread
+22. Reply to an existing comment (nested reply) — should nest under the parent comment (1–2 levels)
+23. Each comment should show author avatar, name, and timestamp
+24. Visit a thread while logged out — should show content read-only, no reply form
+25. Visit `/forums/nonexistent-id` — should show "Thread Not Found" state
+
+#### 2. Screenshots to Take
+
+Take each at **desktop (1280px+)** and **mobile (375px)**:
+
+| Page | URL | What to verify |
+|---|---|---|
+| Home Feed (logged in) | `/` | Create post form, post cards, like/comment buttons, sidebar widgets |
+| Home Feed (logged out) | `/` | Post cards visible, no create form |
+| Forums Listing | `/forums` | 6 category cards, thread counts, "New Discussion" button |
+| New Thread Form | `/forums` (after clicking New Discussion) | Title, content, tag/grade/subject fields |
+| Forum Thread | `/forums/{id}` | Thread content, upvote, comments, nested replies |
+| Forum Thread (mobile) | `/forums/{id}` | Readable layout, reply form accessible |
+
+#### 3. Code Validation — Files Worked On
+
+| File | Type |
+|---|---|
+| `lib/firestore/posts.ts` | Created — Post model + CRUD + like/comment helpers |
+| `lib/firestore/forums.ts` | Created — Forum categories, threads, comments model |
+| `components/posts/CreatePost.tsx` | Created — Post creation form |
+| `components/posts/PostCard.tsx` | Created — Post display with actions |
+| `components/comments/CommentThread.tsx` | Created — Nested comment component |
+| `app/(main)/page.tsx` | Replaced — Full home feed with sidebar |
+| `app/(main)/forums/page.tsx` | Replaced — Forum categories listing |
+| `app/(main)/forums/[id]/page.tsx` | Replaced — Thread detail + comments |
+| `components/layout/Sidebar.tsx` | Modified — Dynamic sidebar widgets |
+
 ---
 
 ## Phase 4: Resource Library + Lesson Plan Builder
@@ -333,6 +399,80 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Author info
   - Comments
 
+### Phase 4 — Manual Test Checklist
+
+#### 1. Functionality Tests
+
+Requires logged-in account with completed profile.
+
+**Resource Library (4.1 + 4.2)**
+1. Visit `/resources` — should show resource cards or empty state
+2. Filter by grade level — results should update
+3. Filter by subject — results should update
+4. Sort by Popularity — should reorder by download count
+5. Sort by Newest — should reorder by date
+6. Click "Upload Resource" — should open upload form (requires login)
+7. Fill out resource form (title, description, grade, subject, type, file) — submit should save to Firestore and upload file to Storage
+8. Try uploading without required fields — should show validation errors
+9. Search within resources (type a keyword) — should filter results
+10. Visit `/resources` while logged out — should show resources read-only, no upload button
+
+**Resource Detail (4.3)**
+11. Click a resource card — should navigate to `/resources/{id}`
+12. Resource detail should show: title, description, author card, grade, subject, type, download count
+13. Click "Download" — file should download, download count should increment
+14. Click "Save" / bookmark — should toggle saved state
+15. Rate the resource — rating should update
+16. Post a comment on the resource — should appear in the comments section
+17. "Related Resources" section should show other resources with matching subject/grade
+18. Visit `/resources/nonexistent-id` — should show "Resource Not Found" state
+
+**Lesson Plan Builder (4.4 + 4.5)**
+19. Visit `/lesson-builder` while logged in — should show the builder form
+20. Fill in title, grade level, subject — fields should accept input
+21. Add 2+ learning objectives (add/remove) — list should update dynamically
+22. Add 2+ materials needed (add/remove) — list should update dynamically
+23. Add 3+ steps to the plan — should be ordered and reorderable (drag or up/down buttons)
+24. Attach a resource/file — should upload and show in attachments list
+25. Click "Save Draft" — should save to Firestore with `isPublic: false`
+26. Click "Publish" — should save with `isPublic: true`
+27. Toggle to "Preview" mode — should show the lesson as a shareable card
+28. Visit `/lesson-builder` while logged out — should redirect to login
+
+**Lesson Detail (4.6)**
+29. Visit `/lesson-builder/{id}` — should show the full lesson card
+30. Click "Download" — should download lesson as a file/PDF
+31. Click "Remix" — should open lesson builder pre-filled with the lesson data (new draft)
+32. Author info card should show name, avatar, link to profile
+33. Post a comment on the lesson — should appear in comments section
+34. Visit `/lesson-builder/nonexistent-id` — should show "Lesson Not Found" state
+
+#### 2. Screenshots to Take
+
+Take each at **desktop (1280px+)** and **mobile (375px)**:
+
+| Page | URL | What to verify |
+|---|---|---|
+| Resource Library | `/resources` | Filter bar, resource cards grid, sort controls |
+| Resource Library (empty) | `/resources` with filter yielding 0 | Empty state |
+| Upload Resource Form | `/resources` (upload modal/form) | All fields, file picker, type selector |
+| Resource Detail | `/resources/{id}` | Full info, download/save buttons, comments, related |
+| Lesson Builder (empty) | `/lesson-builder` | Empty form, all sections visible |
+| Lesson Builder (filled) | `/lesson-builder` | Objectives list, materials, steps, attachments |
+| Lesson Preview | `/lesson-builder` (preview mode) | Shareable card layout |
+| Lesson Detail | `/lesson-builder/{id}` | Full lesson, download/remix buttons, comments |
+
+#### 3. Code Validation — Files Worked On
+
+| File | Type |
+|---|---|
+| `lib/firestore/resources.ts` | Created — Resource model + CRUD + download/save/rate helpers |
+| `lib/firestore/lessons.ts` | Created — Lesson model + CRUD |
+| `app/(main)/resources/page.tsx` | Replaced — Resource library with filters |
+| `app/(main)/resources/[id]/page.tsx` | Created — Resource detail page |
+| `app/(main)/lesson-builder/page.tsx` | Replaced — Lesson plan builder form |
+| `app/(main)/lesson-builder/[id]/page.tsx` | Created — Lesson detail page |
+
 ---
 
 ## Phase 5: Inspiration Hub + Job Board + Badges + Search + Notifications
@@ -374,6 +514,88 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Search across: Educators, Resources, Discussions, Lessons, Jobs
   - Tabbed results by type
   - Firestore text search (Algolia integration placeholder for future)
+
+### Phase 5 — Manual Test Checklist
+
+#### 1. Functionality Tests
+
+Requires logged-in account with completed profile and some existing content (posts, resources, lessons, threads).
+
+**Inspiration Hub (5.1)**
+1. Visit `/inspiration` — should show a magazine-style grid of content cards
+2. Switch between category tabs (Podcasts, Articles, Videos, Education News, Teacher Stories) — cards should filter
+3. Each card should show: thumbnail, title, short description, creator/source
+4. Click "Submit Content" — should open a submission form (requires login)
+5. Submit an inspiration item (title, description, category, link/thumbnail) — should save and appear in listing
+6. Visit `/inspiration` while logged out — should show content read-only, no submit button
+
+**Job Board (5.2 + 5.3)**
+7. Visit `/jobs` — should show job listing cards or empty state
+8. Filter by location — results should update
+9. Filter by grade level — results should update
+10. Filter by subject — results should update
+11. Filter by job type (full-time, part-time, contract) — results should update
+12. Click "Post Job" — should open job creation form (requires login)
+13. Fill out job form (title, school/org, location, grade, subject, type, description) — submit should save
+14. Click a job card — should navigate to `/jobs/{id}`
+15. Job detail should show: full description, school/org info, apply action
+16. Visit `/jobs/nonexistent-id` — should show "Job Not Found" state
+
+**Badges (5.4)**
+17. Visit your profile — badges section should display any earned badges
+18. Share a resource → check if "Resource Creator" badge appears on profile
+19. Create a lesson → check if "Lesson Builder" badge appears
+20. Start a discussion → check if "Discussion Starter" badge appears
+21. Badges should appear next to usernames in forum threads and comments
+22. Badge icons should have tooltip/label on hover
+
+**Notifications (5.5)**
+23. Click the notification bell icon in the navbar — dropdown should open
+24. Follow a user from a second account → first account should see "new follower" notification
+25. Comment on a user's post → post author should see notification
+26. Upvote a thread → thread author should see notification
+27. Earn a badge → should see "badge earned" notification
+28. Click a notification — should navigate to the relevant content
+29. Click "Mark as read" — notification should visually update
+30. Unread notification count should show as badge on the bell icon
+
+**Universal Search (5.6)**
+31. Type a query in the navbar search bar and press Enter — should navigate to `/search?q={query}`
+32. Search results should show tabbed sections: Educators, Resources, Discussions, Lessons, Jobs
+33. Click a tab — should filter results to that type
+34. Click a result — should navigate to the relevant detail page
+35. Search for a term with no results — should show "No results found" state
+36. Search with an empty query — should show prompt to enter a search term
+
+#### 2. Screenshots to Take
+
+Take each at **desktop (1280px+)** and **mobile (375px)**:
+
+| Page | URL | What to verify |
+|---|---|---|
+| Inspiration Hub | `/inspiration` | Magazine grid, category tabs, content cards |
+| Job Board | `/jobs` | Filter bar, job cards, "Post Job" button |
+| Job Detail | `/jobs/{id}` | Full description, school info, apply button |
+| Profile with Badges | `/profile` | Badges section with icons |
+| Notification Dropdown | Any page (click bell) | Notification list, read/unread states |
+| Search Results | `/search?q=math` | Tabbed results, result cards |
+| Search Empty | `/search?q=zzzzzzz` | Empty state message |
+
+#### 3. Code Validation — Files Worked On
+
+| File | Type |
+|---|---|
+| `lib/firestore/inspiration.ts` | Created — Inspiration content model |
+| `lib/firestore/jobs.ts` | Created — Job listings model + CRUD |
+| `lib/badges.ts` | Created — Badge definitions + checking logic |
+| `lib/notifications.ts` | Created — Notification model + CRUD |
+| `components/badges/BadgeIcon.tsx` | Created — Badge display component |
+| `components/layout/NotificationDropdown.tsx` | Created — Notification dropdown |
+| `app/(main)/inspiration/page.tsx` | Replaced — Inspiration hub with tabs |
+| `app/(main)/jobs/page.tsx` | Replaced — Job board with filters |
+| `app/(main)/jobs/[id]/page.tsx` | Created — Job detail page |
+| `app/(main)/search/page.tsx` | Replaced — Universal search with tabs |
+| `components/layout/Navbar.tsx` | Modified — Notification bell + search integration |
 
 ---
 
