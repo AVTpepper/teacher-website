@@ -274,7 +274,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Thread schema: id, title, authorId, content, tags[], gradeLevel, subject, createdAt, upvotes, commentCount
   - Upvote/downvote system
 
-- [ ] **3.4 Forums listing page** (`app/forums/page.tsx`)
+- [x] **3.4 Forums listing page** (`app/forums/page.tsx`)
   - Categories: Classroom Management, Lesson Planning, Student Engagement, Technology in Education, Teacher Support, Grade-Level Discussions
   - Category cards with thread count and latest activity
   - "New Discussion" button
