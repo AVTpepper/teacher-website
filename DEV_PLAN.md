@@ -393,7 +393,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Save draft / Publish
   - Preview mode (shareable lesson card)
 
-- [ ] **4.6 Lesson detail page** (`app/lesson-builder/[id]/page.tsx`)
+- [x] **4.6 Lesson detail page** (`app/lesson-builder/[id]/page.tsx`)
   - Full lesson card display
   - Download / Share / Remix buttons
   - Author info

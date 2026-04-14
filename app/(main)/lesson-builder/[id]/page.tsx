@@ -1,0 +1,549 @@
+"use client";
+
+import { use, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import {
+  getLesson,
+  trackLessonDownload,
+  getLessonComments,
+  addLessonComment,
+  type Lesson,
+  type LessonComment,
+} from "@/lib/firestore/lessons";
+import { getUser, type UserProfile } from "@/lib/firestore/users";
+import { Avatar, Badge, Button, Card } from "@/components/ui";
+import CommentThread, {
+  type CommentData,
+} from "@/components/comments/CommentThread";
+
+function timeAgo(timestamp: { seconds: number } | null): string {
+  if (!timestamp) return "just now";
+  const seconds = Math.floor(Date.now() / 1000 - timestamp.seconds);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
+export default function LessonDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const { user } = useAuth();
+  const router = useRouter();
+
+  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [author, setAuthor] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  // Download
+  const [localDownloadCount, setLocalDownloadCount] = useState(0);
+
+  // Comments
+  const [comments, setComments] = useState<LessonComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+
+  const loadComments = useCallback(async () => {
+    setCommentsLoading(true);
+    try {
+      const result = await getLessonComments(id);
+      setComments(result);
+    } catch {
+      // ignore
+    } finally {
+      setCommentsLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await getLesson(id);
+        if (!res) {
+          setNotFound(true);
+          return;
+        }
+        setLesson(res);
+        setLocalDownloadCount(res.downloadCount);
+
+        const [authorData] = await Promise.all([
+          getUser(res.authorId),
+          loadComments(),
+        ]);
+        setAuthor(authorData);
+      } catch {
+        setNotFound(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [id, loadComments]);
+
+  async function handleDownload() {
+    if (!lesson) return;
+
+    if (user) {
+      trackLessonDownload(lesson.id, user.uid).catch(() => {});
+      setLocalDownloadCount((c) => c + 1);
+    }
+
+    // Build a text representation of the lesson and trigger download
+    const lines: string[] = [];
+    lines.push(lesson.title);
+    lines.push("=".repeat(lesson.title.length));
+    lines.push("");
+    if (lesson.gradeLevel) lines.push(`Grade Level: ${lesson.gradeLevel}`);
+    if (lesson.subject) lines.push(`Subject: ${lesson.subject}`);
+    lines.push(`Author: ${lesson.authorName}`);
+    lines.push("");
+
+    if (lesson.objectives.length > 0) {
+      lines.push("LEARNING OBJECTIVES");
+      lines.push("-".repeat(20));
+      lesson.objectives.forEach((o, i) => lines.push(`${i + 1}. ${o}`));
+      lines.push("");
+    }
+
+    if (lesson.materials.length > 0) {
+      lines.push("MATERIALS NEEDED");
+      lines.push("-".repeat(16));
+      lesson.materials.forEach((m) => lines.push(`• ${m}`));
+      lines.push("");
+    }
+
+    if (lesson.steps.length > 0) {
+      lines.push("LESSON PLAN");
+      lines.push("-".repeat(11));
+      lesson.steps.forEach((s, i) => {
+        lines.push(`Step ${i + 1}: ${s.title}`);
+        if (s.description) lines.push(`  ${s.description}`);
+        lines.push("");
+      });
+    }
+
+    if (lesson.attachments.length > 0) {
+      lines.push("ATTACHMENTS");
+      lines.push("-".repeat(11));
+      lesson.attachments.forEach((a) => lines.push(`• ${a.name}: ${a.url}`));
+      lines.push("");
+    }
+
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${lesson.title.replace(/[^a-zA-Z0-9 ]/g, "").trim()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function handleRemix() {
+    if (!lesson) return;
+    // Navigate to lesson builder with remix param
+    router.push(`/lesson-builder?remix=${lesson.id}`);
+  }
+
+  // Map comments for CommentThread
+  const commentData: CommentData[] = comments.map((c) => ({
+    id: c.id,
+    parentId: c.parentId,
+    authorId: c.authorId,
+    authorName: c.authorName,
+    authorPhotoURL: c.authorPhotoURL,
+    content: c.content,
+    createdAt: c.createdAt as { seconds: number } | null,
+  }));
+
+  // ─── Loading ───
+  if (loading) {
+    return (
+      <div className="space-y-4 animate-pulse py-8">
+        <div className="h-4 w-24 bg-secondary-100 rounded" />
+        <div className="rounded-xl border border-border bg-surface p-6 space-y-3">
+          <div className="h-6 w-2/3 bg-secondary-100 rounded" />
+          <div className="h-3 w-full bg-secondary-100 rounded" />
+          <div className="h-3 w-3/4 bg-secondary-100 rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Not found ───
+  if (notFound || !lesson) {
+    return (
+      <div className="text-center py-16">
+        <div className="text-5xl mb-4">📝</div>
+        <h1 className="text-2xl font-bold text-foreground">
+          Lesson Not Found
+        </h1>
+        <p className="text-sm text-muted mt-2">
+          This lesson may have been removed or the link is incorrect.
+        </p>
+        <Link href="/lesson-builder">
+          <Button variant="outline" className="mt-4">
+            Back to Lesson Builder
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  const isOwner = user?.uid === lesson.authorId;
+
+  return (
+    <div className="py-8 space-y-8">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <Link
+          href="/lesson-builder"
+          className="hover:text-foreground transition-colors"
+        >
+          Lesson Builder
+        </Link>
+        <span>/</span>
+        <span className="text-foreground truncate">{lesson.title}</span>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* Main content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Lesson card */}
+          <Card padding="lg" className="space-y-6">
+            {/* Header */}
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                {lesson.gradeLevel && (
+                  <Badge variant="default">{lesson.gradeLevel}</Badge>
+                )}
+                {lesson.subject && (
+                  <Badge variant="info">{lesson.subject}</Badge>
+                )}
+                {!lesson.isPublic && (
+                  <Badge variant="warning">Draft</Badge>
+                )}
+                {lesson.remixedFromId && (
+                  <Badge variant="success">Remixed</Badge>
+                )}
+              </div>
+
+              <h1 className="text-2xl font-bold text-foreground">
+                {lesson.title}
+              </h1>
+
+              <div className="mt-2 flex items-center gap-3">
+                <Link href={`/educators/${lesson.authorId}`}>
+                  <Avatar
+                    src={lesson.authorPhotoURL}
+                    alt={lesson.authorName}
+                    size="sm"
+                  />
+                </Link>
+                <div>
+                  <Link
+                    href={`/educators/${lesson.authorId}`}
+                    className="text-sm font-semibold text-foreground hover:underline"
+                  >
+                    {lesson.authorName}
+                  </Link>
+                  <p className="text-xs text-muted">
+                    {timeAgo(
+                      lesson.createdAt as { seconds: number } | null
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Objectives */}
+            {lesson.objectives.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">
+                  🎯 Learning Objectives
+                </h3>
+                <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
+                  {lesson.objectives.map((obj, i) => (
+                    <li key={i}>{obj}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Materials */}
+            {lesson.materials.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">
+                  📦 Materials Needed
+                </h3>
+                <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
+                  {lesson.materials.map((mat, i) => (
+                    <li key={i}>{mat}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Steps */}
+            {lesson.steps.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-3">
+                  📋 Lesson Plan
+                </h3>
+                <div className="space-y-4">
+                  {lesson.steps.map((step, i) => (
+                    <div
+                      key={i}
+                      className="border-l-2 border-primary-300 pl-4"
+                    >
+                      <p className="text-sm font-semibold text-foreground">
+                        Step {i + 1}
+                        {step.title ? `: ${step.title}` : ""}
+                      </p>
+                      {step.description && (
+                        <p className="mt-1 text-sm text-muted whitespace-pre-wrap">
+                          {step.description}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Attachments */}
+            {lesson.attachments.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">
+                  📎 Attachments
+                </h3>
+                <div className="space-y-1">
+                  {lesson.attachments.map((att, i) => (
+                    <a
+                      key={i}
+                      href={att.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-primary-900 hover:underline"
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"
+                        />
+                      </svg>
+                      {att.name}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Actions bar */}
+            <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+              <Button onClick={handleDownload}>
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+                  />
+                </svg>
+                Download
+              </Button>
+
+              {user && !isOwner && (
+                <Button variant="outline" onClick={handleRemix}>
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3"
+                    />
+                  </svg>
+                  Remix
+                </Button>
+              )}
+
+              {isOwner && (
+                <Link href="/lesson-builder">
+                  <Button variant="outline">Edit</Button>
+                </Link>
+              )}
+
+              <span className="flex items-center gap-1 text-sm text-muted ml-auto">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+                  />
+                </svg>
+                {localDownloadCount} downloads
+              </span>
+            </div>
+          </Card>
+
+          {/* Comments */}
+          <Card padding="lg">
+            <h2 className="text-lg font-semibold text-foreground mb-4">
+              Discussion
+            </h2>
+            <CommentThread
+              comments={commentData}
+              loading={commentsLoading}
+              mode="like"
+              maxDepth={2}
+              onAddComment={async (content, parentId) => {
+                if (!user) throw new Error("Must be logged in");
+                const newId = await addLessonComment(lesson.id, {
+                  parentId,
+                  authorId: user.uid,
+                  authorName: user.displayName || "Anonymous",
+                  authorPhotoURL: user.photoURL,
+                  content,
+                });
+                await loadComments();
+                return newId;
+              }}
+            />
+          </Card>
+        </div>
+
+        {/* Right sidebar */}
+        <div className="space-y-6">
+          {/* Author card */}
+          <Card padding="lg">
+            <h3 className="text-sm font-semibold text-foreground mb-3">
+              Created by
+            </h3>
+            <Link
+              href={`/educators/${lesson.authorId}`}
+              className="flex items-center gap-3 group"
+            >
+              <Avatar
+                src={author?.photoURL ?? lesson.authorPhotoURL}
+                alt={author?.displayName ?? lesson.authorName}
+                size="lg"
+              />
+              <div>
+                <p className="font-semibold text-foreground group-hover:underline">
+                  {author?.displayName ?? lesson.authorName}
+                </p>
+                {author?.gradeLevel && (
+                  <p className="text-xs text-muted">{author.gradeLevel}</p>
+                )}
+                {author?.school && (
+                  <p className="text-xs text-muted">{author.school}</p>
+                )}
+              </div>
+            </Link>
+            {author?.bio && (
+              <p className="mt-3 text-xs text-muted line-clamp-3">
+                {author.bio}
+              </p>
+            )}
+            <Link href={`/educators/${lesson.authorId}`}>
+              <Button variant="outline" size="sm" className="mt-3 w-full">
+                View Profile
+              </Button>
+            </Link>
+          </Card>
+
+          {/* Lesson details sidebar */}
+          <Card padding="lg">
+            <h3 className="text-sm font-semibold text-foreground mb-3">
+              Lesson Details
+            </h3>
+            <dl className="space-y-2 text-sm">
+              {lesson.gradeLevel && (
+                <div className="flex justify-between">
+                  <dt className="text-muted">Grade Level</dt>
+                  <dd className="text-foreground font-medium">
+                    {lesson.gradeLevel}
+                  </dd>
+                </div>
+              )}
+              {lesson.subject && (
+                <div className="flex justify-between">
+                  <dt className="text-muted">Subject</dt>
+                  <dd className="text-foreground font-medium">
+                    {lesson.subject}
+                  </dd>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <dt className="text-muted">Objectives</dt>
+                <dd className="text-foreground font-medium">
+                  {lesson.objectives.length}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted">Steps</dt>
+                <dd className="text-foreground font-medium">
+                  {lesson.steps.length}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted">Attachments</dt>
+                <dd className="text-foreground font-medium">
+                  {lesson.attachments.length}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted">Downloads</dt>
+                <dd className="text-foreground font-medium">
+                  {localDownloadCount}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted">Status</dt>
+                <dd>
+                  <Badge variant={lesson.isPublic ? "success" : "warning"}>
+                    {lesson.isPublic ? "Published" : "Draft"}
+                  </Badge>
+                </dd>
+              </div>
+            </dl>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
