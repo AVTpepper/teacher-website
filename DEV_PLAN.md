@@ -363,7 +363,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 
 > **Goal**: Resource sharing system and the structured lesson plan creation tool.
 
-- [ ] **4.1 Firestore data model — Resources** (`lib/firestore/resources.ts`)
+- [x] **4.1 Firestore data model — Resources** (`lib/firestore/resources.ts`)
   - Collection: `resources`
   - Schema: id, title, description, authorId, gradeLevel, subject, type (lessonPlan/worksheet/strategy/slides/tool), fileURL, downloadCount, ratings, savedByCount, createdAt, tags[]
   - Helpers: CRUD + download tracking + save/bookmark
