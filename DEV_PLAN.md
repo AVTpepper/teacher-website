@@ -380,7 +380,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Comments / discussion
   - Related resources
 
-- [ ] **4.4 Firestore data model — Lessons** (`lib/firestore/lessons.ts`)
+- [x] **4.4 Firestore data model — Lessons** (`lib/firestore/lessons.ts`)
   - Collection: `lessons`
   - Schema: id, title, authorId, gradeLevel, subject, objectives[], materials[], steps[], attachments[], isPublic, remixedFromId, createdAt, updatedAt, downloadCount
 
