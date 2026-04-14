@@ -384,7 +384,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Collection: `lessons`
   - Schema: id, title, authorId, gradeLevel, subject, objectives[], materials[], steps[], attachments[], isPublic, remixedFromId, createdAt, updatedAt, downloadCount
 
-- [ ] **4.5 Lesson Plan Builder** (`app/lesson-builder/page.tsx`)
+- [x] **4.5 Lesson Plan Builder** (`app/lesson-builder/page.tsx`)
   - Form: title, grade level, subject
   - Learning objectives (add/remove list)
   - Materials needed (add/remove list)
