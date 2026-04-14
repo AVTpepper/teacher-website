@@ -25,7 +25,7 @@ export default function Sidebar() {
   }, []);
 
   return (
-    <aside className="hidden xl:block w-72 shrink-0 space-y-4">
+    <aside className="hidden lg:block w-72 shrink-0 space-y-4">
       {/* Trending Discussions */}
       <Card padding="md">
         <h3 className="text-sm font-semibold text-foreground mb-3">

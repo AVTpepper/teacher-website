@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import {
   findThreadById,
+  parseThreadSlug,
   upvoteThread,
   downvoteThread,
   getUserVote,
@@ -42,7 +43,8 @@ export default function ForumThreadPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id: threadId } = use(params);
+  const { id: rawId } = use(params);
+  const threadId = parseThreadSlug(rawId);
   const { user } = useAuth();
 
   const [thread, setThread] = useState<ForumThread | null>(null);

@@ -7,6 +7,7 @@ import {
   getCategories,
   getThreads,
   createThread,
+  threadSlug,
   FORUM_CATEGORIES,
   type ForumCategory,
   type ForumThread,
@@ -356,7 +357,7 @@ export default function ForumsPage() {
               {threads.map((thread) => (
                 <Link
                   key={thread.id}
-                  href={`/forums/${thread.id}`}
+                  href={`/forums/${threadSlug(thread.title, thread.id)}`}
                 >
                   <Card padding="md" hoverable className="mb-3">
                     <div className="flex gap-3">

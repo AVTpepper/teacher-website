@@ -621,3 +621,13 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 - PWA / mobile app
 - Educator verification flow (manual review process)
 - Full-text search via Algolia / ElasticSearch
+
+---
+
+## Future Features (Backlog)
+
+- **Reply to post comments**: Allow nested replies on home feed post comments (currently flat).
+- **User tagging in posts/comments**: `@username` mentions that send notifications to tagged users.
+- **Sort forum replies by upvotes**: Highest-upvoted top-level replies float to the top.
+- **Dedicated New Thread page**: Replace the forums "New Discussion" modal with a full page at `/forums/new`.
+- **Notification system**: In-app notification bell for likes, comments, mentions, and replies.

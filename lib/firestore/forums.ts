@@ -8,7 +8,6 @@ import {
   increment,
   collection,
   query,
-  where,
   orderBy,
   limit,
   startAfter,
@@ -18,6 +17,22 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+// --- Slug helper ---
+
+export function threadSlug(title: string, id: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60);
+  return `${slug}--${id}`;
+}
+
+export function parseThreadSlug(slug: string): string {
+  const idx = slug.lastIndexOf("--");
+  return idx !== -1 ? slug.slice(idx + 2) : slug;
+}
 
 // --- Forum category definitions ---
 
