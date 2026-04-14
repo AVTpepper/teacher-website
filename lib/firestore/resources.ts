@@ -290,3 +290,80 @@ export function getAverageRating(resource: Resource): number {
   if (resource.ratingCount === 0) return 0;
   return resource.ratingSum / resource.ratingCount;
 }
+
+// --- Comment system ---
+
+export interface ResourceComment {
+  id: string;
+  resourceId: string;
+  parentId: string | null;
+  authorId: string;
+  authorName: string;
+  authorPhotoURL: string | null;
+  content: string;
+  createdAt: Timestamp | null;
+}
+
+export interface ResourceCommentInput {
+  parentId?: string | null;
+  authorId: string;
+  authorName: string;
+  authorPhotoURL: string | null;
+  content: string;
+}
+
+export async function addResourceComment(
+  resourceId: string,
+  data: ResourceCommentInput
+): Promise<string> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const ref = doc(collection(db, "resources", resourceId, "comments"));
+
+  await setDoc(ref, {
+    ...data,
+    id: ref.id,
+    resourceId,
+    parentId: data.parentId ?? null,
+    createdAt: serverTimestamp(),
+  });
+
+  return ref.id;
+}
+
+export async function getResourceComments(
+  resourceId: string
+): Promise<ResourceComment[]> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const q = query(
+    collection(db, "resources", resourceId, "comments"),
+    orderBy("createdAt", "asc")
+  );
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map((d) => d.data() as ResourceComment);
+}
+
+// --- Related resources ---
+
+export async function getRelatedResources(
+  resource: Resource,
+  maxResults = 4
+): Promise<Resource[]> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  // Query by same subject, excluding the current resource
+  const q = query(
+    collection(db, "resources"),
+    where("subject", "==", resource.subject),
+    orderBy("downloadCount", "desc"),
+    limit(maxResults + 1)
+  );
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs
+    .map((d) => d.data() as Resource)
+    .filter((r) => r.id !== resource.id)
+    .slice(0, maxResults);
+}

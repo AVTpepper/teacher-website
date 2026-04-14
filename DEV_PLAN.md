@@ -374,7 +374,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - File upload flow (Firebase Storage)
   - Search within resources
 
-- [ ] **4.3 Resource detail page** (`app/resources/[id]/page.tsx`)
+- [x] **4.3 Resource detail page** (`app/resources/[id]/page.tsx`)
   - Full resource view with download, save, rate
   - Author info card
   - Comments / discussion
