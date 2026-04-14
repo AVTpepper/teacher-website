@@ -368,7 +368,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Schema: id, title, description, authorId, gradeLevel, subject, type (lessonPlan/worksheet/strategy/slides/tool), fileURL, downloadCount, ratings, savedByCount, createdAt, tags[]
   - Helpers: CRUD + download tracking + save/bookmark
 
-- [ ] **4.2 Resource library page** (`app/resources/page.tsx`)
+- [x] **4.2 Resource library page** (`app/resources/page.tsx`)
   - Filters: Grade level, Subject, Popularity, Newest
   - Resource cards: title, description, grade level, subject, author, download, save, rating/downloads
   - File upload flow (Firebase Storage)
