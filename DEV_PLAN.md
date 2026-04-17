@@ -411,11 +411,13 @@ Requires logged-in account with completed profile.
 3. Filter by subject — results should update
 4. Sort by Popularity — should reorder by download count
 5. Sort by Newest — should reorder by date
-6. Click "Upload Resource" — should open upload form (requires login)
+6. Click "Upload Resource" — should navigate to `/resources/upload` (requires login)
 7. Fill out resource form (title, description, grade, subject, type, file) — submit should save to Firestore and upload file to Storage
 8. Try uploading without required fields — should show validation errors
-9. Search within resources (type a keyword) — should filter results
-10. Visit `/resources` while logged out — should show resources read-only, no upload button
+9. Click suggested tags — should add to tag list; already-added suggestions should disappear
+10. Select "Cross-Curricular" subject — should save correctly for cross-subject resources
+11. Search within resources (type a keyword) — should filter results
+12. Visit `/resources` while logged out — should show resources read-only, no upload button
 
 **Resource Detail (4.3)**
 11. Click a resource card — should navigate to `/resources/{id}`
@@ -455,7 +457,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 |---|---|---|
 | Resource Library | `/resources` | Filter bar, resource cards grid, sort controls |
 | Resource Library (empty) | `/resources` with filter yielding 0 | Empty state |
-| Upload Resource Form | `/resources` (upload modal/form) | All fields, file picker, type selector |
+| Upload Resource Form | `/resources/upload` | All fields, file picker, type selector, suggested tags |
 | Resource Detail | `/resources/{id}` | Full info, download/save buttons, comments, related |
 | Lesson Builder (empty) | `/lesson-builder` | Empty form, all sections visible |
 | Lesson Builder (filled) | `/lesson-builder` | Objectives list, materials, steps, attachments |
@@ -466,9 +468,12 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 
 | File | Type |
 |---|---|
-| `lib/firestore/resources.ts` | Created — Resource model + CRUD + download/save/rate helpers |
+| `lib/firestore/resources.ts` | Created — Resource model + CRUD + download/save/rate helpers + suggested tags |
+| `lib/firestore/users.ts` | Modified — Added "Cross-Curricular" to SUBJECTS |
 | `lib/firestore/lessons.ts` | Created — Lesson model + CRUD |
-| `app/(main)/resources/page.tsx` | Replaced — Resource library with filters |
+| `firestore.indexes.json` | Created — Composite indexes for resource filtering |
+| `app/(main)/resources/page.tsx` | Replaced — Resource library with filters (modal removed) |
+| `app/(main)/resources/upload/page.tsx` | Created — Dedicated upload resource page with suggested tags |
 | `app/(main)/resources/[id]/page.tsx` | Created — Resource detail page |
 | `app/(main)/lesson-builder/page.tsx` | Replaced — Lesson plan builder form |
 | `app/(main)/lesson-builder/[id]/page.tsx` | Created — Lesson detail page |

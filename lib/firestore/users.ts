@@ -49,6 +49,7 @@ export const GRADE_LEVELS = [
 ] as const;
 
 export const SUBJECTS = [
+  "Cross-Curricular",
   "Math",
   "Science",
   "English",

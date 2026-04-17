@@ -36,6 +36,29 @@ export const RESOURCE_TYPES: { value: ResourceType; label: string }[] = [
   { value: "tool", label: "Tool" },
 ];
 
+export const SUGGESTED_TAGS = [
+  "Differentiated Instruction",
+  "Project-Based Learning",
+  "Assessment",
+  "Homework",
+  "Group Activity",
+  "Interactive",
+  "Printable",
+  "Digital",
+  "Rubric",
+  "Anchor Chart",
+  "Warm-Up",
+  "Exit Ticket",
+  "Review",
+  "Test Prep",
+  "Hands-On",
+  "Scaffolded",
+  "IEP Accommodations",
+  "ESL / ELL",
+  "Classroom Management",
+  "Parent Communication",
+] as const;
+
 export interface Resource {
   id: string;
   title: string;

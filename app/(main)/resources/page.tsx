@@ -1,15 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { type DocumentSnapshot } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import {
   getResources,
-  createResource,
   RESOURCE_TYPES,
   getAverageRating,
   type Resource,
@@ -23,13 +20,8 @@ import {
   Button,
   Card,
   Input,
-  Modal,
   Select,
-  Textarea,
-  Tag,
 } from "@/components/ui";
-
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
 export default function ResourcesPage() {
   const { user } = useAuth();
@@ -47,9 +39,6 @@ export default function ResourcesPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-
-  // Upload modal
-  const [showUpload, setShowUpload] = useState(false);
 
   const filters: ResourceFilters = {
     gradeLevel: gradeLevel || undefined,
@@ -122,22 +111,24 @@ export default function ResourcesPage() {
           </p>
         </div>
         {user && (
-          <Button onClick={() => setShowUpload(true)} className="shrink-0">
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4.5v15m7.5-7.5h-15"
-              />
-            </svg>
-            Upload Resource
-          </Button>
+          <Link href="/resources/upload">
+            <Button className="shrink-0">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 4.5v15m7.5-7.5h-15"
+                />
+              </svg>
+              Upload Resource
+            </Button>
+          </Link>
         )}
       </div>
 
@@ -276,17 +267,6 @@ export default function ResourcesPage() {
           )}
         </>
       )}
-
-      {/* Upload modal */}
-      <UploadResourceModal
-        open={showUpload}
-        onClose={() => setShowUpload(false)}
-        onCreated={() => {
-          setShowUpload(false);
-          setCursor(null);
-          fetchResources(true);
-        }}
-      />
     </div>
   );
 }
@@ -407,261 +387,5 @@ function ResourceCard({ resource }: { resource: Resource }) {
         </div>
       </Card>
     </Link>
-  );
-}
-
-// --- Upload resource modal ---
-
-function UploadResourceModal({
-  open,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const { user } = useAuth();
-
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [resGradeLevel, setResGradeLevel] = useState("");
-  const [resSubject, setResSubject] = useState("");
-  const [resType, setResType] = useState<string>("");
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  function resetForm() {
-    setTitle("");
-    setDescription("");
-    setResGradeLevel("");
-    setResSubject("");
-    setResType("");
-    setTags([]);
-    setTagInput("");
-    setFile(null);
-    setError("");
-  }
-
-  function handleClose() {
-    if (!saving) {
-      resetForm();
-      onClose();
-    }
-  }
-
-  function addTag() {
-    const t = tagInput.trim();
-    if (t && !tags.includes(t) && tags.length < 10) {
-      setTags((prev) => [...prev, t]);
-      setTagInput("");
-    }
-  }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
-
-    if (selected.size > MAX_FILE_SIZE) {
-      setError("File must be under 25 MB.");
-      setFile(null);
-      return;
-    }
-
-    setError("");
-    setFile(selected);
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!user) return;
-
-    // Validation
-    if (!title.trim()) return setError("Title is required.");
-    if (!description.trim()) return setError("Description is required.");
-    if (!resGradeLevel) return setError("Grade level is required.");
-    if (!resSubject) return setError("Subject is required.");
-    if (!resType) return setError("Resource type is required.");
-    if (!file) return setError("Please select a file to upload.");
-
-    setError("");
-    setSaving(true);
-
-    try {
-      // Upload file to Firebase Storage
-      let fileURL = "";
-      if (storage) {
-        const storageRef = ref(
-          storage,
-          `resources/${user.uid}/${Date.now()}_${file.name}`
-        );
-        await uploadBytes(storageRef, file);
-        fileURL = await getDownloadURL(storageRef);
-      }
-
-      await createResource({
-        title: title.trim(),
-        description: description.trim(),
-        authorId: user.uid,
-        authorName: user.displayName || "Anonymous",
-        authorPhotoURL: user.photoURL,
-        gradeLevel: resGradeLevel,
-        subject: resSubject,
-        type: resType as ResourceType,
-        fileURL,
-        fileName: file.name,
-        tags,
-      });
-
-      resetForm();
-      onCreated();
-    } catch (err) {
-      console.error("Upload resource error:", err);
-      setError("Failed to upload resource. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title="Upload Resource"
-      className="max-w-2xl"
-    >
-      <form onSubmit={handleSubmit} className="px-6 pb-6 pt-4 space-y-4">
-        {error && (
-          <div className="rounded-lg bg-error-50 px-4 py-3 text-sm text-error-700">
-            {error}
-          </div>
-        )}
-
-        <Input
-          label="Title"
-          placeholder="e.g. Fractions Worksheet Pack"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-
-        <Textarea
-          label="Description"
-          placeholder="Describe what this resource covers and how to use it…"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-          required
-        />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            label="Grade Level"
-            value={resGradeLevel}
-            onChange={(e) => setResGradeLevel(e.target.value)}
-            placeholder="Select grade level"
-            options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
-          />
-          <Select
-            label="Subject"
-            value={resSubject}
-            onChange={(e) => setResSubject(e.target.value)}
-            placeholder="Select subject"
-            options={SUBJECTS.map((s) => ({ value: s, label: s }))}
-          />
-        </div>
-
-        <Select
-          label="Resource Type"
-          value={resType}
-          onChange={(e) => setResType(e.target.value)}
-          placeholder="Select type"
-          options={RESOURCE_TYPES.map((t) => ({
-            value: t.value,
-            label: t.label,
-          }))}
-        />
-
-        {/* Tags */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-foreground">
-            Tags (up to 10)
-          </label>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Add a tag…"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addTag();
-                }
-              }}
-              className="flex-1"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addTag}
-              disabled={!tagInput.trim() || tags.length >= 10}
-            >
-              Add
-            </Button>
-          </div>
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-1">
-              {tags.map((tag) => (
-                <Tag
-                  key={tag}
-                  label={tag}
-                  removable
-                  onRemove={() =>
-                    setTags((prev) => prev.filter((t) => t !== tag))
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* File upload */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-foreground">File</label>
-          <div className="relative">
-            <input
-              type="file"
-              onChange={handleFileChange}
-              className="block w-full text-sm text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-100 file:text-primary-800 hover:file:bg-primary-200 file:cursor-pointer cursor-pointer"
-            />
-          </div>
-          {file && (
-            <p className="text-xs text-muted">
-              {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)
-            </p>
-          )}
-          <p className="text-xs text-muted">Max file size: 25 MB</p>
-        </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-3 pt-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleClose}
-            disabled={saving}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={saving}>
-            Upload
-          </Button>
-        </div>
-      </form>
-    </Modal>
   );
 }
