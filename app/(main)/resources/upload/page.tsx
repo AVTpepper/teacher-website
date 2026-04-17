@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
@@ -30,6 +30,8 @@ export default function UploadResourcePage() {
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
+  const formTopRef = useRef<HTMLDivElement>(null);
 
   if (!user) {
     return (
@@ -66,29 +68,53 @@ export default function UploadResourcePage() {
     setFile(selected);
   }
 
+  function showError(msg: string, errors: Record<string, boolean>) {
+    setError(msg);
+    setFieldErrors(errors);
+    formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!user) return;
 
-    if (!title.trim()) return setError("Title is required.");
-    if (!description.trim()) return setError("Description is required.");
-    if (!gradeLevel) return setError("Grade level is required.");
-    if (!subject) return setError("Subject is required.");
-    if (!resType) return setError("Resource type is required.");
-    if (!file) return setError("Please select a file to upload.");
+    setFieldErrors({});
+    setError("");
+
+    const errors: Record<string, boolean> = {};
+    const missing: string[] = [];
+
+    if (!title.trim()) { errors.title = true; missing.push("Title"); }
+    if (!description.trim()) { errors.description = true; missing.push("Description"); }
+    if (!gradeLevel) { errors.gradeLevel = true; missing.push("Grade Level"); }
+    if (!subject) { errors.subject = true; missing.push("Subject"); }
+    if (!resType) { errors.resType = true; missing.push("Resource Type"); }
+
+    if (missing.length > 0) {
+      return showError(
+        missing.length === 1
+          ? `${missing[0]} is required.`
+          : `Please fill in the following fields: ${missing.join(", ")}.`,
+        errors
+      );
+    }
 
     setError("");
     setSaving(true);
 
     try {
       let fileURL = "";
-      if (storage) {
+      let fileName = "";
+      if (file && storage) {
         const storageRef = ref(
           storage,
           `resources/${user.uid}/${Date.now()}_${file.name}`
         );
         await uploadBytes(storageRef, file);
         fileURL = await getDownloadURL(storageRef);
+        fileName = file.name;
+      } else if (file && !storage) {
+        console.warn("Firebase Storage not activated — skipping file upload");
       }
 
       const id = await createResource({
@@ -101,14 +127,14 @@ export default function UploadResourcePage() {
         subject,
         type: resType as ResourceType,
         fileURL,
-        fileName: file.name,
+        fileName,
         tags,
       });
 
       router.push(`/resources/${id}`);
     } catch (err) {
       console.error("Upload resource error:", err);
-      setError("Failed to upload resource. Please try again.");
+      showError("Failed to upload resource. Please try again.", {});
     } finally {
       setSaving(false);
     }
@@ -129,19 +155,21 @@ export default function UploadResourcePage() {
       </div>
 
       <Card>
-        <form onSubmit={handleSubmit} className="space-y-5 p-6">
-          {error && (
-            <div className="rounded-lg bg-error-50 px-4 py-3 text-sm text-error-700">
-              {error}
-            </div>
-          )}
+        <form onSubmit={handleSubmit} noValidate className="space-y-5 p-6">
+          <div ref={formTopRef} className="scroll-mt-32">
+            {error && (
+              <div className="rounded-lg bg-error-50 px-4 py-3 text-sm text-error-700">
+                {error}
+              </div>
+            )}
+          </div>
 
           <Input
             label="Title"
             placeholder="e.g. Fractions Worksheet Pack"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            required
+            error={fieldErrors.title ? "Title is required" : undefined}
           />
 
           <Textarea
@@ -150,7 +178,7 @@ export default function UploadResourcePage() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
-            required
+            error={fieldErrors.description ? "Description is required" : undefined}
           />
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -160,6 +188,7 @@ export default function UploadResourcePage() {
               onChange={(e) => setGradeLevel(e.target.value)}
               placeholder="Select grade level"
               options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
+              error={fieldErrors.gradeLevel ? "Grade level is required" : undefined}
             />
             <Select
               label="Subject"
@@ -167,6 +196,7 @@ export default function UploadResourcePage() {
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Select subject"
               options={SUBJECTS.map((s) => ({ value: s, label: s }))}
+              error={fieldErrors.subject ? "Subject is required" : undefined}
             />
           </div>
 
@@ -179,6 +209,7 @@ export default function UploadResourcePage() {
               value: t.value,
               label: t.label,
             }))}
+            error={fieldErrors.resType ? "Resource type is required" : undefined}
           />
 
           {/* Tags */}
@@ -248,13 +279,16 @@ export default function UploadResourcePage() {
           {/* File upload */}
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">File</label>
-            <div className="relative">
+            <div className={`relative rounded-lg ${fieldErrors.file ? "ring-2 ring-error-500" : ""}`}>
               <input
                 type="file"
                 onChange={handleFileChange}
                 className="block w-full text-sm text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-100 file:text-primary-800 hover:file:bg-primary-200 file:cursor-pointer cursor-pointer"
               />
             </div>
+            {fieldErrors.file && (
+              <p className="text-xs text-error-500">Please select a file to upload</p>
+            )}
             {file && (
               <p className="text-xs text-muted">
                 {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)

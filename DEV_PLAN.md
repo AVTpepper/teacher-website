@@ -604,6 +604,62 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 
 ---
 
+## Phase 6: Firebase Storage Activation + CORS
+
+> **Goal**: Enable file uploads across the platform (currently skipped gracefully).
+
+- [ ] **6.1 Activate Firebase Storage**
+  - Upgrade Firebase project to Blaze (pay-as-you-go) plan
+  - Enable Cloud Storage in Firebase Console
+  - Free tier: 5 GB stored, 1 GB/day downloads, 20K/day upload operations
+
+- [ ] **6.2 Deploy CORS configuration**
+  - Run: `gsutil cors set cors.json gs://educonnect-60b69.firebasestorage.app`
+  - Verify: `gsutil cors get gs://educonnect-60b69.firebasestorage.app`
+  - Update `cors.json` to include production domain when deployed
+
+- [ ] **6.3 Set Firebase Storage security rules**
+  - Only authenticated users can upload
+  - Max file size limits (5 MB avatars, 25 MB resources/lessons)
+  - Allowed content types
+
+- [ ] **6.4 Verify all upload flows work**
+  - Profile photo upload (`/profile/edit`)
+  - Resource file upload (`/resources/upload`)
+  - Lesson attachment upload (`/lesson-builder`)
+
+---
+
+## Phase 7: Deployment
+
+> **Goal**: Deploy the application so it's live and accessible to real users.
+
+- [ ] **7.1 Firebase Hosting setup**
+  - Run `firebase init hosting` — set build output directory
+  - Configure `firebase.json` for Next.js (or use Firebase's Next.js framework support)
+  - Set up custom domain (optional)
+
+- [ ] **7.2 Environment & build configuration**
+  - Set production environment variables in Firebase / hosting provider
+  - Update `cors.json` to include production domain origin
+  - Update Firebase Auth authorized domains (Firebase Console → Auth → Settings)
+  - Verify `next.config.ts` production settings (image domains, etc.)
+
+- [ ] **7.3 Deploy**
+  - Build: `npm run build`
+  - Deploy: `firebase deploy` (or hosting provider CLI)
+  - Verify all pages load correctly on production URL
+  - Test auth flow (sign up, login, logout) on production
+  - Test file uploads on production (after Phase 6)
+
+- [ ] **7.4 Post-deployment checks**
+  - Firestore security rules deployed and tested
+  - Storage security rules deployed and tested
+  - No API keys / secrets exposed in client bundle
+  - Performance check (Lighthouse audit)
+
+---
+
 ## Architecture Decisions
 
 - **Firestore structure**: Top-level collections with sub-collections for comments. Denormalize author info on cards to minimize reads.

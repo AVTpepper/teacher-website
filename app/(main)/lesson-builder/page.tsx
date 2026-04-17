@@ -86,6 +86,12 @@ export default function LessonBuilderPage() {
     setError("");
 
     try {
+      if (!storage) {
+        setError("File uploads are not available yet. Firebase Storage must be activated.");
+        setUploading(false);
+        e.target.value = "";
+        return;
+      }
       const storageRef = ref(
         storage,
         `lessons/${user.uid}/${Date.now()}_${file.name}`

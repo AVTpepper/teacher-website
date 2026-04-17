@@ -123,13 +123,18 @@ export default function EditProfilePage() {
       let finalPhotoURL = photoURL;
 
       // Upload photo if a new one was selected
-      if (photoFile && storage) {
-        const storageRef = ref(
-          storage,
-          `avatars/${user.uid}/${Date.now()}_${photoFile.name}`
-        );
-        await uploadBytes(storageRef, photoFile);
-        finalPhotoURL = await getDownloadURL(storageRef);
+      if (photoFile) {
+        if (!storage) {
+          // Storage not activated — skip upload, keep existing photo
+          console.warn("Firebase Storage not activated — skipping photo upload");
+        } else {
+          const storageRef = ref(
+            storage,
+            `avatars/${user.uid}/${Date.now()}_${photoFile.name}`
+          );
+          await uploadBytes(storageRef, photoFile);
+          finalPhotoURL = await getDownloadURL(storageRef);
+        }
       }
 
       const profileData: UserProfileInput = {
