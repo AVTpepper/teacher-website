@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import {
   getResources,
+  resourceSlug,
   RESOURCE_TYPES,
   getAverageRating,
   type Resource,
@@ -280,7 +281,7 @@ function ResourceCard({ resource }: { resource: Resource }) {
     resource.type;
 
   return (
-    <Link href={`/resources/${resource.id}`}>
+    <Link href={`/resources/${resourceSlug(resource.title, resource.id)}`}>
       <Card hoverable className="flex h-full flex-col">
         {/* Type badge */}
         <div className="mb-2 flex items-center justify-between">

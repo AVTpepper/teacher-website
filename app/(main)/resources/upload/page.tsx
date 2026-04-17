@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import {
   createResource,
+  resourceSlug,
   RESOURCE_TYPES,
   SUGGESTED_TAGS,
   type ResourceType,
@@ -131,7 +132,7 @@ export default function UploadResourcePage() {
         tags,
       });
 
-      router.push(`/resources/${id}`);
+      router.push(`/resources/${resourceSlug(title, id)}`);  
     } catch (err) {
       console.error("Upload resource error:", err);
       showError("Failed to upload resource. Please try again.", {});

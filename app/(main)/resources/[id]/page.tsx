@@ -15,6 +15,8 @@ import {
   getResourceComments,
   addResourceComment,
   getRelatedResources,
+  parseResourceSlug,
+  resourceSlug,
   RESOURCE_TYPES,
   type Resource,
   type ResourceComment,
@@ -44,7 +46,8 @@ export default function ResourceDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = use(params);
+  const { id: rawId } = use(params);
+  const id = parseResourceSlug(rawId);
   const { user } = useAuth();
 
   const [resource, setResource] = useState<Resource | null>(null);
@@ -95,15 +98,15 @@ export default function ResourceDetailPage({
         setLocalDownloadCount(res.downloadCount);
         setLocalSavedCount(res.savedByCount);
 
-        // Load author, comments, related in parallel
-        const [authorData, , relatedData] = await Promise.all([
-          getUser(res.authorId),
-          loadComments(),
-          getRelatedResources(res),
+        // Load author, comments, related in parallel — failures are non-fatal
+        const [authorData] = await Promise.all([
+          getUser(res.authorId).catch(() => null),
+          loadComments().catch(() => {}),
+          getRelatedResources(res).then(setRelated).catch(() => {}),
         ]);
         setAuthor(authorData);
-        setRelated(relatedData);
-      } catch {
+      } catch (err) {
+        console.error("Failed to load resource:", err);
         setNotFound(true);
       } finally {
         setLoading(false);
@@ -498,7 +501,7 @@ function RelatedResourceItem({ resource }: { resource: Resource }) {
 
   return (
     <Link
-      href={`/resources/${resource.id}`}
+      href={`/resources/${resourceSlug(resource.title, resource.id)}`}
       className="block group rounded-lg p-2 -mx-2 hover:bg-surface-hover transition-colors"
     >
       <div className="flex items-start gap-2">
