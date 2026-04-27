@@ -1,23 +1,72 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type KeyboardEvent,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import {
   createLesson,
+  getLesson,
+  getLessonsByAuthor,
+  updateLesson,
+  type Lesson,
   type LessonStep,
   type LessonAttachment,
 } from "@/lib/firestore/lessons";
 import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+const UPLOAD_TIMEOUT_MS = 30_000;
+const STORAGE_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+
+function timeAgo(timestamp: { seconds: number } | null): string {
+  if (!timestamp) return "just now";
+  const seconds = Math.floor(Date.now() / 1000 - timestamp.seconds);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error("Upload timed out. Please try again."));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
 
 export default function LessonBuilderPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const editingLessonId = searchParams.get("edit");
+  const remixLessonId = searchParams.get("remix");
+  const sourceLessonId = editingLessonId ?? remixLessonId;
+  const isEditMode = Boolean(editingLessonId);
 
   // Basic info
   const [title, setTitle] = useState("");
@@ -37,12 +86,93 @@ export default function LessonBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [sourceLoading, setSourceLoading] = useState(false);
+  const [drafts, setDrafts] = useState<Lesson[]>([]);
+  const [draftsLoading, setDraftsLoading] = useState(false);
+
+  const objectiveRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const materialRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  useEffect(() => {
+    objectiveRefs.current = objectiveRefs.current.slice(0, objectives.length);
+  }, [objectives.length]);
+
+  useEffect(() => {
+    materialRefs.current = materialRefs.current.slice(0, materials.length);
+  }, [materials.length]);
+
+  useEffect(() => {
+    async function loadDrafts() {
+      if (!user) {
+        setDrafts([]);
+        return;
+      }
+
+      setDraftsLoading(true);
+      try {
+        const result = await getLessonsByAuthor(user.uid, true, null, 50);
+        setDrafts(result.lessons.filter((lesson) => !lesson.isPublic));
+      } catch {
+        // Non-blocking: form remains usable even if draft list fails.
+        setDrafts([]);
+      } finally {
+        setDraftsLoading(false);
+      }
+    }
+
+    loadDrafts();
+  }, [user]);
+
+  useEffect(() => {
+    async function loadSourceLesson() {
+      if (!sourceLessonId) return;
+      if (isEditMode && !user) return;
+
+      setSourceLoading(true);
+      setError("");
+
+      try {
+        const sourceLesson = await getLesson(sourceLessonId);
+        if (!sourceLesson) {
+          setError("Could not load lesson data.");
+          return;
+        }
+
+        if (isEditMode && user && sourceLesson.authorId !== user.uid) {
+          setError("You can only edit lessons you created.");
+          return;
+        }
+
+        setTitle(sourceLesson.title);
+        setGradeLevel(sourceLesson.gradeLevel);
+        setSubject(sourceLesson.subject);
+        setObjectives(
+          sourceLesson.objectives.length > 0 ? sourceLesson.objectives : [""]
+        );
+        setMaterials(
+          sourceLesson.materials.length > 0 ? sourceLesson.materials : [""]
+        );
+        setSteps(
+          sourceLesson.steps.length > 0
+            ? sourceLesson.steps
+            : [{ title: "", description: "" }]
+        );
+        setAttachments(sourceLesson.attachments ?? []);
+      } catch {
+        setError("Failed to load lesson data.");
+      } finally {
+        setSourceLoading(false);
+      }
+    }
+
+    loadSourceLesson();
+  }, [sourceLessonId, isEditMode, user]);
 
   // --- List helpers ---
 
   function updateListItem<T>(
     list: T[],
-    setList: React.Dispatch<React.SetStateAction<T[]>>,
+    setList: Dispatch<SetStateAction<T[]>>,
     index: number,
     value: T
   ) {
@@ -51,7 +181,7 @@ export default function LessonBuilderPage() {
 
   function removeListItem<T>(
     list: T[],
-    setList: React.Dispatch<React.SetStateAction<T[]>>,
+    setList: Dispatch<SetStateAction<T[]>>,
     index: number
   ) {
     if (list.length <= 1) return;
@@ -60,7 +190,7 @@ export default function LessonBuilderPage() {
 
   function moveListItem<T>(
     list: T[],
-    setList: React.Dispatch<React.SetStateAction<T[]>>,
+    setList: Dispatch<SetStateAction<T[]>>,
     from: number,
     to: number
   ) {
@@ -71,11 +201,49 @@ export default function LessonBuilderPage() {
     setList(next);
   }
 
+  function handleListInputEnter(
+    event: KeyboardEvent<HTMLInputElement>,
+    list: string[],
+    setList: Dispatch<SetStateAction<string[]>>,
+    index: number,
+    refs: MutableRefObject<Array<HTMLInputElement | null>>
+  ) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+
+    const isLast = index === list.length - 1;
+    const hasValue = list[index].trim().length > 0;
+
+    if (isLast && hasValue) {
+      setList((prev) => [...prev, ""]);
+      setTimeout(() => {
+        refs.current[index + 1]?.focus();
+      }, 0);
+      return;
+    }
+
+    refs.current[index + 1]?.focus();
+  }
+
   // --- File attachment upload ---
 
   async function handleAttachFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file || !user || !storage) return;
+    if (!file) return;
+
+    if (!user) {
+      setError("Sign in to attach files.");
+      e.target.value = "";
+      return;
+    }
+
+    if (!STORAGE_CONFIGURED || !storage) {
+      setError(
+        "File uploads are not available yet. Activate Firebase Storage first, then try again."
+      );
+      e.target.value = "";
+      return;
+    }
 
     if (file.size > MAX_FILE_SIZE) {
       setError("File must be under 25 MB.");
@@ -86,21 +254,21 @@ export default function LessonBuilderPage() {
     setError("");
 
     try {
-      if (!storage) {
-        setError("File uploads are not available yet. Firebase Storage must be activated.");
-        setUploading(false);
-        e.target.value = "";
-        return;
-      }
       const storageRef = ref(
         storage,
         `lessons/${user.uid}/${Date.now()}_${file.name}`
       );
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
+
+      await withTimeout(uploadBytes(storageRef, file), UPLOAD_TIMEOUT_MS);
+      const url = await withTimeout(getDownloadURL(storageRef), UPLOAD_TIMEOUT_MS);
       setAttachments((prev) => [...prev, { name: file.name, url }]);
-    } catch {
-      setError("Failed to upload file.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (message.toLowerCase().includes("timed out")) {
+        setError("Upload timed out. If Storage is not active yet, skip attachments for now.");
+      } else {
+        setError("Failed to upload file. If Storage is not active yet, skip attachments for now.");
+      }
     } finally {
       setUploading(false);
       // Reset input so same file can be re-selected
@@ -138,7 +306,7 @@ export default function LessonBuilderPage() {
     setSaving(true);
 
     try {
-      const lessonId = await createLesson({
+      const lessonPayload = {
         title: title.trim(),
         authorId: user.uid,
         authorName: user.displayName || "Anonymous",
@@ -153,6 +321,17 @@ export default function LessonBuilderPage() {
         })),
         attachments,
         isPublic: publish,
+      };
+
+      if (isEditMode && editingLessonId) {
+        await updateLesson(editingLessonId, lessonPayload);
+        router.push(`/lesson-builder/${editingLessonId}`);
+        return;
+      }
+
+      const lessonId = await createLesson({
+        ...lessonPayload,
+        remixedFromId: remixLessonId || null,
       });
 
       router.push(`/lesson-builder/${lessonId}`);
@@ -323,21 +502,83 @@ export default function LessonBuilderPage() {
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            Lesson Plan Builder
+            {isEditMode ? "Edit Lesson" : "Lesson Plan Builder"}
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Create, save, and share structured lesson plans with the community.
+            {isEditMode
+              ? "Update your existing lesson draft or publish it when ready."
+              : "Create, save, and share structured lesson plans with the community."}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPreview(true)}
-          disabled={!title.trim()}
-        >
-          Preview
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href="/lesson-builder/drafts">
+            <Button variant="outline" size="sm" type="button">
+              View Drafts
+            </Button>
+          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPreview(true)}
+            disabled={!title.trim() || sourceLoading}
+          >
+            Preview
+          </Button>
+        </div>
       </div>
+
+      {sourceLoading && (
+        <div className="mb-6 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">
+          Loading lesson data...
+        </div>
+      )}
+
+      {user && !isEditMode && (
+        <Card padding="lg" className="mb-8 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">Your Drafts</h2>
+            <Link href="/lesson-builder/drafts" className="text-sm text-primary-900 hover:underline">
+              Open drafts page
+            </Link>
+          </div>
+
+          {draftsLoading && <p className="text-sm text-muted">Loading drafts...</p>}
+
+          {!draftsLoading && drafts.length === 0 && (
+            <p className="text-sm text-muted">No saved drafts yet.</p>
+          )}
+
+          {!draftsLoading && drafts.length > 0 && (
+            <div className="space-y-2">
+              {drafts.slice(0, 5).map((draft) => (
+                <div
+                  key={draft.id}
+                  className="rounded-lg border border-border px-3 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{draft.title || "Untitled draft"}</p>
+                    <p className="text-xs text-muted">
+                      Updated {timeAgo(draft.updatedAt as { seconds: number } | null)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Link href={`/lesson-builder/${draft.id}`}>
+                      <Button type="button" variant="outline" size="sm">
+                        Open
+                      </Button>
+                    </Link>
+                    <Link href={`/lesson-builder?edit=${draft.id}`}>
+                      <Button type="button" variant="ghost" size="sm">
+                        Edit
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       {error && (
         <div className="mb-6 rounded-lg bg-error-50 px-4 py-3 text-sm text-error-700">
@@ -399,10 +640,16 @@ export default function LessonBuilderPage() {
                   {i + 1}.
                 </span>
                 <Input
+                  ref={(el) => {
+                    objectiveRefs.current[i] = el;
+                  }}
                   placeholder={`Objective ${i + 1}`}
                   value={obj}
                   onChange={(e) =>
                     updateListItem(objectives, setObjectives, i, e.target.value)
+                  }
+                  onKeyDown={(e) =>
+                    handleListInputEnter(e, objectives, setObjectives, i, objectiveRefs)
                   }
                   className="flex-1"
                 />
@@ -458,10 +705,16 @@ export default function LessonBuilderPage() {
                   •
                 </span>
                 <Input
+                  ref={(el) => {
+                    materialRefs.current[i] = el;
+                  }}
                   placeholder={`Material ${i + 1}`}
                   value={mat}
                   onChange={(e) =>
                     updateListItem(materials, setMaterials, i, e.target.value)
+                  }
+                  onKeyDown={(e) =>
+                    handleListInputEnter(e, materials, setMaterials, i, materialRefs)
                   }
                   className="flex-1"
                 />
@@ -496,24 +749,9 @@ export default function LessonBuilderPage() {
 
         {/* Step-by-step plan */}
         <Card padding="lg" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
-              📋 Step-by-Step Plan
-            </h2>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                setSteps((prev) => [
-                  ...prev,
-                  { title: "", description: "" },
-                ])
-              }
-            >
-              + Add Step
-            </Button>
-          </div>
+          <h2 className="text-lg font-semibold text-foreground">
+            📋 Step-by-Step Plan
+          </h2>
 
           <div className="space-y-4">
             {steps.map((step, i) => (
@@ -619,6 +857,23 @@ export default function LessonBuilderPage() {
                   }
                   rows={3}
                 />
+
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setSteps((prev) => {
+                        const next = [...prev];
+                        next.splice(i + 1, 0, { title: "", description: "" });
+                        return next;
+                      })
+                    }
+                  >
+                    + Add Step Below
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -678,11 +933,13 @@ export default function LessonBuilderPage() {
             <input
               type="file"
               onChange={handleAttachFile}
-              disabled={uploading}
+              disabled={uploading || !STORAGE_CONFIGURED}
               className="block w-full text-sm text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-100 file:text-primary-800 hover:file:bg-primary-200 file:cursor-pointer cursor-pointer disabled:opacity-50"
             />
             <p className="mt-1 text-xs text-muted">
-              Max file size: 25 MB{uploading ? " — Uploading…" : ""}
+              {!STORAGE_CONFIGURED
+                ? "File uploads are disabled until Firebase Storage is activated."
+                : `Max file size: 25 MB${uploading ? " — Uploading..." : ""}`}
             </p>
           </div>
         </Card>

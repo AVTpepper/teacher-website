@@ -396,7 +396,7 @@ export default function LessonDetailPage({
               )}
 
               {isOwner && (
-                <Link href="/lesson-builder">
+                <Link href={`/lesson-builder?edit=${lesson.id}`}>
                   <Button variant="outline">Edit</Button>
                 </Link>
               )}

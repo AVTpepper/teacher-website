@@ -149,7 +149,8 @@ export async function getPublicLessons(
 export async function getLessonsByAuthor(
   authorId: string,
   includePrivate = false,
-  cursor?: DocumentSnapshot | null
+  cursor?: DocumentSnapshot | null,
+  pageSize = PAGE_SIZE
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
@@ -162,7 +163,7 @@ export async function getLessonsByAuthor(
   }
 
   constraints.push(orderBy("updatedAt", "desc"));
-  constraints.push(limit(PAGE_SIZE));
+  constraints.push(limit(pageSize));
 
   if (cursor) {
     constraints.push(startAfter(cursor));
@@ -173,7 +174,7 @@ export async function getLessonsByAuthor(
 
   const lessons = snapshot.docs.map((d) => d.data() as Lesson);
   const lastDoc =
-    snapshot.docs.length === PAGE_SIZE
+    snapshot.docs.length === pageSize
       ? snapshot.docs[snapshot.docs.length - 1]
       : null;
 
