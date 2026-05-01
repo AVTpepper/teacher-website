@@ -432,22 +432,28 @@ Requires logged-in account with completed profile.
 **Lesson Plan Builder (4.4 + 4.5)**
 19. Visit `/lesson-builder` while logged in — should show the builder form
 20. Fill in title, grade level, subject — fields should accept input
-21. Add 2+ learning objectives (add/remove) — list should update dynamically
-22. Add 2+ materials needed (add/remove) — list should update dynamically
-23. Add 3+ steps to the plan — should be ordered and reorderable (drag or up/down buttons)
-24. Attach a resource/file — should upload and show in attachments list
-25. Click "Save Draft" — should save to Firestore with `isPublic: false`
-26. Click "Publish" — should save with `isPublic: true`
-27. Toggle to "Preview" mode — should show the lesson as a shareable card
-28. Visit `/lesson-builder` while logged out — should redirect to login
+21. In Learning Objectives, type text and press Enter — should add a new objective row and move focus to the next row
+22. In Materials Needed, type text and press Enter — should add a new material row and move focus to the next row
+23. Add 3+ steps, then click "+ Add Step Below" from Step 3 — new step should be inserted directly below Step 3
+24. Reorder steps using up/down controls — order should update correctly
+25. If Firebase Storage is not activated, attachment input should be disabled and should show the "uploads are disabled" helper text
+26. After Storage is activated, attach a file — should upload and show in attachments list
+27. Click "Save Draft" — should save to Firestore with `isPublic: false` and open lesson detail
+28. Return to `/lesson-builder` — "Your Drafts" card should show the saved draft
+29. Click "View Drafts" (or go to `/lesson-builder/drafts`) — drafts list should show your saved drafts
+30. Click "Edit" on a draft — builder should open pre-filled with existing draft data
+31. Click "Publish" from edit mode — lesson should update and show published status on detail page
+32. Toggle to "Preview" mode — should show the lesson as a shareable card
+33. Visit `/lesson-builder` while logged out — should redirect to login
 
 **Lesson Detail (4.6)**
-29. Visit `/lesson-builder/{id}` — should show the full lesson card
-30. Click "Download" — should download lesson as a file/PDF
-31. Click "Remix" — should open lesson builder pre-filled with the lesson data (new draft)
-32. Author info card should show name, avatar, link to profile
-33. Post a comment on the lesson — should appear in comments section
-34. Visit `/lesson-builder/nonexistent-id` — should show "Lesson Not Found" state
+34. Visit `/lesson-builder/{id}` — should show the full lesson card
+35. Click "Download" — should download lesson as a file/PDF
+36. Click "Remix" — should open lesson builder pre-filled with the lesson data (new draft)
+37. If you are the lesson owner, click "Edit" — should open `/lesson-builder?edit={id}` pre-filled (not blank)
+38. Author info card should show name, avatar, link to profile
+39. Post a comment on the lesson — should appear in comments section
+40. Visit `/lesson-builder/nonexistent-id` — should show "Lesson Not Found" state
 
 #### 2. Screenshots to Take
 
@@ -460,9 +466,11 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 | Upload Resource Form | `/resources/upload` | All fields, file picker, type selector, suggested tags |
 | Resource Detail | `/resources/{id}` | Full info, download/save buttons, comments, related |
 | Lesson Builder (empty) | `/lesson-builder` | Empty form, all sections visible |
-| Lesson Builder (filled) | `/lesson-builder` | Objectives list, materials, steps, attachments |
+| Lesson Builder (filled) | `/lesson-builder` | Enter-to-add in objectives/materials, step cards with "+ Add Step Below" |
+| Lesson Builder (drafts widget) | `/lesson-builder` | "Your Drafts" section shows recent drafts |
+| Lesson Drafts page | `/lesson-builder/drafts` | Draft list with Open/Edit actions |
 | Lesson Preview | `/lesson-builder` (preview mode) | Shareable card layout |
-| Lesson Detail | `/lesson-builder/{id}` | Full lesson, download/remix buttons, comments |
+| Lesson Detail | `/lesson-builder/{id}` | Full lesson, download/remix/edit buttons, comments |
 
 #### 3. Code Validation — Files Worked On
 

@@ -153,7 +153,7 @@ export default function LessonDetailPage({
   function handleRemix() {
     if (!lesson) return;
     // Navigate to lesson builder with remix param
-    router.push(`/lesson-builder?remix=${lesson.id}`);
+    router.push(`/lesson-builder/new?remix=${lesson.id}`);
   }
 
   // Map comments for CommentThread
@@ -396,7 +396,7 @@ export default function LessonDetailPage({
               )}
 
               {isOwner && (
-                <Link href={`/lesson-builder?edit=${lesson.id}`}>
+                <Link href={`/lesson-builder/new?edit=${lesson.id}`}>
                   <Button variant="outline">Edit</Button>
                 </Link>
               )}

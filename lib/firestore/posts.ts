@@ -120,31 +120,23 @@ export async function getPosts(
 }
 
 export async function getPostsByAuthor(
-  authorId: string,
-  cursor?: DocumentSnapshot | null
+  authorId: string
 ): Promise<GetPostsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  const constraints: QueryConstraint[] = [
-    where("authorId", "==", authorId),
-    orderBy("createdAt", "desc"),
-    limit(PAGE_SIZE),
-  ];
-
-  if (cursor) {
-    constraints.push(startAfter(cursor));
-  }
-
-  const q = query(collection(db, "posts"), ...constraints);
+  // Single equality where() — uses Firestore auto single-field index, no composite needed.
+  // Sort client-side to avoid needing a composite index.
+  const q = query(
+    collection(db, "posts"),
+    where("authorId", "==", authorId)
+  );
   const snapshot = await getDocs(q);
 
-  const posts = snapshot.docs.map((d) => d.data() as Post);
-  const lastDoc =
-    snapshot.docs.length === PAGE_SIZE
-      ? snapshot.docs[snapshot.docs.length - 1]
-      : null;
+  const posts = snapshot.docs
+    .map((d) => d.data() as Post)
+    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
 
-  return { posts, lastDoc };
+  return { posts, lastDoc: null };
 }
 
 export async function getPost(postId: string): Promise<Post | null> {

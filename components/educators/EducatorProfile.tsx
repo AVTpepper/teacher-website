@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -10,6 +11,26 @@ import {
   isFollowing as checkIsFollowing,
   type UserProfile,
 } from "@/lib/firestore/users";
+import {
+  getLessonsByAuthor,
+  getPublicLessons,
+  type Lesson,
+} from "@/lib/firestore/lessons";
+import {
+  getPostsByAuthor,
+  type Post,
+} from "@/lib/firestore/posts";
+import {
+  getResourcesByAuthor,
+  resourceSlug,
+  RESOURCE_TYPES,
+  type Resource,
+} from "@/lib/firestore/resources";
+import {
+  getThreadsByAuthor,
+  threadSlug,
+  type ForumThread,
+} from "@/lib/firestore/forums";
 import { Avatar, Badge, Button, Card, Tabs, Tag } from "@/components/ui";
 
 const PROFILE_TABS = [
@@ -26,9 +47,25 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [activeTab, setActiveTab] = useState("posts");
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [lessonsLoading, setLessonsLoading] = useState(false);
+  const [lessonsLoaded, setLessonsLoaded] = useState(false);
+
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [postsLoaded, setPostsLoaded] = useState(false);
+
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [resourcesLoading, setResourcesLoading] = useState(false);
+  const [resourcesLoaded, setResourcesLoaded] = useState(false);
+
+  const [threads, setThreads] = useState<ForumThread[]>([]);
+  const [threadsLoading, setThreadsLoading] = useState(false);
+  const [threadsLoaded, setThreadsLoaded] = useState(false);
+
+  const [activeTab, setActiveTab] = useState("posts");
 
   const isOwnProfile = user?.uid === userId;
 
@@ -55,6 +92,91 @@ export default function EducatorProfile({ userId }: { userId: string }) {
     if (!user || !userId || isOwnProfile) return;
     checkIsFollowing(user.uid, userId).then(setFollowing).catch(() => {});
   }, [user, userId, isOwnProfile]);
+
+  // Lazy-load lessons when the tab becomes active
+  useEffect(() => {
+    if (activeTab !== "lessons" || lessonsLoaded) return;
+
+    async function loadLessons() {
+      setLessonsLoading(true);
+      try {
+        if (isOwnProfile) {
+          // Own profile: show all lessons (published + drafts)
+          const result = await getLessonsByAuthor(userId, true, null, 100);
+          setLessons(result.lessons);
+        } else {
+          // Other profiles: only published
+          const result = await getPublicLessons(
+            { gradeLevel: undefined, subject: undefined },
+            null
+          );
+          // Filter to this specific author since getPublicLessons has no authorId filter
+          setLessons(result.lessons.filter((l) => l.authorId === userId));
+        }
+      } catch {
+        setLessons([]);
+      } finally {
+        setLessonsLoading(false);
+        setLessonsLoaded(true);
+      }
+    }
+
+    loadLessons();
+  }, [activeTab, lessonsLoaded, isOwnProfile, userId]);
+
+  // Lazy-load posts when the tab becomes active
+  useEffect(() => {
+    if (activeTab !== "posts" || postsLoaded) return;
+    async function loadPosts() {
+      setPostsLoading(true);
+      try {
+        const result = await getPostsByAuthor(userId);
+        setPosts(result.posts);
+      } catch {
+        setPosts([]);
+      } finally {
+        setPostsLoading(false);
+        setPostsLoaded(true);
+      }
+    }
+    loadPosts();
+  }, [activeTab, postsLoaded, userId]);
+
+  // Lazy-load resources when the tab becomes active
+  useEffect(() => {
+    if (activeTab !== "resources" || resourcesLoaded) return;
+    async function loadResources() {
+      setResourcesLoading(true);
+      try {
+        const result = await getResourcesByAuthor(userId);
+        setResources(result.resources);
+      } catch {
+        setResources([]);
+      } finally {
+        setResourcesLoading(false);
+        setResourcesLoaded(true);
+      }
+    }
+    loadResources();
+  }, [activeTab, resourcesLoaded, userId]);
+
+  // Lazy-load forum threads when the tab becomes active
+  useEffect(() => {
+    if (activeTab !== "discussions" || threadsLoaded) return;
+    async function loadThreads() {
+      setThreadsLoading(true);
+      try {
+        const result = await getThreadsByAuthor(userId);
+        setThreads(result.threads);
+      } catch {
+        setThreads([]);
+      } finally {
+        setThreadsLoading(false);
+        setThreadsLoaded(true);
+      }
+    }
+    loadThreads();
+  }, [activeTab, threadsLoaded, userId]);
 
   async function handleFollowToggle() {
     if (!user || !profile) return;
@@ -315,43 +437,35 @@ export default function EducatorProfile({ userId }: { userId: string }) {
         />
         <Card className="mt-4 min-h-50" padding="lg">
           {activeTab === "posts" && (
-            <EmptyTabContent
-              title="No Posts Yet"
-              description={
-                isOwnProfile
-                  ? "Share your first post with the community."
-                  : `${profile.displayName} hasn't posted yet.`
-              }
+            <PostsTabContent
+              posts={posts}
+              loading={postsLoading}
+              isOwnProfile={isOwnProfile}
+              displayName={profile.displayName}
             />
           )}
           {activeTab === "resources" && (
-            <EmptyTabContent
-              title="No Resources Shared"
-              description={
-                isOwnProfile
-                  ? "Share a resource to help fellow educators."
-                  : `${profile.displayName} hasn't shared resources yet.`
-              }
+            <ResourcesTabContent
+              resources={resources}
+              loading={resourcesLoading}
+              isOwnProfile={isOwnProfile}
+              displayName={profile.displayName}
             />
           )}
           {activeTab === "lessons" && (
-            <EmptyTabContent
-              title="No Lessons Created"
-              description={
-                isOwnProfile
-                  ? "Create your first lesson plan."
-                  : `${profile.displayName} hasn't created lessons yet.`
-              }
+            <LessonsTabContent
+              lessons={lessons}
+              loading={lessonsLoading}
+              isOwnProfile={isOwnProfile}
+              displayName={profile.displayName}
             />
           )}
           {activeTab === "discussions" && (
-            <EmptyTabContent
-              title="No Discussions"
-              description={
-                isOwnProfile
-                  ? "Start a discussion in the forums."
-                  : `${profile.displayName} hasn't joined any discussions yet.`
-              }
+            <DiscussionsTabContent
+              threads={threads}
+              loading={threadsLoading}
+              isOwnProfile={isOwnProfile}
+              displayName={profile.displayName}
             />
           )}
         </Card>
@@ -360,12 +474,396 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   );
 }
 
+// --- Posts tab ---
+
+function PostsTabContent({
+  posts,
+  loading,
+  isOwnProfile,
+  displayName,
+}: {
+  posts: Post[];
+  loading: boolean;
+  isOwnProfile: boolean;
+  displayName: string;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+      </div>
+    );
+  }
+  if (posts.length === 0) {
+    return (
+      <EmptyTabContent
+        title="No Posts Yet"
+        description={
+          isOwnProfile
+            ? "Share your first post with the community."
+            : `${displayName} hasn't posted yet.`
+        }
+        cta={
+          isOwnProfile ? (
+            <Link href="/">
+              <Button size="sm" className="mt-4">
+                Create a Post
+              </Button>
+            </Link>
+          ) : undefined
+        }
+      />
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {posts.map((post) => (
+        <div
+          key={post.id}
+          className="rounded-lg border border-border px-4 py-3"
+        >
+          <div className="mb-1 flex items-center gap-2">
+            <Badge variant="primary">{post.type}</Badge>
+            {post.gradeLevel && (
+              <span className="text-xs text-muted">{post.gradeLevel}</span>
+            )}
+          </div>
+          <p className="text-sm text-foreground line-clamp-3">{post.content}</p>
+          <div className="mt-2 flex items-center gap-4 text-xs text-muted">
+            <span className="flex items-center gap-1">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+              </svg>
+              {post.likesCount}
+            </span>
+            <span className="flex items-center gap-1">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+              </svg>
+              {post.commentsCount}
+            </span>
+            {post.tags.slice(0, 3).map((t) => (
+              <span key={t} className="rounded-full bg-secondary-100 px-2 py-0.5 text-xs">
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// --- Resources tab ---
+
+function ResourcesTabContent({
+  resources,
+  loading,
+  isOwnProfile,
+  displayName,
+}: {
+  resources: Resource[];
+  loading: boolean;
+  isOwnProfile: boolean;
+  displayName: string;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+      </div>
+    );
+  }
+  if (resources.length === 0) {
+    return (
+      <EmptyTabContent
+        title="No Resources Shared"
+        description={
+          isOwnProfile
+            ? "Share a resource to help fellow educators."
+            : `${displayName} hasn't shared resources yet.`
+        }
+        cta={
+          isOwnProfile ? (
+            <Link href="/resources/upload">
+              <Button size="sm" className="mt-4">
+                Upload a Resource
+              </Button>
+            </Link>
+          ) : undefined
+        }
+      />
+    );
+  }
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {resources.map((resource) => {
+        const typeLabel =
+          RESOURCE_TYPES.find((t) => t.value === resource.type)?.label ??
+          resource.type;
+        return (
+          <Link
+            key={resource.id}
+            href={`/resources/${resourceSlug(resource.title, resource.id)}`}
+          >
+            <div className="flex h-full flex-col rounded-lg border border-border px-4 py-3 transition-colors hover:border-primary-300 hover:bg-primary-50/40">
+              <div className="mb-1 flex items-center gap-2">
+                <Badge variant="primary">{typeLabel}</Badge>
+                {resource.gradeLevel && (
+                  <span className="text-xs text-muted">{resource.gradeLevel}</span>
+                )}
+              </div>
+              <p className="text-sm font-medium text-foreground line-clamp-2">
+                {resource.title}
+              </p>
+              {resource.description && (
+                <p className="mt-0.5 text-xs text-muted line-clamp-2">
+                  {resource.description}
+                </p>
+              )}
+              <div className="mt-2 flex items-center gap-3 text-xs text-muted">
+                <span className="flex items-center gap-1">
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                  </svg>
+                  {resource.downloadCount}
+                </span>
+              </div>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+// --- Discussions tab ---
+
+function DiscussionsTabContent({
+  threads,
+  loading,
+  isOwnProfile,
+  displayName,
+}: {
+  threads: ForumThread[];
+  loading: boolean;
+  isOwnProfile: boolean;
+  displayName: string;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+      </div>
+    );
+  }
+  if (threads.length === 0) {
+    return (
+      <EmptyTabContent
+        title="No Discussions"
+        description={
+          isOwnProfile
+            ? "Start a discussion in the forums."
+            : `${displayName} hasn't started any discussions yet.`
+        }
+        cta={
+          isOwnProfile ? (
+            <Link href="/forums">
+              <Button size="sm" className="mt-4">
+                Browse Forums
+              </Button>
+            </Link>
+          ) : undefined
+        }
+      />
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {threads.map((thread) => (
+        <Link
+          key={thread.id}
+          href={`/forums/${thread.categoryId}/${threadSlug(thread.title, thread.id)}`}
+        >
+          <div className="rounded-lg border border-border px-4 py-3 transition-colors hover:border-primary-300 hover:bg-primary-50/40">
+            <p className="text-sm font-medium text-foreground line-clamp-2">
+              {thread.title}
+            </p>
+            {thread.content && (
+              <p className="mt-0.5 text-xs text-muted line-clamp-2">
+                {thread.content}
+              </p>
+            )}
+            <div className="mt-2 flex items-center gap-4 text-xs text-muted">
+              <span className="flex items-center gap-1">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+                </svg>
+                {thread.commentCount}
+              </span>
+              <span className="flex items-center gap-1">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                </svg>
+                {thread.upvotes}
+              </span>
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// --- Lessons tab ---
+
+function LessonsTabContent({
+  lessons,
+  loading,
+  isOwnProfile,
+  displayName,
+}: {
+  lessons: Lesson[];
+  loading: boolean;
+  isOwnProfile: boolean;
+  displayName: string;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (lessons.length === 0) {
+    return (
+      <EmptyTabContent
+        title="No Lessons Created"
+        description={
+          isOwnProfile
+            ? "Create your first lesson plan."
+            : `${displayName} hasn't created lessons yet.`
+        }
+        cta={
+          isOwnProfile ? (
+            <Link href="/lesson-builder/new">
+              <Button size="sm" className="mt-4">
+                Create a Lesson Plan
+              </Button>
+            </Link>
+          ) : undefined
+        }
+      />
+    );
+  }
+
+  const published = lessons.filter((l) => l.isPublic);
+  const drafts = lessons.filter((l) => !l.isPublic);
+
+  return (
+    <div className="space-y-6">
+      {/* Published */}
+      {published.length > 0 && (
+        <div>
+          {isOwnProfile && (
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
+              Published ({published.length})
+            </h3>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {published.map((lesson) => (
+              <LessonMiniCard key={lesson.id} lesson={lesson} isOwnProfile={isOwnProfile} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Drafts – own profile only */}
+      {isOwnProfile && drafts.length > 0 && (
+        <div>
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
+            Drafts ({drafts.length})
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {drafts.map((lesson) => (
+              <LessonMiniCard key={lesson.id} lesson={lesson} isOwnProfile={isOwnProfile} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isOwnProfile && (
+        <div className="flex justify-end">
+          <Link href="/lesson-builder/new">
+            <Button variant="outline" size="sm">
+              + New Lesson Plan
+            </Button>
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LessonMiniCard({
+  lesson,
+  isOwnProfile,
+}: {
+  lesson: Lesson;
+  isOwnProfile: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border border-border px-4 py-3">
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+          {lesson.isPublic ? (
+            <Badge variant="success">Published</Badge>
+          ) : (
+            <Badge variant="default">Draft</Badge>
+          )}
+          {lesson.gradeLevel && (
+            <span className="text-xs text-muted">{lesson.gradeLevel}</span>
+          )}
+          {lesson.subject && (
+            <span className="text-xs text-muted">· {lesson.subject}</span>
+          )}
+        </div>
+        <p className="text-sm font-medium text-foreground line-clamp-2">
+          {lesson.title || "Untitled lesson"}
+        </p>
+        {lesson.objectives.length > 0 && (
+          <p className="mt-0.5 text-xs text-muted line-clamp-1">
+            {lesson.objectives[0]}
+          </p>
+        )}
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <Link href={`/lesson-builder/${lesson.id}`}>
+          <Button type="button" variant="outline" size="sm">
+            View
+          </Button>
+        </Link>
+        {isOwnProfile && (
+          <Link href={`/lesson-builder/new?edit=${lesson.id}`}>
+            <Button type="button" variant="ghost" size="sm">
+              Edit
+            </Button>
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function EmptyTabContent({
   title,
   description,
+  cta,
 }: {
   title: string;
   description: string;
+  cta?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -384,6 +882,7 @@ function EmptyTabContent({
       </svg>
       <h3 className="mt-3 text-sm font-medium text-foreground">{title}</h3>
       <p className="mt-1 text-xs text-muted">{description}</p>
+      {cta}
     </div>
   );
 }

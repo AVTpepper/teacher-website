@@ -1,35 +1,18 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import {
-  useEffect,
-  useRef,
-  useState,
-  type Dispatch,
-  type FormEvent,
-  type KeyboardEvent,
-  type MutableRefObject,
-  type SetStateAction,
-} from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/lib/firebase";
+import { useCallback, useEffect, useState } from "react";
+import { type DocumentSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import {
-  createLesson,
-  getLesson,
+  getPublicLessons,
   getLessonsByAuthor,
-  updateLesson,
   type Lesson,
-  type LessonStep,
-  type LessonAttachment,
 } from "@/lib/firestore/lessons";
-import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
+import { Avatar, Badge, Button, Card, Select } from "@/components/ui";
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
-const UPLOAD_TIMEOUT_MS = 30_000;
-const STORAGE_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+const PAGE_SIZE = 12;
 
 function timeAgo(timestamp: { seconds: number } | null): string {
   if (!timestamp) return "just now";
@@ -43,534 +26,154 @@ function timeAgo(timestamp: { seconds: number } | null): string {
   return `${days}d ago`;
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error("Upload timed out. Please try again."));
-    }, timeoutMs);
-  });
-
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
+function LessonCard({ lesson }: { lesson: Lesson }) {
+  return (
+    <Link href={`/lesson-builder/${lesson.id}`}>
+      <Card hoverable className="flex h-full flex-col">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <Badge variant="primary">Lesson Plan</Badge>
+          {lesson.gradeLevel && <Badge variant="default">{lesson.gradeLevel}</Badge>}
+        </div>
+        <h3 className="font-semibold text-foreground line-clamp-2">{lesson.title}</h3>
+        {lesson.objectives.length > 0 && (
+          <p className="mt-1 text-xs text-muted line-clamp-2">
+            {lesson.objectives[0]}
+            {lesson.objectives.length > 1 && ` + ${lesson.objectives.length - 1} more`}
+          </p>
+        )}
+        <div className="flex-1" />
+        <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+          <div className="flex items-center gap-2">
+            <Avatar src={lesson.authorPhotoURL} alt={lesson.authorName} size="sm" />
+            <span className="text-xs text-muted truncate max-w-28">{lesson.authorName}</span>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted">
+            <span className="flex items-center gap-1">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              {lesson.downloadCount}
+            </span>
+            {lesson.subject && <span className="truncate max-w-24">{lesson.subject}</span>}
+          </div>
+        </div>
+      </Card>
+    </Link>
+  );
 }
 
 export default function LessonBuilderPage() {
   const { user } = useAuth();
-  const router = useRouter();
-  const searchParams = useSearchParams();
 
-  const editingLessonId = searchParams.get("edit");
-  const remixLessonId = searchParams.get("remix");
-  const sourceLessonId = editingLessonId ?? remixLessonId;
-  const isEditMode = Boolean(editingLessonId);
-
-  // Basic info
-  const [title, setTitle] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
 
-  // Lists
-  const [objectives, setObjectives] = useState<string[]>([""]);
-  const [materials, setMaterials] = useState<string[]>([""]);
-  const [steps, setSteps] = useState<LessonStep[]>([
-    { title: "", description: "" },
-  ]);
-  const [attachments, setAttachments] = useState<LessonAttachment[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [cursor, setCursor] = useState<DocumentSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
-  // UI state
-  const [preview, setPreview] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [sourceLoading, setSourceLoading] = useState(false);
   const [drafts, setDrafts] = useState<Lesson[]>([]);
   const [draftsLoading, setDraftsLoading] = useState(false);
 
-  const objectiveRefs = useRef<Array<HTMLInputElement | null>>([]);
-  const materialRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const fetchLessons = useCallback(
+    async (reset: boolean) => {
+      if (reset) setLoading(true);
+      else setLoadingMore(true);
+      try {
+        const filters = {
+          gradeLevel: gradeLevel || undefined,
+          subject: subject || undefined,
+        };
+        const result = await getPublicLessons(filters, reset ? null : cursor);
+        setLessons((prev) => (reset ? result.lessons : [...prev, ...result.lessons]));
+        setCursor(result.lastDoc);
+        setHasMore(result.lastDoc !== null);
+      } catch {
+        if (reset) setLessons([]);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [gradeLevel, subject]
+  );
 
   useEffect(() => {
-    objectiveRefs.current = objectiveRefs.current.slice(0, objectives.length);
-  }, [objectives.length]);
-
-  useEffect(() => {
-    materialRefs.current = materialRefs.current.slice(0, materials.length);
-  }, [materials.length]);
+    setCursor(null);
+    fetchLessons(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gradeLevel, subject]);
 
   useEffect(() => {
     async function loadDrafts() {
-      if (!user) {
-        setDrafts([]);
-        return;
-      }
-
+      if (!user) { setDrafts([]); return; }
       setDraftsLoading(true);
       try {
         const result = await getLessonsByAuthor(user.uid, true, null, 50);
-        setDrafts(result.lessons.filter((lesson) => !lesson.isPublic));
+        setDrafts(result.lessons.filter((l) => !l.isPublic));
       } catch {
-        // Non-blocking: form remains usable even if draft list fails.
         setDrafts([]);
       } finally {
         setDraftsLoading(false);
       }
     }
-
     loadDrafts();
   }, [user]);
 
-  useEffect(() => {
-    async function loadSourceLesson() {
-      if (!sourceLessonId) return;
-      if (isEditMode && !user) return;
-
-      setSourceLoading(true);
-      setError("");
-
-      try {
-        const sourceLesson = await getLesson(sourceLessonId);
-        if (!sourceLesson) {
-          setError("Could not load lesson data.");
-          return;
-        }
-
-        if (isEditMode && user && sourceLesson.authorId !== user.uid) {
-          setError("You can only edit lessons you created.");
-          return;
-        }
-
-        setTitle(sourceLesson.title);
-        setGradeLevel(sourceLesson.gradeLevel);
-        setSubject(sourceLesson.subject);
-        setObjectives(
-          sourceLesson.objectives.length > 0 ? sourceLesson.objectives : [""]
-        );
-        setMaterials(
-          sourceLesson.materials.length > 0 ? sourceLesson.materials : [""]
-        );
-        setSteps(
-          sourceLesson.steps.length > 0
-            ? sourceLesson.steps
-            : [{ title: "", description: "" }]
-        );
-        setAttachments(sourceLesson.attachments ?? []);
-      } catch {
-        setError("Failed to load lesson data.");
-      } finally {
-        setSourceLoading(false);
-      }
-    }
-
-    loadSourceLesson();
-  }, [sourceLessonId, isEditMode, user]);
-
-  // --- List helpers ---
-
-  function updateListItem<T>(
-    list: T[],
-    setList: Dispatch<SetStateAction<T[]>>,
-    index: number,
-    value: T
-  ) {
-    setList(list.map((item, i) => (i === index ? value : item)));
-  }
-
-  function removeListItem<T>(
-    list: T[],
-    setList: Dispatch<SetStateAction<T[]>>,
-    index: number
-  ) {
-    if (list.length <= 1) return;
-    setList(list.filter((_, i) => i !== index));
-  }
-
-  function moveListItem<T>(
-    list: T[],
-    setList: Dispatch<SetStateAction<T[]>>,
-    from: number,
-    to: number
-  ) {
-    if (to < 0 || to >= list.length) return;
-    const next = [...list];
-    const [item] = next.splice(from, 1);
-    next.splice(to, 0, item);
-    setList(next);
-  }
-
-  function handleListInputEnter(
-    event: KeyboardEvent<HTMLInputElement>,
-    list: string[],
-    setList: Dispatch<SetStateAction<string[]>>,
-    index: number,
-    refs: MutableRefObject<Array<HTMLInputElement | null>>
-  ) {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-
-    const isLast = index === list.length - 1;
-    const hasValue = list[index].trim().length > 0;
-
-    if (isLast && hasValue) {
-      setList((prev) => [...prev, ""]);
-      setTimeout(() => {
-        refs.current[index + 1]?.focus();
-      }, 0);
-      return;
-    }
-
-    refs.current[index + 1]?.focus();
-  }
-
-  // --- File attachment upload ---
-
-  async function handleAttachFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!user) {
-      setError("Sign in to attach files.");
-      e.target.value = "";
-      return;
-    }
-
-    if (!STORAGE_CONFIGURED || !storage) {
-      setError(
-        "File uploads are not available yet. Activate Firebase Storage first, then try again."
-      );
-      e.target.value = "";
-      return;
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      setError("File must be under 25 MB.");
-      return;
-    }
-
-    setUploading(true);
-    setError("");
-
-    try {
-      const storageRef = ref(
-        storage,
-        `lessons/${user.uid}/${Date.now()}_${file.name}`
-      );
-
-      await withTimeout(uploadBytes(storageRef, file), UPLOAD_TIMEOUT_MS);
-      const url = await withTimeout(getDownloadURL(storageRef), UPLOAD_TIMEOUT_MS);
-      setAttachments((prev) => [...prev, { name: file.name, url }]);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "";
-      if (message.toLowerCase().includes("timed out")) {
-        setError("Upload timed out. If Storage is not active yet, skip attachments for now.");
-      } else {
-        setError("Failed to upload file. If Storage is not active yet, skip attachments for now.");
-      }
-    } finally {
-      setUploading(false);
-      // Reset input so same file can be re-selected
-      e.target.value = "";
-    }
-  }
-
-  // --- Save ---
-
-  async function handleSave(publish: boolean) {
-    if (!user) return;
-
-    // Validation
-    if (!title.trim()) return setError("Title is required.");
-    if (!gradeLevel) return setError("Grade level is required.");
-    if (!subject) return setError("Subject is required.");
-
-    const cleanObjectives = objectives
-      .map((o) => o.trim())
-      .filter((o) => o.length > 0);
-    if (cleanObjectives.length === 0)
-      return setError("Add at least one learning objective.");
-
-    const cleanSteps = steps.filter(
-      (s) => s.title.trim() || s.description.trim()
-    );
-    if (cleanSteps.length === 0)
-      return setError("Add at least one step to the plan.");
-
-    const cleanMaterials = materials
-      .map((m) => m.trim())
-      .filter((m) => m.length > 0);
-
-    setError("");
-    setSaving(true);
-
-    try {
-      const lessonPayload = {
-        title: title.trim(),
-        authorId: user.uid,
-        authorName: user.displayName || "Anonymous",
-        authorPhotoURL: user.photoURL,
-        gradeLevel,
-        subject,
-        objectives: cleanObjectives,
-        materials: cleanMaterials,
-        steps: cleanSteps.map((s) => ({
-          title: s.title.trim(),
-          description: s.description.trim(),
-        })),
-        attachments,
-        isPublic: publish,
-      };
-
-      if (isEditMode && editingLessonId) {
-        await updateLesson(editingLessonId, lessonPayload);
-        router.push(`/lesson-builder/${editingLessonId}`);
-        return;
-      }
-
-      const lessonId = await createLesson({
-        ...lessonPayload,
-        remixedFromId: remixLessonId || null,
-      });
-
-      router.push(`/lesson-builder/${lessonId}`);
-    } catch (err) {
-      console.error("Create lesson error:", err);
-      setError("Failed to save lesson. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-  }
-
-  // --- Preview mode ---
-
-  if (preview) {
-    const cleanObjectives = objectives.map((o) => o.trim()).filter(Boolean);
-    const cleanMaterials = materials.map((m) => m.trim()).filter(Boolean);
-    const cleanSteps = steps.filter(
-      (s) => s.title.trim() || s.description.trim()
-    );
-
-    return (
-      <div className="py-8 max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-foreground">
-            Lesson Preview
-          </h2>
-          <Button variant="outline" size="sm" onClick={() => setPreview(false)}>
-            Back to Editor
-          </Button>
-        </div>
-
-        <Card padding="lg" className="space-y-6">
-          {/* Header */}
-          <div>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {gradeLevel && <Badge variant="default">{gradeLevel}</Badge>}
-              {subject && <Badge variant="info">{subject}</Badge>}
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">
-              {title || "Untitled Lesson"}
-            </h1>
-            <div className="mt-2 flex items-center gap-2 text-sm text-muted">
-              <span>By {user?.displayName || "Anonymous"}</span>
-            </div>
-          </div>
-
-          {/* Objectives */}
-          {cleanObjectives.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-2">
-                🎯 Learning Objectives
-              </h3>
-              <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                {cleanObjectives.map((obj, i) => (
-                  <li key={i}>{obj}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Materials */}
-          {cleanMaterials.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-2">
-                📦 Materials Needed
-              </h3>
-              <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                {cleanMaterials.map((mat, i) => (
-                  <li key={i}>{mat}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Steps */}
-          {cleanSteps.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-3">
-                📋 Lesson Plan
-              </h3>
-              <div className="space-y-4">
-                {cleanSteps.map((step, i) => (
-                  <div
-                    key={i}
-                    className="border-l-2 border-primary-300 pl-4"
-                  >
-                    <p className="text-sm font-semibold text-foreground">
-                      Step {i + 1}
-                      {step.title.trim() ? `: ${step.title.trim()}` : ""}
-                    </p>
-                    {step.description.trim() && (
-                      <p className="mt-1 text-sm text-muted whitespace-pre-wrap">
-                        {step.description.trim()}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Attachments */}
-          {attachments.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-2">
-                📎 Attachments
-              </h3>
-              <div className="space-y-1">
-                {attachments.map((att, i) => (
-                  <a
-                    key={i}
-                    href={att.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm text-primary-900 hover:underline"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"
-                      />
-                    </svg>
-                    {att.name}
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-        </Card>
-
-        {/* Preview action buttons */}
-        <div className="flex justify-end gap-3 mt-6">
-          <Button
-            variant="outline"
-            onClick={() => handleSave(false)}
-            isLoading={saving}
-            disabled={saving}
-          >
-            Save Draft
-          </Button>
-          <Button
-            onClick={() => handleSave(true)}
-            isLoading={saving}
-            disabled={saving}
-          >
-            Publish
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // --- Editor mode ---
+  const hasFilters = gradeLevel || subject;
 
   return (
-    <div className="py-8 max-w-3xl mx-auto">
+    <div className="py-8">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {isEditMode ? "Edit Lesson" : "Lesson Plan Builder"}
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            {isEditMode
-              ? "Update your existing lesson draft or publish it when ready."
-              : "Create, save, and share structured lesson plans with the community."}
-          </p>
+          <h1 className="text-2xl font-bold text-foreground">Lesson Builder</h1>
+          <p className="mt-1 text-sm text-muted">Browse community lesson plans or create your own.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/lesson-builder/drafts">
-            <Button variant="outline" size="sm" type="button">
-              View Drafts
+            <Button variant="outline" size="sm" type="button">Your Drafts</Button>
+          </Link>
+          <Link href="/lesson-builder/new">
+            <Button type="button">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              New Lesson Plan
             </Button>
           </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPreview(true)}
-            disabled={!title.trim() || sourceLoading}
-          >
-            Preview
-          </Button>
         </div>
       </div>
 
-      {sourceLoading && (
-        <div className="mb-6 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">
-          Loading lesson data...
-        </div>
-      )}
-
-      {user && !isEditMode && (
+      {user && (
         <Card padding="lg" className="mb-8 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Your Drafts</h2>
-            <Link href="/lesson-builder/drafts" className="text-sm text-primary-900 hover:underline">
-              Open drafts page
-            </Link>
+            <h2 className="text-base font-semibold text-foreground">Your Drafts</h2>
+            <Link href="/lesson-builder/drafts" className="text-sm text-primary-900 hover:underline">See all</Link>
           </div>
-
           {draftsLoading && <p className="text-sm text-muted">Loading drafts...</p>}
-
           {!draftsLoading && drafts.length === 0 && (
-            <p className="text-sm text-muted">No saved drafts yet.</p>
+            <p className="text-sm text-muted">
+              No drafts yet.{" "}
+              <Link href="/lesson-builder/new" className="text-primary-900 hover:underline">Create your first lesson plan</Link>.
+            </p>
           )}
-
           {!draftsLoading && drafts.length > 0 && (
             <div className="space-y-2">
-              {drafts.slice(0, 5).map((draft) => (
-                <div
-                  key={draft.id}
-                  className="rounded-lg border border-border px-3 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
-                >
+              {drafts.slice(0, 4).map((draft) => (
+                <div key={draft.id} className="flex flex-col gap-2 rounded-lg border border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-medium text-foreground">{draft.title || "Untitled draft"}</p>
-                    <p className="text-xs text-muted">
-                      Updated {timeAgo(draft.updatedAt as { seconds: number } | null)}
-                    </p>
+                    <p className="text-xs text-muted">Updated {timeAgo(draft.updatedAt as { seconds: number } | null)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Link href={`/lesson-builder/${draft.id}`}>
-                      <Button type="button" variant="outline" size="sm">
-                        Open
-                      </Button>
+                      <Button type="button" variant="outline" size="sm">Open</Button>
                     </Link>
-                    <Link href={`/lesson-builder?edit=${draft.id}`}>
-                      <Button type="button" variant="ghost" size="sm">
-                        Edit
-                      </Button>
+                    <Link href={`/lesson-builder/new?edit=${draft.id}`}>
+                      <Button type="button" variant="ghost" size="sm">Edit</Button>
                     </Link>
                   </div>
                 </div>
@@ -580,391 +183,61 @@ export default function LessonBuilderPage() {
         </Card>
       )}
 
-      {error && (
-        <div className="mb-6 rounded-lg bg-error-50 px-4 py-3 text-sm text-error-700">
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Basic info */}
-        <Card padding="lg" className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Basic Info</h2>
-
-          <Input
-            label="Lesson Title"
-            placeholder="e.g. Introduction to Fractions"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <Select
+            label="Grade Level"
+            value={gradeLevel}
+            onChange={(e) => setGradeLevel(e.target.value)}
+            placeholder="All Grade Levels"
+            options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
           />
+        </div>
+        <div className="flex-1">
+          <Select
+            label="Subject"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="All Subjects"
+            options={SUBJECTS.map((s) => ({ value: s, label: s }))}
+          />
+        </div>
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={() => { setGradeLevel(""); setSubject(""); }}>
+            Clear Filters
+          </Button>
+        )}
+      </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select
-              label="Grade Level"
-              value={gradeLevel}
-              onChange={(e) => setGradeLevel(e.target.value)}
-              placeholder="Select grade level"
-              options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
-            />
-            <Select
-              label="Subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Select subject"
-              options={SUBJECTS.map((s) => ({ value: s, label: s }))}
-            />
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+        </div>
+      ) : lessons.length === 0 ? (
+        <div className="py-20 text-center">
+          <div className="text-5xl mb-4">📝</div>
+          <h3 className="text-sm font-medium text-foreground">No lesson plans found</h3>
+          <p className="mt-1 text-xs text-muted">
+            {hasFilters ? "Try adjusting your filters." : "Be the first to publish a lesson plan!"}
+          </p>
+          <Link href="/lesson-builder/new">
+            <Button className="mt-4" size="sm">Create a Lesson Plan</Button>
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {lessons.map((lesson) => <LessonCard key={lesson.id} lesson={lesson} />)}
           </div>
-        </Card>
-
-        {/* Learning objectives */}
-        <Card padding="lg" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
-              🎯 Learning Objectives
-            </h2>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setObjectives((prev) => [...prev, ""])}
-            >
-              + Add
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            {objectives.map((obj, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <span className="mt-2.5 text-xs text-muted font-medium w-5 shrink-0">
-                  {i + 1}.
-                </span>
-                <Input
-                  ref={(el) => {
-                    objectiveRefs.current[i] = el;
-                  }}
-                  placeholder={`Objective ${i + 1}`}
-                  value={obj}
-                  onChange={(e) =>
-                    updateListItem(objectives, setObjectives, i, e.target.value)
-                  }
-                  onKeyDown={(e) =>
-                    handleListInputEnter(e, objectives, setObjectives, i, objectiveRefs)
-                  }
-                  className="flex-1"
-                />
-                {objectives.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      removeListItem(objectives, setObjectives, i)
-                    }
-                    className="mt-2 p-1 text-muted hover:text-error-500 transition-colors cursor-pointer"
-                    aria-label="Remove objective"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18 18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Materials needed */}
-        <Card padding="lg" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
-              📦 Materials Needed
-            </h2>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setMaterials((prev) => [...prev, ""])}
-            >
-              + Add
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            {materials.map((mat, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <span className="mt-2.5 text-xs text-muted font-medium w-5 shrink-0">
-                  •
-                </span>
-                <Input
-                  ref={(el) => {
-                    materialRefs.current[i] = el;
-                  }}
-                  placeholder={`Material ${i + 1}`}
-                  value={mat}
-                  onChange={(e) =>
-                    updateListItem(materials, setMaterials, i, e.target.value)
-                  }
-                  onKeyDown={(e) =>
-                    handleListInputEnter(e, materials, setMaterials, i, materialRefs)
-                  }
-                  className="flex-1"
-                />
-                {materials.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      removeListItem(materials, setMaterials, i)
-                    }
-                    className="mt-2 p-1 text-muted hover:text-error-500 transition-colors cursor-pointer"
-                    aria-label="Remove material"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18 18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Step-by-step plan */}
-        <Card padding="lg" className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">
-            📋 Step-by-Step Plan
-          </h2>
-
-          <div className="space-y-4">
-            {steps.map((step, i) => (
-              <div
-                key={i}
-                className="rounded-lg border border-border p-4 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-foreground">
-                    Step {i + 1}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {/* Move up */}
-                    <button
-                      type="button"
-                      onClick={() => moveListItem(steps, setSteps, i, i - 1)}
-                      disabled={i === 0}
-                      className="p-1 text-muted hover:text-foreground disabled:opacity-30 transition-colors cursor-pointer disabled:cursor-not-allowed"
-                      aria-label="Move step up"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="m4.5 15.75 7.5-7.5 7.5 7.5"
-                        />
-                      </svg>
-                    </button>
-                    {/* Move down */}
-                    <button
-                      type="button"
-                      onClick={() => moveListItem(steps, setSteps, i, i + 1)}
-                      disabled={i === steps.length - 1}
-                      className="p-1 text-muted hover:text-foreground disabled:opacity-30 transition-colors cursor-pointer disabled:cursor-not-allowed"
-                      aria-label="Move step down"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="m19.5 8.25-7.5 7.5-7.5-7.5"
-                        />
-                      </svg>
-                    </button>
-                    {/* Remove */}
-                    {steps.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          removeListItem(steps, setSteps, i)
-                        }
-                        className="p-1 text-muted hover:text-error-500 transition-colors cursor-pointer"
-                        aria-label="Remove step"
-                      >
-                        <svg
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M6 18 18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <Input
-                  placeholder="Step title (e.g. Warm-Up Activity)"
-                  value={step.title}
-                  onChange={(e) =>
-                    updateListItem(steps, setSteps, i, {
-                      ...step,
-                      title: e.target.value,
-                    })
-                  }
-                />
-                <Textarea
-                  placeholder="Describe what happens in this step…"
-                  value={step.description}
-                  onChange={(e) =>
-                    updateListItem(steps, setSteps, i, {
-                      ...step,
-                      description: e.target.value,
-                    })
-                  }
-                  rows={3}
-                />
-
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      setSteps((prev) => {
-                        const next = [...prev];
-                        next.splice(i + 1, 0, { title: "", description: "" });
-                        return next;
-                      })
-                    }
-                  >
-                    + Add Step Below
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Attachments */}
-        <Card padding="lg" className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">
-            📎 Attachments
-          </h2>
-
-          {attachments.length > 0 && (
-            <div className="space-y-2">
-              {attachments.map((att, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
-                >
-                  <a
-                    href={att.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary-900 hover:underline truncate flex-1 mr-2"
-                  >
-                    {att.name}
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setAttachments((prev) =>
-                        prev.filter((_, idx) => idx !== i)
-                      )
-                    }
-                    className="p-1 text-muted hover:text-error-500 transition-colors cursor-pointer shrink-0"
-                    aria-label="Remove attachment"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18 18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+          {hasMore && (
+            <div className="mt-8 flex justify-center">
+              <Button variant="outline" onClick={() => fetchLessons(false)} isLoading={loadingMore}>
+                Load More
+              </Button>
             </div>
           )}
-
-          <div>
-            <input
-              type="file"
-              onChange={handleAttachFile}
-              disabled={uploading || !STORAGE_CONFIGURED}
-              className="block w-full text-sm text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-100 file:text-primary-800 hover:file:bg-primary-200 file:cursor-pointer cursor-pointer disabled:opacity-50"
-            />
-            <p className="mt-1 text-xs text-muted">
-              {!STORAGE_CONFIGURED
-                ? "File uploads are disabled until Firebase Storage is activated."
-                : `Max file size: 25 MB${uploading ? " — Uploading..." : ""}`}
-            </p>
-          </div>
-        </Card>
-
-        {/* Actions */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => handleSave(false)}
-            isLoading={saving}
-            disabled={saving}
-          >
-            Save Draft
-          </Button>
-          <Button
-            type="button"
-            onClick={() => handleSave(true)}
-            isLoading={saving}
-            disabled={saving}
-          >
-            Publish
-          </Button>
-        </div>
-      </form>
+        </>
+      )}
     </div>
   );
 }

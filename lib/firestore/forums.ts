@@ -7,7 +7,9 @@ import {
   serverTimestamp,
   increment,
   collection,
+  collectionGroup,
   query,
+  where,
   orderBy,
   limit,
   startAfter,
@@ -259,6 +261,28 @@ export async function getThread(
   );
   if (!snap.exists()) return null;
   return snap.data() as ForumThread;
+}
+
+/** Get all forum threads created by a specific author across all categories. */
+export async function getThreadsByAuthor(
+  authorId: string
+): Promise<GetThreadsResult> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  // collectionGroup queries all 'threads' subcollections across every category.
+  // Single equality where() uses the auto single-field index — no composite needed.
+  // Sort client-side to avoid orderBy composite index requirement.
+  const q = query(
+    collectionGroup(db, "threads"),
+    where("authorId", "==", authorId)
+  );
+  const snapshot = await getDocs(q);
+
+  const threads = snapshot.docs
+    .map((d) => d.data() as ForumThread)
+    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+
+  return { threads, lastDoc: null };
 }
 
 /** Search all categories for a thread by ID. Returns thread + categoryId. */

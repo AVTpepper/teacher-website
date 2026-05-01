@@ -9,8 +9,6 @@ import {
   query,
   where,
   orderBy,
-  limit,
-  startAfter,
   getDocs,
   type DocumentSnapshot,
   type Timestamp,
@@ -112,10 +110,13 @@ export interface GetLessonsResult {
 
 export async function getPublicLessons(
   filters?: { gradeLevel?: string; subject?: string },
-  cursor?: DocumentSnapshot | null
+  // cursor param kept for API compatibility but pagination is handled client-side
+  _cursor?: DocumentSnapshot | null
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
+  // Only equality where() filters — no composite index required.
+  // orderBy is done client-side to avoid needing a composite index.
   const constraints: QueryConstraint[] = [
     where("isPublic", "==", true),
   ];
@@ -127,58 +128,51 @@ export async function getPublicLessons(
     constraints.push(where("subject", "==", filters.subject));
   }
 
-  constraints.push(orderBy("createdAt", "desc"));
-  constraints.push(limit(PAGE_SIZE));
-
-  if (cursor) {
-    constraints.push(startAfter(cursor));
-  }
-
   const q = query(collection(db, "lessons"), ...constraints);
   const snapshot = await getDocs(q);
 
-  const lessons = snapshot.docs.map((d) => d.data() as Lesson);
-  const lastDoc =
-    snapshot.docs.length === PAGE_SIZE
-      ? snapshot.docs[snapshot.docs.length - 1]
-      : null;
+  const lessons = snapshot.docs
+    .map((d) => d.data() as Lesson)
+    .sort((a, b) => {
+      const aTs = a.createdAt?.seconds ?? 0;
+      const bTs = b.createdAt?.seconds ?? 0;
+      return bTs - aTs;
+    });
 
-  return { lessons, lastDoc };
+  return { lessons, lastDoc: null };
 }
 
 export async function getLessonsByAuthor(
   authorId: string,
   includePrivate = false,
-  cursor?: DocumentSnapshot | null,
-  pageSize = PAGE_SIZE
+  // cursor + pageSize params kept for API compatibility
+  _cursor?: DocumentSnapshot | null,
+  _pageSize = PAGE_SIZE
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  const constraints: QueryConstraint[] = [
-    where("authorId", "==", authorId),
-  ];
+  // Single equality where() — no composite index required.
+  // Filtering by isPublic and sorting are done client-side.
+  const q = query(
+    collection(db, "lessons"),
+    where("authorId", "==", authorId)
+  );
 
-  if (!includePrivate) {
-    constraints.push(where("isPublic", "==", true));
-  }
-
-  constraints.push(orderBy("updatedAt", "desc"));
-  constraints.push(limit(pageSize));
-
-  if (cursor) {
-    constraints.push(startAfter(cursor));
-  }
-
-  const q = query(collection(db, "lessons"), ...constraints);
   const snapshot = await getDocs(q);
 
-  const lessons = snapshot.docs.map((d) => d.data() as Lesson);
-  const lastDoc =
-    snapshot.docs.length === pageSize
-      ? snapshot.docs[snapshot.docs.length - 1]
-      : null;
+  let lessons = snapshot.docs.map((d) => d.data() as Lesson);
 
-  return { lessons, lastDoc };
+  if (!includePrivate) {
+    lessons = lessons.filter((l) => l.isPublic);
+  }
+
+  lessons.sort((a, b) => {
+    const aTs = a.updatedAt?.seconds ?? 0;
+    const bTs = b.updatedAt?.seconds ?? 0;
+    return bTs - aTs;
+  });
+
+  return { lessons, lastDoc: null };
 }
 
 // --- Download tracking ---

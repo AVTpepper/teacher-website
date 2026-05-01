@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -16,6 +16,10 @@ import {
   type ResourceSortBy,
 } from "@/lib/firestore/resources";
 import {
+  getPublicLessons,
+  type Lesson,
+} from "@/lib/firestore/lessons";
+import {
   Avatar,
   Badge,
   Button,
@@ -24,22 +28,36 @@ import {
   Select,
 } from "@/components/ui";
 
+// A lesson plan entry normalised for display alongside resources
+type DisplayItem =
+  | { kind: "resource"; data: Resource }
+  | { kind: "lesson"; data: Lesson };
+
 export default function ResourcesPage() {
   const { user } = useAuth();
 
-  // Filters
+  // Shared filters
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
   const [resourceType, setResourceType] = useState("");
   const [sortBy, setSortBy] = useState<ResourceSortBy>("newest");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Data
+  // Resources (uploaded files)
   const [resources, setResources] = useState<Resource[]>([]);
   const [cursor, setCursor] = useState<DocumentSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+
+  // Lesson plans (from lessons collection)
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [lessonsLoading, setLessonsLoading] = useState(false);
+
+  // Whether to include lesson plans: when no type selected, or "lessonPlan" selected
+  const includeLessons = !resourceType || resourceType === "lessonPlan";
+  // Whether to include uploaded resources: when no type selected, or a non-lesson type selected
+  const includeResources = !resourceType || resourceType !== "lessonPlan";
 
   const filters: ResourceFilters = {
     gradeLevel: gradeLevel || undefined,
@@ -50,15 +68,16 @@ export default function ResourcesPage() {
 
   const fetchResources = useCallback(
     async (reset: boolean) => {
-      if (reset) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
+      if (!includeResources) {
+        setResources([]);
+        setHasMore(false);
+        setLoading(false);
+        return;
       }
-
+      if (reset) setLoading(true);
+      else setLoadingMore(true);
       try {
         const result = await getResources(filters, reset ? null : cursor);
-
         setResources((prev) =>
           reset ? result.resources : [...prev, ...result.resources]
         );
@@ -74,28 +93,90 @@ export default function ResourcesPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gradeLevel, subject, resourceType, sortBy, cursor]
+    [gradeLevel, subject, resourceType, sortBy, cursor, includeResources]
   );
 
-  // Re-fetch when filters change
+  const fetchLessons = useCallback(async () => {
+    if (!includeLessons) {
+      setLessons([]);
+      return;
+    }
+    setLessonsLoading(true);
+    try {
+      const result = await getPublicLessons({
+        gradeLevel: gradeLevel || undefined,
+        subject: subject || undefined,
+      });
+      setLessons(result.lessons);
+    } catch {
+      setLessons([]);
+    } finally {
+      setLessonsLoading(false);
+    }
+  }, [gradeLevel, subject, includeLessons]);
+
   useEffect(() => {
     setCursor(null);
     fetchResources(true);
+    fetchLessons();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gradeLevel, subject, resourceType, sortBy]);
 
-  // Client-side search filtering
-  const displayed = searchQuery.trim()
-    ? resources.filter(
-        (r) =>
-          r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          r.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          r.tags.some((t) =>
-            t.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-      )
-    : resources;
+  // Build combined display list
+  const resourceItems: DisplayItem[] = resources.map((r) => ({
+    kind: "resource",
+    data: r,
+  }));
+  const lessonItems: DisplayItem[] = lessons.map((l) => ({
+    kind: "lesson",
+    data: l,
+  }));
 
+  // Merge and sort by createdAt descending when showing both
+  let combined: DisplayItem[];
+  if (includeResources && includeLessons) {
+    combined = [...resourceItems, ...lessonItems].sort((a, b) => {
+      const aTs =
+        a.kind === "resource"
+          ? (a.data.createdAt?.seconds ?? 0)
+          : (a.data.createdAt?.seconds ?? 0);
+      const bTs =
+        b.kind === "resource"
+          ? (b.data.createdAt?.seconds ?? 0)
+          : (b.data.createdAt?.seconds ?? 0);
+      if (sortBy === "popular") {
+        const aCount = a.kind === "resource" ? a.data.downloadCount : a.data.downloadCount;
+        const bCount = b.kind === "resource" ? b.data.downloadCount : b.data.downloadCount;
+        return bCount - aCount;
+      }
+      return bTs - aTs;
+    });
+  } else if (includeLessons) {
+    combined = lessonItems;
+  } else {
+    combined = resourceItems;
+  }
+
+  // Client-side search
+  const displayed = searchQuery.trim()
+    ? combined.filter((item) => {
+        const q = searchQuery.toLowerCase();
+        if (item.kind === "lesson") {
+          return (
+            item.data.title.toLowerCase().includes(q) ||
+            item.data.objectives.some((o) => o.toLowerCase().includes(q)) ||
+            item.data.subject.toLowerCase().includes(q)
+          );
+        }
+        return (
+          item.data.title.toLowerCase().includes(q) ||
+          item.data.description.toLowerCase().includes(q) ||
+          item.data.tags.some((t) => t.toLowerCase().includes(q))
+        );
+      })
+    : combined;
+
+  const isLoading = loading || lessonsLoading;
   const hasFilters = gradeLevel || subject || resourceType;
 
   return (
@@ -136,7 +217,6 @@ export default function ResourcesPage() {
       {/* Filters + Search */}
       <Card className="mb-8">
         <div className="flex flex-col gap-4">
-          {/* Search */}
           <Input
             placeholder="Search resources by title, description, or tags…"
             value={searchQuery}
@@ -158,7 +238,6 @@ export default function ResourcesPage() {
             }
           />
 
-          {/* Filter row */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex-1">
               <Select
@@ -219,7 +298,7 @@ export default function ResourcesPage() {
       </Card>
 
       {/* Results */}
-      {loading ? (
+      {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
         </div>
@@ -250,12 +329,16 @@ export default function ResourcesPage() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {displayed.map((resource) => (
-              <ResourceCard key={resource.id} resource={resource} />
-            ))}
+            {displayed.map((item) =>
+              item.kind === "lesson" ? (
+                <LessonPlanCard key={`lesson-${item.data.id}`} lesson={item.data} />
+              ) : (
+                <ResourceCard key={`resource-${item.data.id}`} resource={item.data} />
+              )
+            )}
           </div>
 
-          {hasMore && !searchQuery && (
+          {hasMore && !searchQuery && includeResources && (
             <div className="mt-8 flex justify-center">
               <Button
                 variant="outline"
@@ -272,6 +355,67 @@ export default function ResourcesPage() {
   );
 }
 
+// --- Lesson plan card ---
+
+function LessonPlanCard({ lesson }: { lesson: Lesson }) {
+  return (
+    <Link href={`/lesson-builder/${lesson.id}`}>
+      <Card hoverable className="flex h-full flex-col">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <Badge variant="primary">Lesson Plan</Badge>
+          {lesson.gradeLevel && (
+            <Badge variant="default">{lesson.gradeLevel}</Badge>
+          )}
+        </div>
+        <h3 className="font-semibold text-foreground line-clamp-2">
+          {lesson.title}
+        </h3>
+        {lesson.objectives.length > 0 && (
+          <p className="mt-1 text-xs text-muted line-clamp-2">
+            {lesson.objectives[0]}
+            {lesson.objectives.length > 1 &&
+              ` + ${lesson.objectives.length - 1} more`}
+          </p>
+        )}
+        <div className="flex-1" />
+        <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+          <div className="flex items-center gap-2">
+            <Avatar
+              src={lesson.authorPhotoURL}
+              alt={lesson.authorName}
+              size="sm"
+            />
+            <span className="text-xs text-muted truncate max-w-28">
+              {lesson.authorName}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted">
+            <span className="flex items-center gap-1">
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+                />
+              </svg>
+              {lesson.downloadCount}
+            </span>
+            {lesson.subject && (
+              <span className="truncate max-w-24">{lesson.subject}</span>
+            )}
+          </div>
+        </div>
+      </Card>
+    </Link>
+  );
+}
+
 // --- Resource card ---
 
 function ResourceCard({ resource }: { resource: Resource }) {
@@ -283,7 +427,6 @@ function ResourceCard({ resource }: { resource: Resource }) {
   return (
     <Link href={`/resources/${resourceSlug(resource.title, resource.id)}`}>
       <Card hoverable className="flex h-full flex-col">
-        {/* Type badge */}
         <div className="mb-2 flex items-center justify-between">
           <Badge variant="primary">{typeLabel}</Badge>
           {avgRating > 0 && (
@@ -300,7 +443,6 @@ function ResourceCard({ resource }: { resource: Resource }) {
           )}
         </div>
 
-        {/* Title + description */}
         <h3 className="font-semibold text-foreground line-clamp-2">
           {resource.title}
         </h3>
@@ -308,7 +450,6 @@ function ResourceCard({ resource }: { resource: Resource }) {
           {resource.description}
         </p>
 
-        {/* Tags */}
         {resource.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {resource.tags.slice(0, 3).map((tag) => (
@@ -324,10 +465,8 @@ function ResourceCard({ resource }: { resource: Resource }) {
           </div>
         )}
 
-        {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Meta */}
         <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
           <div className="flex items-center gap-2">
             <Avatar
@@ -376,7 +515,6 @@ function ResourceCard({ resource }: { resource: Resource }) {
           </div>
         </div>
 
-        {/* Grade + Subject footer */}
         <div className="mt-2 flex items-center gap-2 text-xs text-muted">
           {resource.gradeLevel && (
             <span className="truncate">{resource.gradeLevel}</span>

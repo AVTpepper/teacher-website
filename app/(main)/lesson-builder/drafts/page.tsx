@@ -101,7 +101,7 @@ export default function LessonDraftsPage() {
                       Open
                     </Button>
                   </Link>
-                  <Link href={`/lesson-builder?edit=${draft.id}`}>
+                  <Link href={`/lesson-builder/new?edit=${draft.id}`}>
                     <Button type="button" variant="ghost" size="sm">
                       Edit
                     </Button>
