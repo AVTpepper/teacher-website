@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { type DocumentSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
@@ -45,7 +45,7 @@ export default function ResourcesPage() {
 
   // Resources (uploaded files)
   const [resources, setResources] = useState<Resource[]>([]);
-  const [cursor, setCursor] = useState<DocumentSnapshot | null>(null);
+  const cursorRef = useRef<DocumentSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -69,19 +69,24 @@ export default function ResourcesPage() {
   const fetchResources = useCallback(
     async (reset: boolean) => {
       if (!includeResources) {
+        cursorRef.current = null;
         setResources([]);
         setHasMore(false);
         setLoading(false);
         return;
       }
-      if (reset) setLoading(true);
-      else setLoadingMore(true);
+      if (reset) {
+        cursorRef.current = null;
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
       try {
-        const result = await getResources(filters, reset ? null : cursor);
+        const result = await getResources(filters, reset ? null : cursorRef.current);
         setResources((prev) =>
           reset ? result.resources : [...prev, ...result.resources]
         );
-        setCursor(result.lastDoc);
+        cursorRef.current = result.lastDoc;
         setHasMore(result.lastDoc !== null);
       } catch (err) {
         console.error("getResources error:", err);
@@ -92,8 +97,7 @@ export default function ResourcesPage() {
         setLoadingMore(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gradeLevel, subject, resourceType, sortBy, cursor, includeResources]
+    [gradeLevel, subject, resourceType, sortBy, includeResources]
   );
 
   const fetchLessons = useCallback(async () => {
@@ -116,11 +120,9 @@ export default function ResourcesPage() {
   }, [gradeLevel, subject, includeLessons]);
 
   useEffect(() => {
-    setCursor(null);
     fetchResources(true);
     fetchLessons();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gradeLevel, subject, resourceType, sortBy]);
+  }, [fetchResources, fetchLessons]);
 
   // Build combined display list
   const resourceItems: DisplayItem[] = resources.map((r) => ({
