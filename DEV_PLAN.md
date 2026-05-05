@@ -86,16 +86,16 @@
 
 Run `npm run dev` and verify:
 
-1. Visit `/` — home page renders with heading and description
-2. Click each nav link (Home, Educators, Forums, Resources, Lesson Builder, Inspiration, Jobs) — each should navigate to its page with heading text
-3. Resize browser to mobile width (<768px) — hamburger menu icon should appear, nav links should hide
-4. Click hamburger — mobile menu overlay should appear covering the page but NOT the header
-5. Click a link in mobile menu — should navigate and close menu
-6. Click outside the mobile menu panel — should close
-7. Visit `/educators/test-id` — should show "Educator Not Found" (placeholder was replaced in Phase 2)
-8. Visit `/forums/test-id` — should show "Discussion Thread" heading with description text (this is the placeholder)
-9. Content sidebar (right-side widget boxes: Trending, Resources, Educators, Quick Links) should only be visible at xl breakpoint (1280px+)
-10. Footer should show 4 columns on desktop, stack on mobile
+- [ ] 1. Visit `/` — home page renders with heading and description
+- [ ] 2. Click each nav link (Home, Educators, Forums, Resources, Lesson Builder, Inspiration, Jobs) — each should navigate to its page with heading text
+- [ ] 3. Resize browser to mobile width (<768px) — hamburger menu icon should appear, nav links should hide
+- [ ] 4. Click hamburger — mobile menu overlay should appear covering the page but NOT the header
+- [ ] 5. Click a link in mobile menu — should navigate and close menu
+- [ ] 6. Click outside the mobile menu panel — should close
+- [ ] 7. Visit `/educators/test-id` — should show "Educator Not Found" (placeholder was replaced in Phase 2)
+- [ ] 8. Visit `/forums/test-id` — should show "Discussion Thread" heading with description text (this is the placeholder)
+- [ ] 9. Content sidebar (right-side widget boxes: Trending, Resources, Educators, Quick Links) should only be visible at xl breakpoint (1280px+)
+- [ ] 10. Footer should show 4 columns on desktop, stack on mobile
 
 #### 2. Screenshots to Take
 
@@ -184,38 +184,38 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 Requires Firebase configured (`.env.local` with real credentials) and `npm run dev` running.
 
 **Auth (2.1 + 2.6)**
-1. Visit `/profile/edit` while logged out — should redirect to `/auth/login?redirect=/profile/edit`
-2. Visit `/lesson-builder` while logged out — should redirect to login
-3. Sign up with email/password at `/auth/signup` — should redirect to `/profile/edit`
-4. Sign up with a duplicate email — should show error message
-5. Sign out, then sign in at `/auth/login` — should redirect to `/`
-6. Sign in with Google OAuth — should work and redirect home
-7. While logged in, visit `/auth/login` — should redirect to `/`
-8. While logged in, visit `/auth/signup` — should redirect to `/`
+- [ ] 1. Visit `/profile/edit` while logged out — should redirect to `/auth/login?redirect=/profile/edit`
+- [ ] 2. Visit `/lesson-builder` while logged out — should redirect to login
+- [ ] 3. Sign up with email/password at `/auth/signup` — should redirect to `/profile/edit`
+- [ ] 4. Sign up with a duplicate email — should show error message
+- [ ] 5. Sign out, then sign in at `/auth/login` — should redirect to `/`
+- [ ] 6. Sign in with Google OAuth — should work and redirect home
+- [ ] 7. While logged in, visit `/auth/login` — should redirect to `/`
+- [ ] 8. While logged in, visit `/auth/signup` — should redirect to `/`
 
 **Profile (2.2 + 2.3)**
-9. After signup, fill out the profile form — name, grade level, subjects (toggle multiple), school, location, years, bio
-10. Upload a profile photo (under 5 MB) — preview should appear
-11. Try uploading a file over 5 MB — should show error
-12. Submit the form — should save to Firestore and redirect to `/profile`
-13. Go back to `/profile/edit` — all fields should be pre-filled with saved data
-14. Change a field and save — should update (not create duplicate)
+- [ ] 9. After signup, fill out the profile form — name, grade level, subjects (toggle multiple), school, location, years, bio
+- [ ] 10. Upload a profile photo (under 5 MB) — preview should appear
+- [ ] 11. Try uploading a file over 5 MB — should show error
+- [ ] 12. Submit the form — should save to Firestore and redirect to `/profile`
+- [ ] 13. Go back to `/profile/edit` — all fields should be pre-filled with saved data
+- [ ] 14. Change a field and save — should update (not create duplicate)
 
 **Educator Profile (2.4)**
-15. Visit `/educators/{your-uid}` — should show your full profile with "Edit Profile" button
-16. Visit `/profile` — should show your profile at the `/profile` URL (no redirect)
-17. Visit `/educators/nonexistent-id` — should show "Educator Not Found" state
+- [ ] 15. Visit `/educators/{your-uid}` — should show your full profile with "Edit Profile" button
+- [ ] 16. Visit `/profile` — should show your profile at the `/profile` URL (no redirect)
+- [ ] 17. Visit `/educators/nonexistent-id` — should show "Educator Not Found" state
 
 **Educator Discovery (2.5)**
-18. Visit `/educators` — should show educator cards (or empty state if no users yet)
-19. Filter by grade level — results should update
-20. Filter by subject — results should update
-21. Click "Clear Filters" — should reset and show all
-22. Click an educator card — should navigate to their profile
+- [ ] 18. Visit `/educators` — should show educator cards (or empty state if no users yet)
+- [ ] 19. Filter by grade level — results should update
+- [ ] 20. Filter by subject — results should update
+- [ ] 21. Click "Clear Filters" — should reset and show all
+- [ ] 22. Click an educator card — should navigate to their profile
 
 **Follow System (2.4)**
-23. Create a second test account, visit first user's profile, click "Follow" — follower count should increment
-24. Click "Following" to unfollow — count should decrement
+- [ ] 23. Create a second test account, visit first user's profile, click "Follow" — follower count should increment
+- [ ] 24. Click "Following" to unfollow — count should decrement
 
 #### 2. Screenshots to Take
 
@@ -298,37 +298,37 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 Requires logged-in account with completed profile.
 
 **Home Feed — Post Creation (3.1 + 3.2)**
-1. Visit `/` while logged in — should show "Create Post" form at top of feed
-2. Write a post with content and select a type (idea/resource/discussion) — submit should succeed
-3. Select tags and grade level on the post — should save correctly
-4. After posting, the new post should appear at the top of the feed
-5. Submit an empty post — should show validation error / disabled submit
-6. Visit `/` while logged out — should show feed (read-only), no create post form
+- [ ] 1. Visit `/` while logged in — should show "Create Post" form at top of feed
+- [ ] 2. Write a post with content and select a type (idea/resource/discussion) — submit should succeed
+- [ ] 3. Select tags and grade level on the post — should save correctly
+- [ ] 4. After posting, the new post should appear at the top of the feed
+- [ ] 5. Submit an empty post — should show validation error / disabled submit
+- [ ] 6. Visit `/` while logged out — should show feed (read-only), no create post form
 
 **Home Feed — Interactions (3.2)**
-7. Click "Like" on a post — like count should increment, button should toggle to liked state
-8. Click "Like" again — should unlike, count should decrement
-9. Click "Comment" on a post — comment form should appear
-10. Submit a comment — comment count should increment, comment should appear
-11. Scroll to bottom of feed — "Load More" should fetch next page of posts
-12. Sidebar widgets (Trending, Resources, Lessons, Inspiration) should display on xl+ screens
+- [ ] 7. Click "Like" on a post — like count should increment, button should toggle to liked state
+- [ ] 8. Click "Like" again — should unlike, count should decrement
+- [ ] 9. Click "Comment" on a post — comment form should appear
+- [ ] 10. Submit a comment — comment count should increment, comment should appear
+- [ ] 11. Scroll to bottom of feed — "Load More" should fetch next page of posts
+- [ ] 12. Sidebar widgets (Trending, Resources, Lessons, Inspiration) should display on xl+ screens
 
 **Forums Listing (3.3 + 3.4)**
-13. Visit `/forums` — should show 6 category cards (Classroom Management, Lesson Planning, Student Engagement, Technology in Education, Teacher Support, Grade-Level Discussions)
-14. Each category card should show thread count and latest activity timestamp
-15. Click "New Discussion" — should open a form/modal to create a thread (requires login)
-16. Create a new thread with title, content, tags, grade level, subject — should save and redirect to thread page
-17. Click a category card — should navigate to that category's thread listing
+- [ ] 13. Visit `/forums` — should show 6 category cards (Classroom Management, Lesson Planning, Student Engagement, Technology in Education, Teacher Support, Grade-Level Discussions)
+- [ ] 14. Each category card should show thread count and latest activity timestamp
+- [ ] 15. Click "New Discussion" — should open a form/modal to create a thread (requires login)
+- [ ] 16. Create a new thread with title, content, tags, grade level, subject — should save and redirect to thread page
+- [ ] 17. Click a category card — should navigate to that category's thread listing
 
 **Forum Thread (3.5 + 3.6)**
-18. Visit `/forums/{thread-id}` — should show thread title, author avatar/name, content, tags
-19. Click upvote on the thread — upvote count should increment
-20. Click upvote again — should toggle off, count should decrement
-21. Submit a reply — comment should appear below the thread
-22. Reply to an existing comment (nested reply) — should nest under the parent comment (1–2 levels)
-23. Each comment should show author avatar, name, and timestamp
-24. Visit a thread while logged out — should show content read-only, no reply form
-25. Visit `/forums/nonexistent-id` — should show "Thread Not Found" state
+- [ ] 18. Visit `/forums/{thread-id}` — should show thread title, author avatar/name, content, tags
+- [ ] 19. Click upvote on the thread — upvote count should increment
+- [ ] 20. Click upvote again — should toggle off, count should decrement
+- [ ] 21. Submit a reply — comment should appear below the thread
+- [ ] 22. Reply to an existing comment (nested reply) — should nest under the parent comment (1–2 levels)
+- [ ] 23. Each comment should show author avatar, name, and timestamp
+- [ ] 24. Visit a thread while logged out — should show content read-only, no reply form
+- [ ] 25. Visit `/forums/nonexistent-id` — should show "Thread Not Found" state
 
 #### 2. Screenshots to Take
 
@@ -406,54 +406,54 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 Requires logged-in account with completed profile.
 
 **Resource Library (4.1 + 4.2)**
-1. Visit `/resources` — should show resource cards or empty state
-2. Filter by grade level — results should update
-3. Filter by subject — results should update
-4. Sort by Popularity — should reorder by download count
-5. Sort by Newest — should reorder by date
-6. Click "Upload Resource" — should navigate to `/resources/upload` (requires login)
-7. Fill out resource form (title, description, grade, subject, type, file) — submit should save to Firestore and upload file to Storage
-8. Try uploading without required fields — should show validation errors
-9. Click suggested tags — should add to tag list; already-added suggestions should disappear
-10. Select "Cross-Curricular" subject — should save correctly for cross-subject resources
-11. Search within resources (type a keyword) — should filter results
-12. Visit `/resources` while logged out — should show resources read-only, no upload button
+- [ ] 1. Visit `/resources` — should show resource cards or empty state
+- [ ] 2. Filter by grade level — results should update
+- [ ] 3. Filter by subject — results should update
+- [ ] 4. Sort by Popularity — should reorder by download count
+- [ ] 5. Sort by Newest — should reorder by date
+- [ ] 6. Click "Upload Resource" — should navigate to `/resources/upload` (requires login)
+- [ ] 7. Fill out resource form (title, description, grade, subject, type, file) — submit should save to Firestore and upload file to Storage
+- [ ] 8. Try uploading without required fields — should show validation errors
+- [ ] 9. Click suggested tags — should add to tag list; already-added suggestions should disappear
+- [ ] 10. Select "Cross-Curricular" subject — should save correctly for cross-subject resources
+- [ ] 11. Search within resources (type a keyword) — should filter results
+- [ ] 12. Visit `/resources` while logged out — should show resources read-only, no upload button
 
 **Resource Detail (4.3)**
-11. Click a resource card — should navigate to `/resources/{id}`
-12. Resource detail should show: title, description, author card, grade, subject, type, download count
-13. Click "Download" — file should download, download count should increment
-14. Click "Save" / bookmark — should toggle saved state
-15. Rate the resource — rating should update
-16. Post a comment on the resource — should appear in the comments section
-17. "Related Resources" section should show other resources with matching subject/grade
-18. Visit `/resources/nonexistent-id` — should show "Resource Not Found" state
+- [ ] 13. Click a resource card — should navigate to `/resources/{id}`
+- [ ] 14. Resource detail should show: title, description, author card, grade, subject, type, download count
+- [ ] 15. Click "Download" — file should download, download count should increment
+- [ ] 16. Click "Save" / bookmark — should toggle saved state
+- [ ] 17. Rate the resource — rating should update
+- [ ] 18. Post a comment on the resource — should appear in the comments section
+- [ ] 19. "Related Resources" section should show other resources with matching subject/grade
+- [ ] 20. Visit `/resources/nonexistent-id` — should show "Resource Not Found" state
 
 **Lesson Plan Builder (4.4 + 4.5)**
-19. Visit `/lesson-builder` while logged in — should show the builder form
-20. Fill in title, grade level, subject — fields should accept input
-21. In Learning Objectives, type text and press Enter — should add a new objective row and move focus to the next row
-22. In Materials Needed, type text and press Enter — should add a new material row and move focus to the next row
-23. Add 3+ steps, then click "+ Add Step Below" from Step 3 — new step should be inserted directly below Step 3
-24. Reorder steps using up/down controls — order should update correctly
-25. If Firebase Storage is not activated, attachment input should be disabled and should show the "uploads are disabled" helper text
-26. After Storage is activated, attach a file — should upload and show in attachments list
-27. Click "Save Draft" — should save to Firestore with `isPublic: false` and open lesson detail
-28. Return to `/lesson-builder` — "Your Drafts" card should show the saved draft
-29. Click "View Drafts" (or go to `/lesson-builder/drafts`) — drafts list should show your saved drafts
-30. Click "Edit" on a draft — builder should open pre-filled with existing draft data
-31. Click "Publish" from edit mode — lesson should update and show published status on detail page
-32. Toggle to "Preview" mode — should show the lesson as a shareable card
-33. Visit `/lesson-builder` while logged out — should redirect to login
+- [ ] 21. Visit `/lesson-builder` while logged in — should show the builder form
+- [ ] 22. Fill in title, grade level, subject — fields should accept input
+- [ ] 23. In Learning Objectives, type text and press Enter — should add a new objective row and move focus to the next row
+- [ ] 24. In Materials Needed, type text and press Enter — should add a new material row and move focus to the next row
+- [ ] 25. Add 3+ steps, then click "+ Add Step Below" from Step 3 — new step should be inserted directly below Step 3
+- [ ] 26. Reorder steps using up/down controls — order should update correctly
+- [ ] 27. If Firebase Storage is not activated, attachment input should be disabled and should show the "uploads are disabled" helper text
+- [ ] 28. After Storage is activated, attach a file — should upload and show in attachments list
+- [ ] 29. Click "Save Draft" — should save to Firestore with `isPublic: false` and open lesson detail
+- [ ] 30. Return to `/lesson-builder` — "Your Drafts" card should show the saved draft
+- [ ] 31. Click "View Drafts" (or go to `/lesson-builder/drafts`) — drafts list should show your saved drafts
+- [ ] 32. Click "Edit" on a draft — builder should open pre-filled with existing draft data
+- [ ] 33. Click "Publish" from edit mode — lesson should update and show published status on detail page
+- [ ] 34. Toggle to "Preview" mode — should show the lesson as a shareable card
+- [ ] 35. Visit `/lesson-builder` while logged out — should redirect to login
 
 **Lesson Detail (4.6)**
-34. Visit `/lesson-builder/{id}` — should show the full lesson card
-35. Click "Download" — should download lesson as a file/PDF
-36. Click "Remix" — should open lesson builder pre-filled with the lesson data (new draft)
-37. If you are the lesson owner, click "Edit" — should open `/lesson-builder?edit={id}` pre-filled (not blank)
-38. Author info card should show name, avatar, link to profile
-39. Post a comment on the lesson — should appear in comments section
-40. Visit `/lesson-builder/nonexistent-id` — should show "Lesson Not Found" state
+- [ ] 36. Visit `/lesson-builder/{id}` — should show the full lesson card
+- [ ] 37. Click "Download" — should download lesson as a file/PDF
+- [ ] 38. Click "Remix" — should open lesson builder pre-filled with the lesson data (new draft)
+- [ ] 39. If you are the lesson owner, click "Edit" — should open `/lesson-builder?edit={id}` pre-filled (not blank)
+- [ ] 40. Author info card should show name, avatar, link to profile
+- [ ] 41. Post a comment on the lesson — should appear in comments section
+- [ ] 42. Visit `/lesson-builder/nonexistent-id` — should show "Lesson Not Found" state
 
 #### 2. Screenshots to Take
 
@@ -535,50 +535,50 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 Requires logged-in account with completed profile and some existing content (posts, resources, lessons, threads).
 
 **Inspiration Hub (5.1)**
-1. Visit `/inspiration` — should show a magazine-style grid of content cards
-2. Switch between category tabs (Podcasts, Articles, Videos, Education News, Teacher Stories) — cards should filter
-3. Each card should show: thumbnail, title, short description, creator/source
-4. Click "Submit Content" — should open a submission form (requires login)
-5. Submit an inspiration item (title, description, category, link/thumbnail) — should save and appear in listing
-6. Visit `/inspiration` while logged out — should show content read-only, no submit button
+- [ ] 1. Visit `/inspiration` — should show a magazine-style grid of content cards
+- [ ] 2. Switch between category tabs (Podcasts, Articles, Videos, Education News, Teacher Stories) — cards should filter
+- [ ] 3. Each card should show: thumbnail, title, short description, creator/source
+- [ ] 4. Click "Submit Content" — should open a submission form (requires login)
+- [ ] 5. Submit an inspiration item (title, description, category, link/thumbnail) — should save and appear in listing
+- [ ] 6. Visit `/inspiration` while logged out — should show content read-only, no submit button
 
 **Job Board (5.2 + 5.3)**
-7. Visit `/jobs` — should show job listing cards or empty state
-8. Filter by location — results should update
-9. Filter by grade level — results should update
-10. Filter by subject — results should update
-11. Filter by job type (full-time, part-time, contract) — results should update
-12. Click "Post Job" — should open job creation form (requires login)
-13. Fill out job form (title, school/org, location, grade, subject, type, description) — submit should save
-14. Click a job card — should navigate to `/jobs/{id}`
-15. Job detail should show: full description, school/org info, apply action
-16. Visit `/jobs/nonexistent-id` — should show "Job Not Found" state
+- [ ] 7. Visit `/jobs` — should show job listing cards or empty state
+- [ ] 8. Filter by location — results should update
+- [ ] 9. Filter by grade level — results should update
+- [ ] 10. Filter by subject — results should update
+- [ ] 11. Filter by job type (full-time, part-time, contract) — results should update
+- [ ] 12. Click "Post Job" — should open job creation form (requires login)
+- [ ] 13. Fill out job form (title, school/org, location, grade, subject, type, description) — submit should save
+- [ ] 14. Click a job card — should navigate to `/jobs/{id}`
+- [ ] 15. Job detail should show: full description, school/org info, apply action
+- [ ] 16. Visit `/jobs/nonexistent-id` — should show "Job Not Found" state
 
 **Badges (5.4)**
-17. Visit your profile — badges section should display any earned badges
-18. Share a resource → check if "Resource Creator" badge appears on profile
-19. Create a lesson → check if "Lesson Builder" badge appears
-20. Start a discussion → check if "Discussion Starter" badge appears
-21. Badges should appear next to usernames in forum threads and comments
-22. Badge icons should have tooltip/label on hover
+- [ ] 17. Visit your profile — badges section should display any earned badges
+- [ ] 18. Share a resource → check if "Resource Creator" badge appears on profile
+- [ ] 19. Create a lesson → check if "Lesson Builder" badge appears
+- [ ] 20. Start a discussion → check if "Discussion Starter" badge appears
+- [ ] 21. Badges should appear next to usernames in forum threads and comments
+- [ ] 22. Badge icons should have tooltip/label on hover
 
 **Notifications (5.5)**
-23. Click the notification bell icon in the navbar — dropdown should open
-24. Follow a user from a second account → first account should see "new follower" notification
-25. Comment on a user's post → post author should see notification
-26. Upvote a thread → thread author should see notification
-27. Earn a badge → should see "badge earned" notification
-28. Click a notification — should navigate to the relevant content
-29. Click "Mark as read" — notification should visually update
-30. Unread notification count should show as badge on the bell icon
+- [ ] 23. Click the notification bell icon in the navbar — dropdown should open
+- [ ] 24. Follow a user from a second account → first account should see "new follower" notification
+- [ ] 25. Comment on a user's post → post author should see notification
+- [ ] 26. Upvote a thread → thread author should see notification
+- [ ] 27. Earn a badge → should see "badge earned" notification
+- [ ] 28. Click a notification — should navigate to the relevant content
+- [ ] 29. Click "Mark as read" — notification should visually update
+- [ ] 30. Unread notification count should show as badge on the bell icon
 
 **Universal Search (5.6)**
-31. Type a query in the navbar search bar and press Enter — should navigate to `/search?q={query}`
-32. Search results should show tabbed sections: Educators, Resources, Discussions, Lessons, Jobs
-33. Click a tab — should filter results to that type
-34. Click a result — should navigate to the relevant detail page
-35. Search for a term with no results — should show "No results found" state
-36. Search with an empty query — should show prompt to enter a search term
+- [ ] 31. Type a query in the navbar search bar and press Enter — should navigate to `/search?q={query}`
+- [ ] 32. Search results should show tabbed sections: Educators, Resources, Discussions, Lessons, Jobs
+- [ ] 33. Click a tab — should filter results to that type
+- [ ] 34. Click a result — should navigate to the relevant detail page
+- [ ] 35. Search for a term with no results — should show "No results found" state
+- [ ] 36. Search with an empty query — should show prompt to enter a search term
 
 #### 2. Screenshots to Take
 
@@ -700,3 +700,4 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 - **Sort forum replies by upvotes**: Highest-upvoted top-level replies float to the top.
 - **Dedicated New Thread page**: Replace the forums "New Discussion" modal with a full page at `/forums/new`.
 - **Notification system**: In-app notification bell for likes, comments, mentions, and replies.
+- **Auto-generated resource PDF**: When a resource is uploaded without a file attachment, generate a formatted PDF from the form data (title, description, grade level, subject, type, tags) using `@react-pdf/renderer` (client-side, no server needed). The generated PDF becomes the downloadable file, so the download button always works. Resources uploaded with a real file continue to use that file as-is. The PDF would be generated at upload time, uploaded to Firebase Storage, and stored as `fileURL` just like a manually uploaded file.
