@@ -1,0 +1,93 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // -----------------------------------------------------------------------
+    // Helper functions
+    // -----------------------------------------------------------------------
+
+    // Must be signed in
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Can only read/write your own files
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    // File size must be <= maxMB megabytes
+    function underMB(maxMB) {
+      return request.resource.size <= maxMB * 1024 * 1024;
+    }
+
+    // Content type must start with one of the allowed MIME prefixes
+    function isImageType() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isDocumentType() {
+      return request.resource.contentType in [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'text/plain',
+        'text/csv'
+      ] || request.resource.contentType.matches('image/.*');
+    }
+
+    // -----------------------------------------------------------------------
+    // Profile avatars — avatars/{userId}/{filename}
+    //   • 5 MB max
+    //   • Images only
+    //   • Only the owner can write; anyone authenticated can read
+    // -----------------------------------------------------------------------
+    match /avatars/{userId}/{fileName} {
+      allow read:  if isAuth();
+      allow write: if isOwner(userId)
+                   && underMB(5)
+                   && isImageType();
+      allow delete: if isOwner(userId);
+    }
+
+    // -----------------------------------------------------------------------
+    // Resource files — resources/{userId}/{filename}
+    //   • 25 MB max
+    //   • PDFs, Office docs, images, plain text/CSV
+    //   • Only the owner can write; anyone authenticated can read
+    // -----------------------------------------------------------------------
+    match /resources/{userId}/{fileName} {
+      allow read:  if isAuth();
+      allow write: if isOwner(userId)
+                   && underMB(25)
+                   && isDocumentType();
+      allow delete: if isOwner(userId);
+    }
+
+    // -----------------------------------------------------------------------
+    // Lesson attachments — lessons/{userId}/{lessonId}/{filename}
+    //   • 25 MB max
+    //   • Same allowed types as resources
+    //   • Only the owner can write; anyone authenticated can read
+    // -----------------------------------------------------------------------
+    match /lessons/{userId}/{lessonId}/{fileName} {
+      allow read:  if isAuth();
+      allow write: if isOwner(userId)
+                   && underMB(25)
+                   && isDocumentType();
+      allow delete: if isOwner(userId);
+    }
+
+    // -----------------------------------------------------------------------
+    // Deny everything else
+    // -----------------------------------------------------------------------
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
