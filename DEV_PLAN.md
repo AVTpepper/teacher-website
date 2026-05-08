@@ -701,3 +701,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 - **Dedicated New Thread page**: Replace the forums "New Discussion" modal with a full page at `/forums/new`.
 - **Notification system**: In-app notification bell for likes, comments, mentions, and replies.
 - **Auto-generated resource PDF**: When a resource is uploaded without a file attachment, generate a formatted PDF from the form data (title, description, grade level, subject, type, tags) using `@react-pdf/renderer` (client-side, no server needed). The generated PDF becomes the downloadable file, so the download button always works. Resources uploaded with a real file continue to use that file as-is. The PDF would be generated at upload time, uploaded to Firebase Storage, and stored as `fileURL` just like a manually uploaded file.
+
+
+additional notes:
+- forum creations should open a new window rather than the modal its opening.

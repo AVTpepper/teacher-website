@@ -103,13 +103,13 @@ function EducatorResult({ user }: { user: UserProfile }) {
     <Link href={`/educators/${user.uid}`} className="block group">
       <Card className="hover:shadow-md transition-shadow">
         <div className="flex items-center gap-3">
-          <Avatar src={user.photoURL ?? undefined} name={user.displayName} size="md" />
+          <Avatar src={user.photoURL ?? null} alt={user.displayName} size="md" />
           <div className="min-w-0">
             <p className="font-semibold text-foreground group-hover:underline truncate">{user.displayName}</p>
             <p className="text-xs text-muted">{user.gradeLevel} · {user.school || user.location}</p>
             <div className="flex flex-wrap gap-1 mt-1">
               {user.subjects?.slice(0, 3).map((s) => (
-                <Badge key={s} variant="secondary" size="sm">{s}</Badge>
+                <Badge key={s} variant="default">{s}</Badge>
               ))}
             </div>
           </div>
@@ -128,8 +128,8 @@ function ResourceResult({ resource }: { resource: Resource }) {
             <p className="font-semibold text-foreground group-hover:underline truncate">{resource.title}</p>
             <p className="text-xs text-muted mt-0.5 line-clamp-2">{resource.description}</p>
             <div className="flex gap-2 mt-2">
-              <Badge variant="secondary" size="sm">{resource.gradeLevel}</Badge>
-              <Badge variant="secondary" size="sm">{resource.subject}</Badge>
+              <Badge variant="default">{resource.gradeLevel}</Badge>
+              <Badge variant="default">{resource.subject}</Badge>
             </div>
           </div>
           <span className="text-2xl shrink-0">📂</span>
@@ -148,8 +148,8 @@ function DiscussionResult({ thread }: { thread: ForumThread }) {
             <p className="font-semibold text-foreground group-hover:underline truncate">{thread.title}</p>
             <p className="text-xs text-muted mt-0.5">by {thread.authorName}</p>
             <div className="flex gap-2 mt-2">
-              {thread.gradeLevel && <Badge variant="secondary" size="sm">{thread.gradeLevel}</Badge>}
-              {thread.subject && <Badge variant="secondary" size="sm">{thread.subject}</Badge>}
+              {thread.gradeLevel && <Badge variant="default">{thread.gradeLevel}</Badge>}
+              {thread.subject && <Badge variant="default">{thread.subject}</Badge>}
             </div>
           </div>
           <span className="text-2xl shrink-0">💬</span>
@@ -168,8 +168,8 @@ function LessonResult({ lesson }: { lesson: Lesson }) {
             <p className="font-semibold text-foreground group-hover:underline truncate">{lesson.title}</p>
             <p className="text-xs text-muted mt-0.5">by {lesson.authorName}</p>
             <div className="flex gap-2 mt-2">
-              <Badge variant="secondary" size="sm">{lesson.gradeLevel}</Badge>
-              <Badge variant="secondary" size="sm">{lesson.subject}</Badge>
+              <Badge variant="default">{lesson.gradeLevel}</Badge>
+              <Badge variant="default">{lesson.subject}</Badge>
             </div>
           </div>
           <span className="text-2xl shrink-0">📝</span>
@@ -188,8 +188,8 @@ function JobResult({ job }: { job: Job }) {
             <p className="font-semibold text-foreground group-hover:underline truncate">{job.title}</p>
             <p className="text-xs text-muted mt-0.5">{job.organization} · {job.location}</p>
             <div className="flex gap-2 mt-2">
-              <Badge variant="secondary" size="sm">{job.gradeLevel}</Badge>
-              <Badge variant="secondary" size="sm">{job.jobType}</Badge>
+              <Badge variant="default">{job.gradeLevel}</Badge>
+              <Badge variant="default">{job.jobType}</Badge>
             </div>
           </div>
           <span className="text-2xl shrink-0">💼</span>

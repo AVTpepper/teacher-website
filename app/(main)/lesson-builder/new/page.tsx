@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  Suspense,
   type Dispatch,
   type FormEvent,
   type KeyboardEvent,
@@ -44,6 +45,14 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 }
 
 export default function LessonBuilderNewPage() {
+  return (
+    <Suspense>
+      <LessonBuilderNewInner />
+    </Suspense>
+  );
+}
+
+function LessonBuilderNewInner() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();

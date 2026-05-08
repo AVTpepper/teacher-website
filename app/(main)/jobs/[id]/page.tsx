@@ -117,8 +117,8 @@ export default function JobDetailPage({
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${JOB_TYPE_COLOR[job.jobType]}`}>
                 {jobTypeLabel}
               </span>
-              <Badge variant="secondary">{job.gradeLevel}</Badge>
-              <Badge variant="secondary">{job.subject}</Badge>
+              <Badge variant="default">{job.gradeLevel}</Badge>
+              <Badge variant="default">{job.subject}</Badge>
             </div>
             <h1 className="text-2xl font-bold text-foreground leading-snug">{job.title}</h1>
           </div>
@@ -196,8 +196,8 @@ export default function JobDetailPage({
             className="flex items-center gap-3 group"
           >
             <Avatar
-              src={poster.photoURL ?? undefined}
-              name={poster.displayName}
+              src={poster.photoURL ?? null}
+              alt={poster.displayName}
               size="md"
             />
             <div>

@@ -251,8 +251,8 @@ function JobCard({ job }: { job: Job }) {
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${JOB_TYPE_COLOR[job.jobType]}`}>
                 {JOB_TYPES.find((t) => t.value === job.jobType)?.label ?? job.jobType}
               </span>
-              <Badge variant="secondary">{job.gradeLevel}</Badge>
-              <Badge variant="secondary">{job.subject}</Badge>
+              <Badge variant="default">{job.gradeLevel}</Badge>
+              <Badge variant="default">{job.subject}</Badge>
             </div>
             <h3 className="text-base font-semibold text-foreground group-hover:underline leading-snug">
               {job.title}

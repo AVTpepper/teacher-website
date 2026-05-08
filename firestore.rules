@@ -1,0 +1,216 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -----------------------------------------------------------------------
+    // Helper functions
+    // -----------------------------------------------------------------------
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    // -----------------------------------------------------------------------
+    // users/{userId}
+    // -----------------------------------------------------------------------
+    match /users/{userId} {
+      // Anyone (even unauthenticated) can read profiles — public directory
+      allow read: if true;
+      // Only the owner can create or update their own profile
+      allow create, update: if isOwner(userId);
+      allow delete: if false;
+
+      // followers sub-collection — users/{userId}/followers/{followerId}
+      match /followers/{followerId} {
+        allow read: if true;
+        allow write: if isOwner(followerId);
+      }
+
+      // following sub-collection — users/{userId}/following/{followingId}
+      match /following/{followingId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // posts/{postId}
+    // -----------------------------------------------------------------------
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if isAuth()
+                    && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuth()
+                    && (
+                      // Author can edit their own post
+                      resource.data.authorId == request.auth.uid
+                      // Any authenticated user can update like/comment counts
+                      || request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['likesCount', 'commentsCount', 'updatedAt'])
+                    );
+      allow delete: if isAuth() && resource.data.authorId == request.auth.uid;
+
+      // likes sub-collection — posts/{postId}/likes/{userId}
+      match /likes/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+
+      // comments sub-collection — posts/{postId}/comments/{commentId}
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuth()
+                      && request.resource.data.authorId == request.auth.uid;
+        allow update, delete: if isAuth()
+                              && resource.data.authorId == request.auth.uid;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // resources/{resourceId}
+    // -----------------------------------------------------------------------
+    match /resources/{resourceId} {
+      allow read: if true;
+      allow create: if isAuth()
+                    && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuth()
+                    && (
+                      resource.data.authorId == request.auth.uid
+                      || request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['downloadCount', 'saveCount', 'ratingCount',
+                                     'ratingTotal', 'updatedAt'])
+                    );
+      allow delete: if isAuth() && resource.data.authorId == request.auth.uid;
+
+      // ratings sub-collection — resources/{resourceId}/ratings/{userId}
+      match /ratings/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+
+      // saves sub-collection — resources/{resourceId}/saves/{userId}
+      match /saves/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+
+      // comments sub-collection — resources/{resourceId}/comments/{commentId}
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuth()
+                      && request.resource.data.authorId == request.auth.uid;
+        allow update, delete: if isAuth()
+                              && resource.data.authorId == request.auth.uid;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // lessons/{lessonId}
+    // -----------------------------------------------------------------------
+    match /lessons/{lessonId} {
+      // Public lessons are visible to all; drafts only to the author
+      allow read: if resource.data.isPublic == true
+                  || (isAuth() && resource.data.authorId == request.auth.uid);
+      allow create: if isAuth()
+                    && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuth()
+                    && (
+                      resource.data.authorId == request.auth.uid
+                      || request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['downloadCount', 'updatedAt'])
+                    );
+      allow delete: if isAuth() && resource.data.authorId == request.auth.uid;
+
+      // downloads sub-collection — lessons/{lessonId}/downloads/{userId}
+      match /downloads/{userId} {
+        allow read: if isAuth() && resource.data.authorId == request.auth.uid;
+        allow write: if isOwner(userId);
+      }
+
+      // comments sub-collection — lessons/{lessonId}/comments/{commentId}
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuth()
+                      && request.resource.data.authorId == request.auth.uid;
+        allow update, delete: if isAuth()
+                              && resource.data.authorId == request.auth.uid;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // forums/{categoryId}  +  forums/{categoryId}/threads/{threadId}
+    // -----------------------------------------------------------------------
+    match /forums/{categoryId} {
+      allow read: if true;
+      // Category docs are managed by the app (ensureCategory helper) — any
+      // authenticated user can trigger the upsert.
+      allow create, update: if isAuth();
+      allow delete: if false;
+
+      match /threads/{threadId} {
+        allow read: if true;
+        allow create: if isAuth()
+                      && request.resource.data.authorId == request.auth.uid;
+        allow update: if isAuth()
+                      && (
+                        resource.data.authorId == request.auth.uid
+                        || request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['upvotes', 'downvotes', 'commentCount',
+                                       'updatedAt'])
+                      );
+        allow delete: if isAuth() && resource.data.authorId == request.auth.uid;
+
+        // comments — forums/{categoryId}/threads/{threadId}/comments/{commentId}
+        match /comments/{commentId} {
+          allow read: if true;
+          allow create: if isAuth()
+                        && request.resource.data.authorId == request.auth.uid;
+          allow update: if isAuth()
+                        && (
+                          resource.data.authorId == request.auth.uid
+                          || request.resource.data.diff(resource.data).affectedKeys()
+                               .hasOnly(['upvotes', 'downvotes'])
+                        );
+          allow delete: if isAuth() && resource.data.authorId == request.auth.uid;
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // jobs/{jobId}
+    // -----------------------------------------------------------------------
+    match /jobs/{jobId} {
+      allow read: if true;
+      allow create: if isAuth()
+                    && request.resource.data.postedById == request.auth.uid;
+      allow update, delete: if isAuth()
+                            && resource.data.postedById == request.auth.uid;
+    }
+
+    // -----------------------------------------------------------------------
+    // notifications/{userId}/items/{notificationId}
+    // -----------------------------------------------------------------------
+    match /notifications/{userId}/items/{notificationId} {
+      // Only the recipient can read their own notifications
+      allow read: if isOwner(userId);
+      // The app writes notifications on behalf of actors — allow any
+      // authenticated user to create a notification for any recipient,
+      // but only the recipient can mark it as read (update) or delete it.
+      allow create: if isAuth();
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
+    // -----------------------------------------------------------------------
+    // Deny everything else
+    // -----------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -197,7 +197,7 @@ export default function NotificationDropdown() {
                         {n.actorPhotoURL || n.actorName !== "EduConnect" ? (
                           <Avatar
                             src={n.actorPhotoURL}
-                            name={n.actorName}
+                            alt={n.actorName}
                             size="sm"
                           />
                         ) : (
