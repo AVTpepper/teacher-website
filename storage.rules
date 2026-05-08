@@ -70,12 +70,12 @@ service firebase.storage {
     }
 
     // -----------------------------------------------------------------------
-    // Lesson attachments — lessons/{userId}/{lessonId}/{filename}
+    // Lesson attachments — lessons/{userId}/{filename}
     //   • 25 MB max
     //   • Same allowed types as resources
     //   • Only the owner can write; anyone authenticated can read
     // -----------------------------------------------------------------------
-    match /lessons/{userId}/{lessonId}/{fileName} {
+    match /lessons/{userId}/{fileName} {
       allow read:  if isAuth();
       allow write: if isOwner(userId)
                    && underMB(25)

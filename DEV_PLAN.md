@@ -616,22 +616,22 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 
 > **Goal**: Enable file uploads across the platform (currently skipped gracefully).
 
-- [ ] **6.1 Activate Firebase Storage**
+- [x] **6.1 Activate Firebase Storage**
   - Upgrade Firebase project to Blaze (pay-as-you-go) plan
   - Enable Cloud Storage in Firebase Console
   - Free tier: 5 GB stored, 1 GB/day downloads, 20K/day upload operations
 
-- [ ] **6.2 Deploy CORS configuration**
+- [x] **6.2 Deploy CORS configuration**
   - Run: `gsutil cors set cors.json gs://educonnect-60b69.firebasestorage.app`
   - Verify: `gsutil cors get gs://educonnect-60b69.firebasestorage.app`
   - Update `cors.json` to include production domain when deployed
 
-- [ ] **6.3 Set Firebase Storage security rules**
+- [x] **6.3 Set Firebase Storage security rules**
   - Only authenticated users can upload
   - Max file size limits (5 MB avatars, 25 MB resources/lessons)
   - Allowed content types
 
-- [ ] **6.4 Verify all upload flows work**
+- [x] **6.4 Verify all upload flows work**
   - Profile photo upload (`/profile/edit`)
   - Resource file upload (`/resources/upload`)
   - Lesson attachment upload (`/lesson-builder`)

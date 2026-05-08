@@ -1,0 +1,102 @@
+[debug] [2026-05-08T12:41:31.396Z] ----------------------------------------------------------------------
+[debug] [2026-05-08T12:41:31.399Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Alexa\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init hosting --project educonnect-60b69
+[debug] [2026-05-08T12:41:31.400Z] CLI Version:   15.17.0
+[debug] [2026-05-08T12:41:31.400Z] Platform:      win32
+[debug] [2026-05-08T12:41:31.400Z] Node Version:  v22.12.0
+[debug] [2026-05-08T12:41:31.400Z] Time:          Fri May 08 2026 14:41:31 GMT+0200 (Central European Summer Time)
+[debug] [2026-05-08T12:41:31.400Z] ----------------------------------------------------------------------
+[debug] 
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  C:\Code\teacher-website
+
+Before we get started, keep in mind:
+
+  * You are currently outside your home directory
+  * You are initializing within an existing Firebase project directory
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] 
+[debug] [2026-05-08T12:41:43.460Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-05-08T12:41:43.460Z] > authorizing via signed-in user (alexander.tastad@gmail.com)
+[debug] [2026-05-08T12:41:43.462Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:41:43.462Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:41:43.464Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/educonnect-60b69 [none]
+[debug] [2026-05-08T12:41:43.941Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/educonnect-60b69 200
+[debug] [2026-05-08T12:41:43.942Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/educonnect-60b69 {"projectId":"educonnect-60b69","projectNumber":"714411286043","displayName":"EduConnect","name":"projects/educonnect-60b69","resources":{"hostingSite":"educonnect-60b69"},"state":"ACTIVE","etag":"1_4b593342-ac92-4342-b2af-f0d06e49006f"}
+[info] i  Using project educonnect-60b69 (EduConnect) . 
+[info] 
+=== Hosting Setup
+[info] 
+[info] 
+=== App Hosting Setup
+[debug] [2026-05-08T12:43:25.487Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:25.487Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:25.488Z] >>> [apiv2][query] GET https://cloudbilling.googleapis.com/v1/projects/educonnect-60b69/billingInfo [none]
+[debug] [2026-05-08T12:43:25.836Z] <<< [apiv2][status] GET https://cloudbilling.googleapis.com/v1/projects/educonnect-60b69/billingInfo 200
+[debug] [2026-05-08T12:43:25.836Z] <<< [apiv2][body] GET https://cloudbilling.googleapis.com/v1/projects/educonnect-60b69/billingInfo {"name":"projects/educonnect-60b69/billingInfo","projectId":"educonnect-60b69","billingAccountName":"billingAccounts/010C97-56C6AE-5BA8C0","billingEnabled":true}
+[debug] [2026-05-08T12:43:25.838Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:25.838Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:25.838Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/firebaseapphosting.googleapis.com [none]
+[debug] [2026-05-08T12:43:25.838Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/firebaseapphosting.googleapis.com  x-goog-user-project=educonnect-60b69
+[debug] [2026-05-08T12:43:26.826Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/firebaseapphosting.googleapis.com 200
+[debug] [2026-05-08T12:43:26.826Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/firebaseapphosting.googleapis.com [omitted]
+[debug] [2026-05-08T12:43:26.827Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:26.827Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:26.827Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/firebaseapphosting.googleapis.com:enable [none]
+[debug] [2026-05-08T12:43:26.827Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/firebaseapphosting.googleapis.com:enable  x-goog-user-project=educonnect-60b69
+[debug] [2026-05-08T12:43:28.056Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/firebaseapphosting.googleapis.com:enable 200
+[debug] [2026-05-08T12:43:28.057Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/firebaseapphosting.googleapis.com:enable [omitted]
+[debug] [2026-05-08T12:43:38.074Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.074Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.075Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.075Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.075Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.075Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.075Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.075Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.076Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.076Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.076Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.076Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:38.076Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/developerconnect.googleapis.com [none]
+[debug] [2026-05-08T12:43:38.076Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/developerconnect.googleapis.com  x-goog-user-project=educonnect-60b69
+[debug] [2026-05-08T12:43:38.078Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/cloudbuild.googleapis.com [none]
+[debug] [2026-05-08T12:43:38.078Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/cloudbuild.googleapis.com  x-goog-user-project=educonnect-60b69
+[debug] [2026-05-08T12:43:38.079Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/secretmanager.googleapis.com [none]
+[debug] [2026-05-08T12:43:38.080Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/secretmanager.googleapis.com  x-goog-user-project=educonnect-60b69
+[debug] [2026-05-08T12:43:38.081Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/run.googleapis.com [none]
+[debug] [2026-05-08T12:43:38.081Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/run.googleapis.com  x-goog-user-project=educonnect-60b69
+[debug] [2026-05-08T12:43:38.083Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/artifactregistry.googleapis.com [none]
+[debug] [2026-05-08T12:43:38.083Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/artifactregistry.googleapis.com  x-goog-user-project=educonnect-60b69
+[debug] [2026-05-08T12:43:38.085Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/iam.googleapis.com [none]
+[debug] [2026-05-08T12:43:38.085Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/iam.googleapis.com  x-goog-user-project=educonnect-60b69
+[debug] [2026-05-08T12:43:39.005Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/secretmanager.googleapis.com 200
+[debug] [2026-05-08T12:43:39.006Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/secretmanager.googleapis.com [omitted]
+[debug] [2026-05-08T12:43:39.028Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/developerconnect.googleapis.com 200
+[debug] [2026-05-08T12:43:39.028Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/developerconnect.googleapis.com [omitted]
+[debug] [2026-05-08T12:43:39.028Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:39.028Z] Checked if tokens are valid: true, expires at: 1778247289723
+[debug] [2026-05-08T12:43:39.029Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/developerconnect.googleapis.com:enable [none]
+[debug] [2026-05-08T12:43:39.029Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/developerconnect.googleapis.com:enable  x-goog-user-project=educonnect-60b69
+[debug] [2026-05-08T12:43:39.032Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/iam.googleapis.com 200
+[debug] [2026-05-08T12:43:39.032Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/iam.googleapis.com [omitted]
+[debug] [2026-05-08T12:43:39.037Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/run.googleapis.com 200
+[debug] [2026-05-08T12:43:39.037Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/run.googleapis.com [omitted]
+[debug] [2026-05-08T12:43:39.043Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/artifactregistry.googleapis.com 200
+[debug] [2026-05-08T12:43:39.043Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/artifactregistry.googleapis.com [omitted]
+[debug] [2026-05-08T12:43:39.049Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/cloudbuild.googleapis.com 200
+[debug] [2026-05-08T12:43:39.049Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/cloudbuild.googleapis.com [omitted]
+[debug] [2026-05-08T12:43:40.272Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/developerconnect.googleapis.com:enable 200
+[debug] [2026-05-08T12:43:40.272Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/educonnect-60b69/services/developerconnect.googleapis.com:enable [omitted]

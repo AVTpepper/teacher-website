@@ -82,6 +82,7 @@ function LessonBuilderNewInner() {
   const [uploading, setUploading] = useState(false);
   const [sourceLoading, setSourceLoading] = useState(false);
 
+  const formTopRef = useRef<HTMLDivElement>(null);
   const objectiveRefs = useRef<Array<HTMLInputElement | null>>([]);
   const materialRefs = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -246,28 +247,33 @@ function LessonBuilderNewInner() {
 
   // --- Save ---
 
+  function showError(msg: string) {
+    setError(msg);
+    formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function handleSave(publish: boolean) {
     if (!user) return;
 
-    if (!title.trim()) return setError("Title is required.");
+    if (!title.trim()) return showError("Title is required.");
 
     // Publishing requires complete info; drafts only need a title
     if (publish) {
-      if (!gradeLevel) return setError("Grade level is required.");
-      if (!subject) return setError("Subject is required.");
+      if (!gradeLevel) return showError("Grade level is required.");
+      if (!subject) return showError("Subject is required.");
     }
 
     const cleanObjectives = objectives
       .map((o) => o.trim())
       .filter((o) => o.length > 0);
     if (publish && cleanObjectives.length === 0)
-      return setError("Add at least one learning objective.");
+      return showError("Add at least one learning objective.");
 
     const cleanSteps = steps.filter(
       (s) => s.title.trim() || s.description.trim()
     );
     if (publish && cleanSteps.length === 0)
-      return setError("Add at least one step to the plan.");
+      return showError("Add at least one step to the plan.");
 
     const cleanMaterials = materials
       .map((m) => m.trim())
@@ -503,11 +509,13 @@ function LessonBuilderNewInner() {
         </div>
       )}
 
-      {error && (
-        <div className="mb-6 rounded-lg bg-error-50 px-4 py-3 text-sm text-error-700">
-          {error}
-        </div>
-      )}
+      <div ref={formTopRef} className="scroll-mt-24">
+        {error && (
+          <div className="mb-6 rounded-lg bg-error-50 px-4 py-3 text-sm text-error-700">
+            {error}
+          </div>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Basic info */}

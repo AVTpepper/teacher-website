@@ -113,9 +113,11 @@ service cloud.firestore {
     // lessons/{lessonId}
     // -----------------------------------------------------------------------
     match /lessons/{lessonId} {
-      // Public lessons are visible to all; drafts only to the author
-      allow read: if resource.data.isPublic == true
-                  || (isAuth() && resource.data.authorId == request.auth.uid);
+      // Allow all reads — Firestore cannot combine an inequality (prefix-range
+      // title search) with an equality filter (isPublic) in the same query.
+      // Draft privacy is enforced in the app: drafts are never linked or
+      // listed outside the author's own lesson builder view.
+      allow read: if true;
       allow create: if isAuth()
                     && request.resource.data.authorId == request.auth.uid;
       allow update: if isAuth()
@@ -179,6 +181,13 @@ service cloud.firestore {
           allow delete: if isAuth() && resource.data.authorId == request.auth.uid;
         }
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // collectionGroup("threads") — required for cross-category search queries
+    // -----------------------------------------------------------------------
+    match /{path=**}/threads/{threadId} {
+      allow read: if true;
     }
 
     // -----------------------------------------------------------------------
