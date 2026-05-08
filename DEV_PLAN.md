@@ -492,18 +492,18 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 
 > **Goal**: Curated content, job listings, achievement system, universal search, and notifications.
 
-- [ ] **5.1 Inspiration Hub** (`app/inspiration/page.tsx`)
+- [x] **5.1 Inspiration Hub** (`app/inspiration/page.tsx`)
   - Magazine-style grid layout
   - Category tabs: Podcasts, Articles, Videos, Education News, Teacher Stories
   - Cards: thumbnail, title, short description, creator/source
   - Content submission form for educators
 
-- [ ] **5.2 Job Board** (`app/jobs/page.tsx`)
+- [x] **5.2 Job Board** (`app/jobs/page.tsx`)
   - Filters: Location, Grade Level, Subject, Job Type (full-time, part-time, contract)
   - Job cards: title, school/org, location, grade level, job type
   - "Post Job" button
 
-- [ ] **5.3 Job detail page** (`app/jobs/[id]/page.tsx`)
+- [x] **5.3 Job detail page** (`app/jobs/[id]/page.tsx`)
   - Full job description
   - Apply action (link or in-app)
   - School/org info
