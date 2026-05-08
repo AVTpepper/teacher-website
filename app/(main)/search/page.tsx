@@ -17,7 +17,7 @@ import { jobSlug, type Job } from "@/lib/firestore/jobs";
 import { threadSlug, type ForumThread } from "@/lib/firestore/forums";
 import { type Lesson } from "@/lib/firestore/lessons";
 import { type UserProfile } from "@/lib/firestore/users";
-import { Avatar, Badge, Button, Card, Input } from "@/components/ui";
+import { Avatar, Badge, Button, Card, Input, SearchResultCard } from "@/components/ui";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -121,81 +121,54 @@ function EducatorResult({ user }: { user: UserProfile }) {
 
 function ResourceResult({ resource }: { resource: Resource }) {
   return (
-    <Link href={`/resources/${resourceSlug(resource.title, resource.id)}`} className="block group">
-      <Card className="hover:shadow-md transition-shadow">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-semibold text-foreground group-hover:underline truncate">{resource.title}</p>
-            <p className="text-xs text-muted mt-0.5 line-clamp-2">{resource.description}</p>
-            <div className="flex gap-2 mt-2">
-              <Badge variant="default">{resource.gradeLevel}</Badge>
-              <Badge variant="default">{resource.subject}</Badge>
-            </div>
-          </div>
-          <span className="text-2xl shrink-0">📂</span>
-        </div>
-      </Card>
-    </Link>
+    <SearchResultCard
+      href={`/resources/${resourceSlug(resource.title, resource.id)}`}
+      title={resource.title}
+      subtitle={resource.description}
+      icon="📂"
+      badges={<><Badge variant="default">{resource.gradeLevel}</Badge><Badge variant="default">{resource.subject}</Badge></>}
+    />
   );
 }
 
 function DiscussionResult({ thread }: { thread: ForumThread }) {
   return (
-    <Link href={`/forums/${threadSlug(thread.title, thread.id)}`} className="block group">
-      <Card className="hover:shadow-md transition-shadow">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-semibold text-foreground group-hover:underline truncate">{thread.title}</p>
-            <p className="text-xs text-muted mt-0.5">by {thread.authorName}</p>
-            <div className="flex gap-2 mt-2">
-              {thread.gradeLevel && <Badge variant="default">{thread.gradeLevel}</Badge>}
-              {thread.subject && <Badge variant="default">{thread.subject}</Badge>}
-            </div>
-          </div>
-          <span className="text-2xl shrink-0">💬</span>
-        </div>
-      </Card>
-    </Link>
+    <SearchResultCard
+      href={`/forums/${threadSlug(thread.title, thread.id)}`}
+      title={thread.title}
+      subtitle={`by ${thread.authorName}`}
+      icon="💬"
+      badges={
+        <>
+          {thread.gradeLevel && <Badge variant="default">{thread.gradeLevel}</Badge>}
+          {thread.subject && <Badge variant="default">{thread.subject}</Badge>}
+        </>
+      }
+    />
   );
 }
 
 function LessonResult({ lesson }: { lesson: Lesson }) {
   return (
-    <Link href={`/lesson-builder/${lesson.id}`} className="block group">
-      <Card className="hover:shadow-md transition-shadow">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-semibold text-foreground group-hover:underline truncate">{lesson.title}</p>
-            <p className="text-xs text-muted mt-0.5">by {lesson.authorName}</p>
-            <div className="flex gap-2 mt-2">
-              <Badge variant="default">{lesson.gradeLevel}</Badge>
-              <Badge variant="default">{lesson.subject}</Badge>
-            </div>
-          </div>
-          <span className="text-2xl shrink-0">📝</span>
-        </div>
-      </Card>
-    </Link>
+    <SearchResultCard
+      href={`/lesson-builder/${lesson.id}`}
+      title={lesson.title}
+      subtitle={`by ${lesson.authorName}`}
+      icon="📝"
+      badges={<><Badge variant="default">{lesson.gradeLevel}</Badge><Badge variant="default">{lesson.subject}</Badge></>}
+    />
   );
 }
 
 function JobResult({ job }: { job: Job }) {
   return (
-    <Link href={`/jobs/${jobSlug(job.title, job.id)}`} className="block group">
-      <Card className="hover:shadow-md transition-shadow">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-semibold text-foreground group-hover:underline truncate">{job.title}</p>
-            <p className="text-xs text-muted mt-0.5">{job.organization} · {job.location}</p>
-            <div className="flex gap-2 mt-2">
-              <Badge variant="default">{job.gradeLevel}</Badge>
-              <Badge variant="default">{job.jobType}</Badge>
-            </div>
-          </div>
-          <span className="text-2xl shrink-0">💼</span>
-        </div>
-      </Card>
-    </Link>
+    <SearchResultCard
+      href={`/jobs/${jobSlug(job.title, job.id)}`}
+      title={job.title}
+      subtitle={`${job.organization} · ${job.location}`}
+      icon="💼"
+      badges={<><Badge variant="default">{job.gradeLevel}</Badge><Badge variant="default">{job.jobType}</Badge></>}
+    />
   );
 }
 

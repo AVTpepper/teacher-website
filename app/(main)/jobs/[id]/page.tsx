@@ -8,32 +8,13 @@ import {
   jobSlug,
   parseJobSlug,
   JOB_TYPES,
+  JOB_TYPE_COLOR,
   type Job,
   type JobType,
 } from "@/lib/firestore/jobs";
 import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { Avatar, Badge, Button, Card } from "@/components/ui";
-
-const JOB_TYPE_COLOR: Record<JobType, string> = {
-  "full-time": "bg-emerald-100 text-emerald-700",
-  "part-time": "bg-blue-100 text-blue-700",
-  contract: "bg-amber-100 text-amber-700",
-  substitute: "bg-purple-100 text-purple-700",
-};
-
-function timeAgo(timestamp: { seconds: number } | null): string {
-  if (!timestamp) return "recently";
-  const seconds = Math.floor(Date.now() / 1000 - timestamp.seconds);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
-}
+import { timeAgo } from "@/lib/utils";
 
 export default function JobDetailPage({
   params,

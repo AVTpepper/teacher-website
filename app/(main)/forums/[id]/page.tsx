@@ -20,21 +20,9 @@ import {
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import Tag from "@/components/ui/Tag";
 import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
-
-function timeAgo(timestamp: { seconds: number } | null): string {
-  if (!timestamp) return "just now";
-  const seconds = Math.floor(Date.now() / 1000 - timestamp.seconds);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
-}
+import { timeAgo } from "@/lib/utils";
 
 // ─── Main page component ───
 
@@ -254,12 +242,7 @@ export default function ForumThreadPage({
                 <Badge variant="info">{thread.subject}</Badge>
               )}
               {thread.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="px-2 py-0.5 text-xs rounded-full bg-secondary-100 text-secondary-600"
-                >
-                  {tag}
-                </span>
+                <Tag key={tag} label={tag} />
               ))}
             </div>
           )}

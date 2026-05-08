@@ -310,9 +310,7 @@ export default function InspirationPage() {
     fetchItems(true);
   }, [fetchItems]);
 
-  const visibleItems = activeCategory === "all"
-    ? items
-    : items.filter((i) => i.category === activeCategory);
+  const visibleItems = items;
   const featured = visibleItems[0] ?? null;
   const rest = visibleItems.slice(1);
 

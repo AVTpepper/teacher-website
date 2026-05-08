@@ -9,20 +9,12 @@ import {
   getJobs,
   jobSlug,
   JOB_TYPES,
+  JOB_TYPE_COLOR,
   type Job,
   type JobFilters,
   type JobType,
 } from "@/lib/firestore/jobs";
 import { Avatar, Badge, Button, Card, Input, Select } from "@/components/ui";
-
-
-
-const JOB_TYPE_COLOR: Record<JobType, string> = {
-  "full-time": "bg-emerald-100 text-emerald-700",
-  "part-time": "bg-blue-100 text-blue-700",
-  contract: "bg-amber-100 text-amber-700",
-  substitute: "bg-purple-100 text-purple-700",
-};
 
 // --- Job Card ---
 
@@ -174,9 +166,9 @@ export default function JobsPage() {
         </div>
         {hasFilters && (
           <div className="mt-3 flex justify-end">
-            <button onClick={clearFilters} className="text-sm text-primary underline">
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
               Clear Filters
-            </button>
+            </Button>
           </div>
         )}
       </Card>
@@ -195,9 +187,9 @@ export default function JobsPage() {
             {hasFilters ? "Try adjusting your filters." : "No job listings yet — be the first to post one!"}
           </p>
           {hasFilters && (
-            <button onClick={clearFilters} className="mt-3 text-sm text-primary underline">
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="mt-3">
               Clear Filters
-            </button>
+            </Button>
           )}
         </div>
       )}

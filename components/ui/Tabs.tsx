@@ -12,6 +12,7 @@ interface TabsProps {
   defaultValue?: string;
   onChange?: (value: string) => void;
   className?: string;
+  variant?: "underline" | "pill";
 }
 
 export default function Tabs({
@@ -19,12 +20,39 @@ export default function Tabs({
   defaultValue,
   onChange,
   className = "",
+  variant = "underline",
 }: TabsProps) {
   const [active, setActive] = useState(defaultValue || tabs[0]?.value);
 
   function handleSelect(value: string) {
     setActive(value);
     onChange?.(value);
+  }
+
+  if (variant === "pill") {
+    return (
+      <div
+        className={`flex flex-wrap gap-2 ${className}`}
+        role="tablist"
+      >
+        {tabs.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            role="tab"
+            aria-selected={active === tab.value}
+            onClick={() => handleSelect(tab.value)}
+            className={`rounded-full px-3 py-1 text-sm font-medium transition-colors cursor-pointer ${
+              active === tab.value
+                ? "bg-primary-900 text-white"
+                : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    );
   }
 
   return (

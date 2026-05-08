@@ -18,6 +18,7 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { byCreatedAtDesc } from "@/lib/utils";
 
 // --- Post types ---
 
@@ -134,7 +135,7 @@ export async function getPostsByAuthor(
 
   const posts = snapshot.docs
     .map((d) => d.data() as Post)
-    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+    .sort(byCreatedAtDesc);
 
   return { posts, lastDoc: null };
 }

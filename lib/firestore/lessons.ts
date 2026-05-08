@@ -15,6 +15,7 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { byCreatedAtDesc, byUpdatedAtDesc } from "@/lib/utils";
 
 // --- Lesson types ---
 
@@ -133,11 +134,7 @@ export async function getPublicLessons(
 
   const lessons = snapshot.docs
     .map((d) => d.data() as Lesson)
-    .sort((a, b) => {
-      const aTs = a.createdAt?.seconds ?? 0;
-      const bTs = b.createdAt?.seconds ?? 0;
-      return bTs - aTs;
-    });
+    .sort(byCreatedAtDesc);
 
   return { lessons, lastDoc: null };
 }
@@ -166,11 +163,7 @@ export async function getLessonsByAuthor(
     lessons = lessons.filter((l) => l.isPublic);
   }
 
-  lessons.sort((a, b) => {
-    const aTs = a.updatedAt?.seconds ?? 0;
-    const bTs = b.updatedAt?.seconds ?? 0;
-    return bTs - aTs;
-  });
+  lessons.sort(byUpdatedAtDesc);
 
   return { lessons, lastDoc: null };
 }

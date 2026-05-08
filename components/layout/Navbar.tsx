@@ -79,20 +79,20 @@ export default function Navbar() {
                       {
                         label: "Profile",
                         onClick: () => {
-                          window.location.href = "/profile";
+                          router.push("/profile");
                         },
                       },
                       {
                         label: "Settings",
                         onClick: () => {
-                          window.location.href = "/profile/edit";
+                          router.push("/profile/edit");
                         },
                       },
                       {
                         label: "Sign out",
                         onClick: async () => {
                           await signOut();
-                          window.location.href = "/";
+                          router.push("/");
                         },
                         destructive: true,
                       },

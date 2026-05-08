@@ -10,3 +10,6 @@ export { default as SearchBar } from "./SearchBar";
 export { default as Tag } from "./Tag";
 export { default as Select } from "./Select";
 export { default as Textarea } from "./Textarea";
+export { default as Spinner } from "./Spinner";
+export { default as PageHeader } from "./PageHeader";
+export { default as SearchResultCard } from "./SearchResultCard";

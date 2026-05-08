@@ -13,7 +13,6 @@ import {
 } from "@/lib/firestore/users";
 import {
   getLessonsByAuthor,
-  getPublicLessons,
   type Lesson,
 } from "@/lib/firestore/lessons";
 import {
@@ -108,12 +107,8 @@ export default function EducatorProfile({ userId }: { userId: string }) {
           setLessons(result.lessons);
         } else {
           // Other profiles: only published
-          const result = await getPublicLessons(
-            { gradeLevel: undefined, subject: undefined },
-            null
-          );
-          // Filter to this specific author since getPublicLessons has no authorId filter
-          setLessons(result.lessons.filter((l) => l.authorId === userId));
+          const result = await getLessonsByAuthor(userId, false, null, 100);
+          setLessons(result.lessons);
         }
       } catch {
         setLessons([]);

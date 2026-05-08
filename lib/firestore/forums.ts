@@ -19,21 +19,16 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { makeSlug, parseSlug, byCreatedAtDesc } from "@/lib/utils";
 
 // --- Slug helper ---
 
 export function threadSlug(title: string, id: string): string {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
-  return `${slug}--${id}`;
+  return makeSlug(title, id);
 }
 
 export function parseThreadSlug(slug: string): string {
-  const idx = slug.lastIndexOf("--");
-  return idx !== -1 ? slug.slice(idx + 2) : slug;
+  return parseSlug(slug);
 }
 
 // --- Forum category definitions ---
@@ -280,7 +275,7 @@ export async function getThreadsByAuthor(
 
   const threads = snapshot.docs
     .map((d) => d.data() as ForumThread)
-    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+    .sort(byCreatedAtDesc);
 
   return { threads, lastDoc: null };
 }

@@ -16,6 +16,7 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { makeSlug, parseSlug } from "@/lib/utils";
 
 // --- Job type definitions ---
 
@@ -50,18 +51,19 @@ export type JobInput = Omit<Job, "id" | "createdAt" | "isActive">;
 // --- Helpers ---
 
 export function jobSlug(title: string, id: string): string {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
-  return `${slug}--${id}`;
+  return makeSlug(title, id);
 }
 
 export function parseJobSlug(slug: string): string {
-  const idx = slug.lastIndexOf("--");
-  return idx !== -1 ? slug.slice(idx + 2) : slug;
+  return parseSlug(slug);
 }
+
+export const JOB_TYPE_COLOR: Record<JobType, string> = {
+  "full-time": "bg-emerald-100 text-emerald-700",
+  "part-time": "bg-blue-100 text-blue-700",
+  contract: "bg-amber-100 text-amber-700",
+  substitute: "bg-purple-100 text-purple-700",
+};
 
 // --- CRUD ---
 
