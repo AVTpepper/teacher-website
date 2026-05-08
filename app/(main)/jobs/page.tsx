@@ -13,8 +13,7 @@ import {
   type JobFilters,
   type JobType,
 } from "@/lib/firestore/jobs";
-import { Avatar, Badge, Button, Card, Input, Modal, Select, Textarea } from "@/components/ui";
-import { createJob } from "@/lib/firestore/jobs";
+import { Avatar, Badge, Button, Card, Input, Select } from "@/components/ui";
 
 
 
@@ -24,127 +23,6 @@ const JOB_TYPE_COLOR: Record<JobType, string> = {
   contract: "bg-amber-100 text-amber-700",
   substitute: "bg-purple-100 text-purple-700",
 };
-
-// --- Post Job Modal ---
-
-function PostJobModal({
-  open,
-  onClose,
-  onPosted,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onPosted: () => void;
-}) {
-  const { user } = useAuth();
-  const [title, setTitle] = useState("");
-  const [organization, setOrganization] = useState("");
-  const [location, setLocation] = useState("");
-  const [gradeLevel, setGradeLevel] = useState("");
-  const [subject, setSubject] = useState("");
-  const [jobType, setJobType] = useState("");
-  const [description, setDescription] = useState("");
-  const [applyURL, setApplyURL] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  function reset() {
-    setTitle(""); setOrganization(""); setLocation(""); setGradeLevel("");
-    setSubject(""); setJobType(""); setDescription(""); setApplyURL("");
-    setError(""); setSaving(false);
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user) return;
-    if (!title.trim() || !organization.trim() || !location.trim() || !gradeLevel || !subject || !jobType || !description.trim()) {
-      setError("Please fill in all required fields.");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      await createJob({
-        title: title.trim(),
-        organization: organization.trim(),
-        location: location.trim(),
-        gradeLevel,
-        subject,
-        jobType: jobType as JobType,
-        description: description.trim(),
-        applyURL: applyURL.trim() || "#",
-        postedBy: user.uid,
-      });
-      reset();
-      onPosted();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      setError("Failed to post job. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal open={open} onClose={() => { reset(); onClose(); }} title="Post a Job">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input label="Job Title *" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. 5th Grade Math Teacher" />
-          <Input label="School / Organization *" value={organization} onChange={(e) => setOrganization(e.target.value)} placeholder="e.g. Lincoln Elementary" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input label="Location *" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Austin, TX or Remote" />
-          <Select
-            label="Job Type *"
-            value={jobType}
-            onChange={(e) => setJobType(e.target.value)}
-            options={[{ value: "", label: "Select type" }, ...JOB_TYPES.map((t) => ({ value: t.value, label: t.label }))]}
-          />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select
-            label="Grade Level *"
-            value={gradeLevel}
-            onChange={(e) => setGradeLevel(e.target.value)}
-            options={[{ value: "", label: "Select grade" }, ...GRADE_LEVELS.map((g) => ({ value: g, label: g }))]}
-          />
-          <Select
-            label="Subject *"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            options={[{ value: "", label: "Select subject" }, ...SUBJECTS.map((s) => ({ value: s, label: s }))]}
-          />
-        </div>
-        <Textarea
-          label="Job Description *"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Describe the role, responsibilities, and requirements…"
-          rows={5}
-        />
-        <Input
-          label="Apply URL (optional)"
-          value={applyURL}
-          onChange={(e) => setApplyURL(e.target.value)}
-          placeholder="https://… (leave blank to handle applications in-app)"
-          type="url"
-        />
-
-        {error && <p className="text-sm text-error font-medium">{error}</p>}
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={() => { reset(); onClose(); }} disabled={saving}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" disabled={saving}>
-            {saving ? "Posting…" : "Post Job"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
 
 // --- Job Card ---
 
@@ -193,7 +71,6 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [showPostJob, setShowPostJob] = useState(false);
   const cursorRef = useRef<DocumentSnapshot | null>(null);
 
   const fetchJobs = useCallback(
@@ -257,9 +134,9 @@ export default function JobsPage() {
           </p>
         </div>
         {user ? (
-          <Button variant="primary" onClick={() => setShowPostJob(true)}>
-            + Post Job
-          </Button>
+          <Link href="/jobs/new">
+            <Button variant="primary">+ Post Job</Button>
+          </Link>
         ) : (
           <p className="text-sm text-muted">
             <a href="/auth/login" className="text-primary underline">Sign in</a> to post a job.
@@ -343,12 +220,6 @@ export default function JobsPage() {
         </div>
       )}
 
-      {/* Post Job modal */}
-      <PostJobModal
-        open={showPostJob}
-        onClose={() => setShowPostJob(false)}
-        onPosted={() => fetchJobs(true)}
-      />
     </div>
   );
 }
