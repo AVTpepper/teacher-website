@@ -12,114 +12,7 @@ import {
 } from "@/lib/firestore/inspiration";
 import { Avatar, Badge, Button, Card, Input, Modal, Select, Textarea } from "@/components/ui";
 
-// --- Seed content shown when Firestore has no items yet ---
 
-const SEED_ITEMS: InspirationItem[] = [
-  {
-    id: "seed-1",
-    title: "The Cult of Pedagogy Podcast",
-    description:
-      "Jennifer Gonzalez interviews educators, researchers, and thought leaders on what works in teaching and why.",
-    category: "podcast",
-    sourceURL: "https://www.cultofpedagogy.com/pod/",
-    thumbnailURL: null,
-    creator: "Jennifer Gonzalez",
-    submittedBy: null,
-    createdAt: null,
-    isApproved: true,
-  },
-  {
-    id: "seed-2",
-    title: "Why Students Forget — and What You Can Do About It",
-    description:
-      "A deep dive into retrieval practice and spaced repetition, and how these evidence-based strategies dramatically improve long-term retention.",
-    category: "article",
-    sourceURL: "https://www.edutopia.org/article/why-students-forget",
-    thumbnailURL: null,
-    creator: "Edutopia",
-    submittedBy: null,
-    createdAt: null,
-    isApproved: true,
-  },
-  {
-    id: "seed-3",
-    title: "Teaching Channel: Classroom Strategies in Action",
-    description:
-      "Video library of real teachers implementing research-backed instructional strategies across grade levels and subjects.",
-    category: "video",
-    sourceURL: "https://www.teachingchannel.com/",
-    thumbnailURL: null,
-    creator: "Teaching Channel",
-    submittedBy: null,
-    createdAt: null,
-    isApproved: true,
-  },
-  {
-    id: "seed-4",
-    title: "The Science of Reading: A New Consensus",
-    description:
-      "How decades of cognitive science research is reshaping early literacy instruction and what it means for classroom practice.",
-    category: "education-news",
-    sourceURL: "https://www.nytimes.com/education",
-    thumbnailURL: null,
-    creator: "The New York Times",
-    submittedBy: null,
-    createdAt: null,
-    isApproved: true,
-  },
-  {
-    id: "seed-5",
-    title: "From Burnout to Balance: One Teacher's Journey",
-    description:
-      "A 15-year veteran shares how she rebuilt her classroom practice and reclaimed her love of teaching after hitting rock bottom.",
-    category: "teacher-story",
-    sourceURL: "#",
-    thumbnailURL: null,
-    creator: "EduConnect Community",
-    submittedBy: null,
-    createdAt: null,
-    isApproved: true,
-  },
-  {
-    id: "seed-6",
-    title: "Mindshift Podcast",
-    description:
-      "KQED's education podcast exploring learning, teaching, and the future of education — from classrooms to cutting-edge research.",
-    category: "podcast",
-    sourceURL: "https://www.kqed.org/mindshift",
-    thumbnailURL: null,
-    creator: "KQED",
-    submittedBy: null,
-    createdAt: null,
-    isApproved: true,
-  },
-  {
-    id: "seed-7",
-    title: "The Power of Project-Based Learning",
-    description:
-      "Explore how PBL drives deeper engagement, cross-disciplinary thinking, and real-world problem solving in K–12 classrooms.",
-    category: "article",
-    sourceURL: "https://www.pblworks.org/",
-    thumbnailURL: null,
-    creator: "PBLWorks",
-    submittedBy: null,
-    createdAt: null,
-    isApproved: true,
-  },
-  {
-    id: "seed-8",
-    title: "AI Tools Every Teacher Should Know About",
-    description:
-      "A practical overview of AI-powered tools that can save time on planning, differentiation, and assessment without replacing the teacher.",
-    category: "education-news",
-    sourceURL: "#",
-    thumbnailURL: null,
-    creator: "EduConnect Editorial",
-    submittedBy: null,
-    createdAt: null,
-    isApproved: true,
-  },
-];
 
 const CATEGORY_COLOR: Record<InspirationCategory, string> = {
   podcast: "bg-purple-100 text-purple-700",
@@ -417,14 +310,9 @@ export default function InspirationPage() {
     fetchItems(true);
   }, [fetchItems]);
 
-  // Fall back to seed items when Firestore is empty or unavailable
-  const displayItems = items.length > 0 ? items : loading ? [] : SEED_ITEMS;
-  const filteredSeedItems =
-    activeCategory === "all"
-      ? displayItems
-      : displayItems.filter((i) => i.category === activeCategory);
-
-  const visibleItems = items.length > 0 ? items : filteredSeedItems;
+  const visibleItems = activeCategory === "all"
+    ? items
+    : items.filter((i) => i.category === activeCategory);
   const featured = visibleItems[0] ?? null;
   const rest = visibleItems.slice(1);
 

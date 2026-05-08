@@ -29,7 +29,7 @@ export default function Tabs({
 
   return (
     <div
-      className={`flex gap-1 border-b border-border overflow-x-auto ${className}`}
+      className={`flex gap-1 border-b border-border overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
       role="tablist"
     >
       {tabs.map((tab) => (

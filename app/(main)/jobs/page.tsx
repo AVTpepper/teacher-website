@@ -16,100 +16,7 @@ import {
 import { Avatar, Badge, Button, Card, Input, Modal, Select, Textarea } from "@/components/ui";
 import { createJob } from "@/lib/firestore/jobs";
 
-// --- Seed jobs shown when Firestore is empty ---
 
-const SEED_JOBS: Job[] = [
-  {
-    id: "seed-1",
-    title: "5th Grade Math Teacher",
-    organization: "Lincoln Elementary School",
-    location: "Austin, TX",
-    gradeLevel: "Elementary",
-    subject: "Math",
-    jobType: "full-time",
-    description:
-      "We are seeking a passionate and experienced 5th Grade Math teacher to join our team. Responsibilities include planning and delivering engaging lessons aligned to state standards, collaborating with grade-level teammates, and communicating regularly with families.",
-    applyURL: "#",
-    postedBy: "seed",
-    createdAt: null,
-    isActive: true,
-  },
-  {
-    id: "seed-2",
-    title: "High School English Teacher",
-    organization: "Riverside Academy",
-    location: "Chicago, IL",
-    gradeLevel: "High School",
-    subject: "English",
-    jobType: "full-time",
-    description:
-      "Riverside Academy is hiring a dedicated High School English teacher for grades 9–12. The ideal candidate holds a valid teaching license, has experience with AP Literature, and is committed to fostering a love of reading and writing.",
-    applyURL: "#",
-    postedBy: "seed",
-    createdAt: null,
-    isActive: true,
-  },
-  {
-    id: "seed-3",
-    title: "Part-Time STEM Instructor",
-    organization: "Code & Create Academy",
-    location: "Remote",
-    gradeLevel: "Middle School",
-    subject: "STEM",
-    jobType: "part-time",
-    description:
-      "Code & Create Academy is looking for a part-time STEM instructor to teach after-school coding and robotics workshops for middle schoolers. Flexible schedule, 10–15 hours/week.",
-    applyURL: "#",
-    postedBy: "seed",
-    createdAt: null,
-    isActive: true,
-  },
-  {
-    id: "seed-4",
-    title: "Substitute Teacher — All Grades",
-    organization: "Maplewood Unified School District",
-    location: "Portland, OR",
-    gradeLevel: "Elementary",
-    subject: "Other",
-    jobType: "substitute",
-    description:
-      "Maplewood USD is building a pool of qualified substitute teachers for all grade levels. Daily and long-term assignments available. A valid sub credential or teaching license required.",
-    applyURL: "#",
-    postedBy: "seed",
-    createdAt: null,
-    isActive: true,
-  },
-  {
-    id: "seed-5",
-    title: "Special Education Teacher",
-    organization: "Sunrise Learning Center",
-    location: "Denver, CO",
-    gradeLevel: "Elementary",
-    subject: "Special Education",
-    jobType: "full-time",
-    description:
-      "Join our dedicated team supporting students with diverse learning needs. You'll design and implement IEPs, collaborate with general ed teachers, and build a supportive, inclusive classroom culture.",
-    applyURL: "#",
-    postedBy: "seed",
-    createdAt: null,
-    isActive: true,
-  },
-  {
-    id: "seed-6",
-    title: "EdTech Curriculum Developer (Contract)",
-    organization: "BrightPath Learning",
-    location: "Remote",
-    gradeLevel: "Higher Education",
-    subject: "Computer Science",
-    jobType: "contract",
-    description:
-      "BrightPath is seeking an experienced curriculum developer to design and write K–12 computer science course materials. 3-month contract, potential to extend. Prior teaching experience required.",
-    applyURL: "#",
-    postedBy: "seed",
-    createdAt: null,
-    isActive: true,
-  },
-];
 
 const JOB_TYPE_COLOR: Record<JobType, string> = {
   "full-time": "bg-emerald-100 text-emerald-700",
@@ -322,20 +229,13 @@ export default function JobsPage() {
     fetchJobs(true);
   }, [fetchJobs]);
 
-  // Use seed data when Firestore is empty
-  const displayJobs = jobs.length > 0 ? jobs : loading ? [] : SEED_JOBS;
-  const filteredDisplay =
-    jobs.length > 0
-      ? jobs
-      : SEED_JOBS.filter((j) => {
-          if (gradeLevel && j.gradeLevel !== gradeLevel) return false;
-          if (subject && j.subject !== subject) return false;
-          if (jobType && j.jobType !== jobType) return false;
-          if (locationQuery && !j.location.toLowerCase().includes(locationQuery.toLowerCase())) return false;
-          return true;
-        });
-
-  const visibleJobs = jobs.length > 0 ? displayJobs : filteredDisplay;
+  const visibleJobs = jobs.filter((j) => {
+    if (gradeLevel && j.gradeLevel !== gradeLevel) return false;
+    if (subject && j.subject !== subject) return false;
+    if (jobType && j.jobType !== jobType) return false;
+    if (locationQuery && !j.location.toLowerCase().includes(locationQuery.toLowerCase())) return false;
+    return true;
+  });
 
   function clearFilters() {
     setGradeLevel("");
