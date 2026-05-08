@@ -523,7 +523,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Notification dropdown in navbar
   - Mark as read
 
-- [ ] **5.6 Universal search** (`app/search/page.tsx`)
+- [x] **5.6 Universal search** (`app/search/page.tsx`)
   - Search across: Educators, Resources, Discussions, Lessons, Jobs
   - Tabbed results by type
   - Firestore text search (Algolia integration placeholder for future)

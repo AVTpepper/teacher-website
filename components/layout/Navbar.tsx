@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { SearchBar } from "@/components/ui";
@@ -20,8 +20,14 @@ const navLinks = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, loading, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  function handleSearch(q: string) {
+    const trimmed = q.trim();
+    if (trimmed) router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+  }
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
@@ -44,7 +50,10 @@ export default function Navbar() {
 
           {/* Search — hidden on mobile, shown md+ */}
           <div className="hidden md:block flex-1 max-w-md mx-4">
-            <SearchBar placeholder="Search educators, resources, discussions..." />
+            <SearchBar
+              placeholder="Search educators, resources, discussions..."
+              onSearch={handleSearch}
+            />
           </div>
 
           {/* Right actions */}
@@ -191,7 +200,13 @@ export default function Navbar() {
         <div className="absolute left-0 right-0 top-0 border-t border-border bg-surface shadow-lg">
           {/* Mobile search */}
           <div className="px-4 py-3 md:hidden">
-            <SearchBar placeholder="Search..." />
+            <SearchBar
+              placeholder="Search..."
+              onSearch={(q) => {
+                handleSearch(q);
+                setMobileMenuOpen(false);
+              }}
+            />
           </div>
 
           <nav className="px-2 pb-3 space-y-1" aria-label="Mobile">
