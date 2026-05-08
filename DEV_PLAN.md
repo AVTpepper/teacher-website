@@ -517,7 +517,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Badge display component (`components/badges/BadgeIcon.tsx`)
   - Badges shown on profiles and next to usernames in discussions
 
-- [ ] **5.5 Notification system** (`components/layout/NotificationDropdown.tsx`, `lib/notifications.ts`)
+- [x] **5.5 Notification system** (`components/layout/NotificationDropdown.tsx`, `lib/notifications.ts`)
   - Firestore `notifications` collection per user
   - Types: new follower, comment, upvote, badge earned, resource liked
   - Notification dropdown in navbar
