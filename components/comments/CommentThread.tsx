@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
+import BadgeIcon from "@/components/badges/BadgeIcon";
 
 // ─── Generic comment type ───
 
@@ -14,6 +15,8 @@ export interface CommentData {
   authorId: string;
   authorName: string;
   authorPhotoURL: string | null;
+  /** Optional badges to show next to the author's name. */
+  authorBadges?: string[];
   content: string;
   createdAt: { seconds: number } | null;
   /** Used for upvote-based interactions (forums). */
@@ -175,6 +178,13 @@ function CommentItem({
             >
               {comment.authorName}
             </Link>
+            {comment.authorBadges && comment.authorBadges.length > 0 && (
+              <span className="flex items-center gap-0.5">
+                {comment.authorBadges.slice(0, 3).map((id) => (
+                  <BadgeIcon key={id} badgeId={id} compact />
+                ))}
+              </span>
+            )}
             <span className="text-xs text-muted">
               {timeAgo(comment.createdAt)}
             </span>

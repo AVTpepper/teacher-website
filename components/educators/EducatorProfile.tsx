@@ -32,6 +32,8 @@ import {
   type ForumThread,
 } from "@/lib/firestore/forums";
 import { Avatar, Badge, Button, Card, Tabs, Tag } from "@/components/ui";
+import { BadgeList } from "@/components/badges/BadgeIcon";
+import { BADGE_LIST } from "@/lib/badges";
 
 const PROFILE_TABS = [
   { label: "Posts", value: "posts" },
@@ -417,14 +419,20 @@ export default function EducatorProfile({ userId }: { userId: string }) {
       {/* Badges Section */}
       {profile.badges.length > 0 && (
         <Card className="mt-6">
-          <h2 className="mb-3 text-lg font-semibold text-foreground">
-            Achievements
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {profile.badges.map((badge) => (
-              <Tag key={badge} label={badge} />
-            ))}
-          </div>
+          <h2 className="mb-4 text-lg font-semibold text-foreground">Achievements</h2>
+          {(["verification", "contribution", "milestone", "expertise"] as const).map((cat) => {
+            const catBadges = profile.badges.filter(
+              (id) => BADGE_LIST.find((b) => b.id === id)?.category === cat
+            );
+            if (catBadges.length === 0) return null;
+            const catLabel = { verification: "Verification", contribution: "Contribution", milestone: "Milestones", expertise: "Expertise" }[cat];
+            return (
+              <div key={cat} className="mb-4 last:mb-0">
+                <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">{catLabel}</p>
+                <BadgeList badgeIds={catBadges} />
+              </div>
+            );
+          })}
         </Card>
       )}
 

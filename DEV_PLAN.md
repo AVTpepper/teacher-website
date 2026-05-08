@@ -508,7 +508,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - Apply action (link or in-app)
   - School/org info
 
-- [ ] **5.4 Achievement & Badge system** (`lib/badges.ts`)
+- [x] **5.4 Achievement & Badge system** (`lib/badges.ts`)
   - Verification Badge (school email / credential verification)
   - Contribution Badges: Resource Creator, Lesson Builder, Community Helper, Discussion Starter, Top Contributor
   - Milestone Achievements: First Resource Shared, 10 Lessons Created, 100 Resource Downloads, 100 Helpful Replies, 1-Year Member
