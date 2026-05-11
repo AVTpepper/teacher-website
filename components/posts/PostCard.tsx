@@ -164,7 +164,7 @@ export default function PostCard({ post }: PostCardProps) {
       </div>
 
       {/* Action buttons */}
-      <div className="mt-2 pt-2 border-t border-border flex items-center gap-1">
+      <div className="mt-2 pt-2 border-t border-border flex flex-wrap items-center gap-1">
         <button
           type="button"
           onClick={handleLike}

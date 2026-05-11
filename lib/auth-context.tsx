@@ -30,6 +30,11 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const googleProvider = new GoogleAuthProvider();
+// Request email + profile scopes (ensures displayName and photoURL are populated)
+googleProvider.addScope("email");
+googleProvider.addScope("profile");
+// Always show account picker so users can switch accounts
+googleProvider.setCustomParameters({ prompt: "select_account" });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

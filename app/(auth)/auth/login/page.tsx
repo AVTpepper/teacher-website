@@ -18,6 +18,9 @@ const firebaseErrorMessages: Record<string, string> = {
   "auth/wrong-password": "Incorrect password.",
   "auth/invalid-credential": "Invalid email or password.",
   "auth/too-many-requests": "Too many attempts. Please try again later.",
+  "auth/popup-blocked": "Popup was blocked. Please allow popups for this site in your browser settings, then try again.",
+  "auth/operation-not-allowed": "Google sign-in is not currently enabled. Please use email and password.",
+  "auth/network-request-failed": "Network error. Please check your connection and try again.",
 };
 
 export default function LoginPage() {
@@ -115,7 +118,7 @@ function LoginForm() {
         err instanceof Error && "code" in err
           ? (err as { code: string }).code
           : "";
-      if (code !== "auth/popup-closed-by-user") {
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
         setError(firebaseErrorMessages[code] || "Failed to sign in with Google.");
       }
     } finally {

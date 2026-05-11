@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -67,6 +67,15 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   const [threadsLoaded, setThreadsLoaded] = useState(false);
 
   const [activeTab, setActiveTab] = useState("posts");
+  const tabsSectionRef = useRef<HTMLDivElement>(null);
+
+  function handleTabChange(tab: string) {
+    setActiveTab(tab);
+    // After content settles, scroll so the tab bar is visible without losing the header
+    requestAnimationFrame(() => {
+      tabsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }
 
   const isOwnProfile = user?.uid === userId;
 
@@ -432,13 +441,13 @@ export default function EducatorProfile({ userId }: { userId: string }) {
       )}
 
       {/* Content Tabs */}
-      <div className="mt-6">
+      <div className="mt-6" ref={tabsSectionRef}>
         <Tabs
           tabs={PROFILE_TABS}
           defaultValue="posts"
-          onChange={setActiveTab}
+          onChange={handleTabChange}
         />
-        <Card className="mt-4 min-h-50" padding="lg">
+        <Card className="mt-4 min-h-[320px]" padding="lg">
           {!user ? (
             <div className="py-12 text-center">
               <div className="text-4xl mb-3">🔒</div>
