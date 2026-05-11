@@ -29,7 +29,7 @@ export default function ResourceDetailPage({
 }) {
   const { id: rawId } = use(params);
   const id = parseResourceSlug(rawId);
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [resource, setResource] = useState<Resource | null>(null);
   const [author, setAuthor] = useState<UserProfile | null>(null);
@@ -50,6 +50,7 @@ export default function ResourceDetailPage({
 
   // Related
   const [related, setRelated] = useState<Resource[]>([]);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -110,6 +111,8 @@ export default function ResourceDetailPage({
       navigator.share({ title: resource?.title ?? "Resource", url });
     } else {
       navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   }
 
@@ -336,53 +339,73 @@ export default function ResourceDetailPage({
             </div>
 
             {/* Action buttons */}
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Button onClick={handleDownload}>
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
-                  />
-                </svg>
-                Download
-              </Button>
-
-              {user && (
-                <Button
-                  variant={saved ? "secondary" : "outline"}
-                  onClick={handleToggleSave}
-                  isLoading={savingToggle}
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill={saved ? "currentColor" : "none"}
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
-                    />
-                  </svg>
-                  {saved ? "Saved" : "Save"}
-                </Button>
+            <div className="mt-4 space-y-3">
+              {!user && !authLoading && (
+                <div className="rounded-xl border border-border bg-secondary-50 p-4">
+                  <p className="text-sm font-semibold text-foreground mb-1">
+                    🔒 Sign in to download and save this resource
+                  </p>
+                  <p className="text-xs text-muted mb-3">
+                    Create a free account to access and save educational resources shared by real teachers.
+                  </p>
+                  <div className="flex gap-2">
+                    <Link href="/auth/login">
+                      <Button size="sm">Sign In</Button>
+                    </Link>
+                    <Link href="/auth/signup">
+                      <Button variant="outline" size="sm">Create Account</Button>
+                    </Link>
+                  </div>
+                </div>
               )}
-
-              <Button variant="outline" onClick={handleShare}>
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
-                </svg>
-                Share
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                {user && (
+                  <>
+                    <Button onClick={handleDownload}>
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+                        />
+                      </svg>
+                      Download
+                    </Button>
+                    <Button
+                      variant={saved ? "secondary" : "outline"}
+                      onClick={handleToggleSave}
+                      isLoading={savingToggle}
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill={saved ? "currentColor" : "none"}
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
+                        />
+                      </svg>
+                      {saved ? "Saved" : "Save"}
+                    </Button>
+                  </>
+                )}
+                <Button variant="outline" onClick={handleShare}>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+                  </svg>
+                  {copied ? "✓ Copied!" : "Share"}
+                </Button>
+              </div>
             </div>
 
             {/* File info */}
