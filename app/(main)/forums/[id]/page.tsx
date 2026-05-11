@@ -49,6 +49,7 @@ export default function ForumThreadPage({
   // Comments
   const [comments, setComments] = useState<ThreadComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [replySort, setReplySort] = useState<"newest" | "top">("newest");
 
   const loadComments = useCallback(
     async (catId: string) => {
@@ -184,6 +185,29 @@ export default function ForumThreadPage({
   const categoryData = FORUM_CATEGORIES.find((c) => c.id === categoryId);
   const score = upvotes - downvotes;
 
+  // Build CommentData — sort top-level by score when replySort === "top"
+  const commentData: CommentData[] = comments.map((c) => ({
+    id: c.id,
+    parentId: c.parentId,
+    authorId: c.authorId,
+    authorName: c.authorName,
+    authorPhotoURL: c.authorPhotoURL,
+    content: c.content,
+    createdAt: c.createdAt as { seconds: number } | null,
+    upvotes: c.upvotes,
+    downvotes: c.downvotes,
+  }));
+
+  const sortedCommentData =
+    replySort === "top"
+      ? [
+          ...commentData
+            .filter((c) => !c.parentId)
+            .sort((a, b) => (b.upvotes ?? 0) - (b.downvotes ?? 0) - ((a.upvotes ?? 0) - (a.downvotes ?? 0))),
+          ...commentData.filter((c) => !!c.parentId),
+        ]
+      : commentData;
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -302,25 +326,34 @@ export default function ForumThreadPage({
 
       {/* Comments section */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">
-          Replies ({comments.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-foreground">
+            Replies ({comments.length})
+          </h2>
+          {comments.length > 1 && (
+            <div className="flex items-center gap-1 text-sm">
+              <span className="text-muted mr-1">Sort:</span>
+              {(["newest", "top"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setReplySort(s)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                    replySort === s
+                      ? "bg-primary-900 text-white"
+                      : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
+                  }`}
+                >
+                  {s === "newest" ? "Newest" : "Top"}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="rounded-xl border border-border bg-surface p-4">
           <CommentThread
-            comments={comments.map(
-              (c): CommentData => ({
-                id: c.id,
-                parentId: c.parentId,
-                authorId: c.authorId,
-                authorName: c.authorName,
-                authorPhotoURL: c.authorPhotoURL,
-                content: c.content,
-                createdAt: c.createdAt as { seconds: number } | null,
-                upvotes: c.upvotes,
-                downvotes: c.downvotes,
-              })
-            )}
+            comments={sortedCommentData}
             loading={loadingComments}
             maxDepth={2}
             mode="upvote"
