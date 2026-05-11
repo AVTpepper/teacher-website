@@ -16,6 +16,7 @@ import {
 } from "@/lib/firestore/resources";
 import { Button, Card, Input, Select, Textarea, Tag } from "@/components/ui";
 import ResourcePDFDocument from "@/components/resources/ResourcePDFDocument";
+import LinkAttacher, { type AttachedLink } from "@/components/ui/LinkAttacher";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
@@ -30,6 +31,7 @@ export default function UploadResourcePage() {
   const [resType, setResType] = useState<string>("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [links, setLinks] = useState<AttachedLink[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -157,6 +159,7 @@ export default function UploadResourcePage() {
         fileURL,
         fileName,
         tags,
+        links,
       });
 
       router.push(`/resources/${resourceSlug(title, id)}`);  
@@ -323,6 +326,15 @@ export default function UploadResourcePage() {
               </p>
             )}
             <p className="text-xs text-muted">Max file size: 25 MB</p>
+          </div>
+
+          {/* Links */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">
+              Links (optional)
+            </label>
+            <p className="text-xs text-muted -mt-1">Attach external URLs that go with this resource.</p>
+            <LinkAttacher links={links} onChange={setLinks} />
           </div>
 
           {/* Actions */}

@@ -33,6 +33,7 @@ export interface Post {
   type: PostType;
   tags: string[];
   gradeLevel: string;
+  links: AttachedLink[];
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
   likesCount: number;
@@ -47,9 +48,15 @@ export interface PostInput {
   type: PostType;
   tags: string[];
   gradeLevel: string;
+  links?: AttachedLink[];
 }
 
 // --- Comment types ---
+
+export interface AttachedLink {
+  url: string;
+  label: string;
+}
 
 export interface PostComment {
   id: string;
@@ -82,6 +89,7 @@ export async function createPost(data: PostInput): Promise<string> {
   await setDoc(ref, {
     ...data,
     id: ref.id,
+    links: data.links ?? [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     likesCount: 0,

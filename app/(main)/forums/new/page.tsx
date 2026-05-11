@@ -11,6 +11,7 @@ import {
 } from "@/lib/firestore/forums";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import { Button, Card, Input, Select, Textarea } from "@/components/ui";
+import LinkAttacher, { type AttachedLink } from "@/components/ui/LinkAttacher";
 
 const TAG_OPTIONS = [
   "Classroom Management",
@@ -46,6 +47,7 @@ function NewDiscussionForm() {
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [links, setLinks] = useState<AttachedLink[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -104,6 +106,7 @@ function NewDiscussionForm() {
         tags,
         gradeLevel,
         subject,
+        links,
       });
       router.push(`/forums/${threadSlug(title.trim(), threadId)}`);
     } catch {
@@ -216,6 +219,12 @@ function NewDiscussionForm() {
               ))}
             </div>
           </div>
+        </Card>
+
+        <Card padding="lg" className="space-y-3">
+          <h2 className="text-base font-semibold text-foreground">Attached Links</h2>
+          <p className="text-xs text-muted -mt-1">Add external URLs relevant to this discussion.</p>
+          <LinkAttacher links={links} onChange={setLinks} />
         </Card>
 
         <div className="flex justify-end gap-3">

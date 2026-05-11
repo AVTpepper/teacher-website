@@ -8,6 +8,7 @@ import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import Tag from "@/components/ui/Tag";
 import MentionInput, { type MentionedUser } from "@/components/ui/MentionInput";
+import LinkAttacher, { type AttachedLink } from "@/components/ui/LinkAttacher";
 
 const POST_TYPES: { value: PostType; label: string }[] = [
   { value: "idea", label: "💡 Idea" },
@@ -44,6 +45,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const { user } = useAuth();
   const [content, setContent] = useState("");
   const [mentions, setMentions] = useState<MentionedUser[]>([]);
+  const [links, setLinks] = useState<AttachedLink[]>([]);
   const [type, setType] = useState<PostType>("idea");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [gradeLevel, setGradeLevel] = useState("");
@@ -77,6 +79,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
         type,
         tags: selectedTags,
         gradeLevel,
+        links,
       });
       // Send mention notifications (fire-and-forget)
       mentions.forEach((m) => {
@@ -91,6 +94,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       void postId;
       setContent("");
       setMentions([]);
+      setLinks([]);
       setType("idea");
       setSelectedTags([]);
       setGradeLevel("");
@@ -185,6 +189,14 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
             </div>
           </div>
 
+          {/* Links */}
+          <div>
+            <label className="text-xs font-medium text-muted mb-1.5 block">
+              Links (optional)
+            </label>
+            <LinkAttacher links={links} onChange={setLinks} />
+          </div>
+
           {/* Error + submit */}
           {error && <p className="text-xs text-error-500">{error}</p>}
 
@@ -197,6 +209,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                 setContent("");
                 setSelectedTags([]);
                 setGradeLevel("");
+                setLinks([]);
                 setType("idea");
                 setError("");
               }}

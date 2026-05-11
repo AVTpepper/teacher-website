@@ -83,6 +83,11 @@ export const FORUM_CATEGORIES: Omit<ForumCategory, "threadCount" | "lastActivity
 
 // --- Thread types ---
 
+export interface AttachedLink {
+  url: string;
+  label: string;
+}
+
 export interface ForumThread {
   id: string;
   categoryId: string;
@@ -94,6 +99,7 @@ export interface ForumThread {
   tags: string[];
   gradeLevel: string;
   subject: string;
+  links: AttachedLink[];
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
   upvotes: number;
@@ -111,6 +117,7 @@ export interface ForumThreadInput {
   tags: string[];
   gradeLevel: string;
   subject: string;
+  links?: AttachedLink[];
 }
 
 // --- Thread comment types ---
@@ -194,6 +201,7 @@ export async function createThread(data: ForumThreadInput): Promise<string> {
   await setDoc(ref, {
     ...data,
     id: ref.id,
+    links: data.links ?? [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     upvotes: 0,
