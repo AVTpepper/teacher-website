@@ -3,6 +3,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { pdf } from "@react-pdf/renderer";
 import { storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
@@ -14,6 +15,7 @@ import {
   type ResourceType,
 } from "@/lib/firestore/resources";
 import { Button, Card, Input, Select, Textarea, Tag } from "@/components/ui";
+import ResourcePDFDocument from "@/components/resources/ResourcePDFDocument";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
@@ -106,7 +108,9 @@ export default function UploadResourcePage() {
     try {
       let fileURL = "";
       let fileName = "";
+
       if (file && storage) {
+        // User attached a real file — upload it as-is
         const storageRef = ref(
           storage,
           `resources/${user.uid}/${Date.now()}_${file.name}`
@@ -114,6 +118,29 @@ export default function UploadResourcePage() {
         await uploadBytes(storageRef, file);
         fileURL = await getDownloadURL(storageRef);
         fileName = file.name;
+      } else if (!file && storage) {
+        // No file attached — generate a formatted PDF from the form data
+        const typeLabelObj = RESOURCE_TYPES.find((t) => t.value === resType);
+        const typeLabel = typeLabelObj?.label ?? resType;
+        const pdfBlob = await pdf(
+          <ResourcePDFDocument
+            title={title.trim()}
+            description={description.trim()}
+            gradeLevel={gradeLevel}
+            subject={subject}
+            type={typeLabel}
+            tags={tags}
+            authorName={user.displayName || "Anonymous"}
+          />
+        ).toBlob();
+        const safeName = title.trim().replace(/[^a-z0-9]/gi, "_").toLowerCase();
+        fileName = `${safeName}.pdf`;
+        const storageRef = ref(
+          storage,
+          `resources/${user.uid}/${Date.now()}_${fileName}`
+        );
+        await uploadBytes(storageRef, pdfBlob, { contentType: "application/pdf" });
+        fileURL = await getDownloadURL(storageRef);
       } else if (file && !storage) {
         console.warn("Firebase Storage not activated — skipping file upload");
       }
