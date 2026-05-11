@@ -239,7 +239,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   return (
     <div className="mx-auto max-w-3xl py-8">
       {/* Profile Header */}
-      <Card padding="lg">
+      <Card padding="lg" className="sticky top-14 z-10">
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
           {/* Avatar */}
           <Avatar
