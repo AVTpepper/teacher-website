@@ -21,6 +21,7 @@ import {
 import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { Avatar, Badge, Button, Card } from "@/components/ui";
 import { timeAgo } from "@/lib/utils";
+import { notifyResourceLiked } from "@/lib/notifications";
 
 export default function ResourceDetailPage({
   params,
@@ -128,6 +129,17 @@ export default function ResourceDetailPage({
         await saveResource(resource.id, user.uid);
         setSaved(true);
         setLocalSavedCount((c) => c + 1);
+        // Notify resource author (fire-and-forget)
+        if (resource.authorId !== user.uid) {
+          notifyResourceLiked({
+            recipientId: resource.authorId,
+            actorId: user.uid,
+            actorName: user.displayName || "Someone",
+            actorPhotoURL: user.photoURL,
+            resourceTitle: resource.title,
+            linkURL: window.location.href,
+          }).catch(() => {});
+        }
       }
     } catch {
       // ignore

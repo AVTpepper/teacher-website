@@ -25,6 +25,7 @@ const TYPE_ICON: Record<NotificationType, string> = {
   upvote: "⬆️",
   "badge-earned": "🏅",
   "resource-liked": "❤️",
+  mention: "@",
 };
 
 // ---------------------------------------------------------------------------

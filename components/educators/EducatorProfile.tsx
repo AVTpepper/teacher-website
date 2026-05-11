@@ -33,6 +33,7 @@ import {
 import { Avatar, Badge, Button, Card, Tabs, Tag } from "@/components/ui";
 import { BadgeList } from "@/components/badges/BadgeIcon";
 import { BADGE_LIST } from "@/lib/badges";
+import { notifyNewFollower } from "@/lib/notifications";
 
 const PROFILE_TABS = [
   { label: "Posts", value: "posts" },
@@ -200,6 +201,13 @@ export default function EducatorProfile({ userId }: { userId: string }) {
         setProfile((p) =>
           p ? { ...p, followerCount: p.followerCount + 1 } : p
         );
+        // Notify the followed user (fire-and-forget)
+        notifyNewFollower({
+          recipientId: profile.uid,
+          actorId: user.uid,
+          actorName: user.displayName || "Someone",
+          actorPhotoURL: user.photoURL,
+        }).catch(() => {});
       }
     } catch {
       // Silently fail

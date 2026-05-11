@@ -23,6 +23,7 @@ import Button from "@/components/ui/Button";
 import Tag from "@/components/ui/Tag";
 import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
+import { notifyUpvote, notifyComment } from "@/lib/notifications";
 
 // ─── Main page component ───
 
@@ -113,6 +114,17 @@ export default function ForumThreadPage({
       } else {
         setVote("up");
         setUpvotes((c) => c + 1);
+        // Notify thread author (fire-and-forget, only on first upvote)
+        if (thread && thread.authorId !== user.uid) {
+          notifyUpvote({
+            recipientId: thread.authorId,
+            actorId: user.uid,
+            actorName: user.displayName || "Someone",
+            actorPhotoURL: user.photoURL,
+            threadTitle: thread.title,
+            linkURL: window.location.href,
+          }).catch(() => {});
+        }
       }
     } catch {
       // ignore
@@ -411,6 +423,17 @@ export default function ForumThreadPage({
                 authorPhotoURL: user!.photoURL,
                 content,
               });
+              // Notify thread author when someone comments (fire-and-forget)
+              if (thread && thread.authorId !== user!.uid && !parentId) {
+                notifyComment({
+                  recipientId: thread.authorId,
+                  actorId: user!.uid,
+                  actorName: user!.displayName || "Someone",
+                  actorPhotoURL: user!.photoURL,
+                  contentLabel: `your discussion "${thread.title}"`,
+                  linkURL: window.location.href,
+                }).catch(() => {});
+              }
               return newId;
             }}
             onUpvote={async (commentId) => {

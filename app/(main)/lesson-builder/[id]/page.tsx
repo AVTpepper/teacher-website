@@ -18,6 +18,7 @@ import CommentThread, {
   type CommentData,
 } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
+import { notifyComment } from "@/lib/notifications";
 
 export default function LessonDetailPage({
   params,
@@ -469,6 +470,17 @@ export default function LessonDetailPage({
                   authorPhotoURL: user.photoURL,
                   content,
                 });
+                // Notify lesson author (fire-and-forget)
+                if (lesson.authorId !== user.uid && !parentId) {
+                  notifyComment({
+                    recipientId: lesson.authorId,
+                    actorId: user.uid,
+                    actorName: user.displayName || "Someone",
+                    actorPhotoURL: user.photoURL,
+                    contentLabel: `your lesson "${lesson.title}"`,
+                    linkURL: window.location.href,
+                  }).catch(() => {});
+                }
                 await loadComments();
                 return newId;
               }}

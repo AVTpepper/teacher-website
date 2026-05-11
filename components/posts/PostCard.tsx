@@ -16,7 +16,7 @@ import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
-import { notifyMention } from "@/lib/notifications";
+import { notifyMention, notifyComment } from "@/lib/notifications";
 import { timeAgo } from "@/lib/utils";
 import Tag from "@/components/ui/Tag";
 
@@ -283,6 +283,17 @@ export default function PostCard({ post }: PostCardProps) {
                 content,
               });
               if (!parentId) setCommentsCount((c) => c + 1);
+              // Notify post author (fire-and-forget, skip if self-comment)
+              if (post.authorId !== user.uid) {
+                notifyComment({
+                  recipientId: post.authorId,
+                  actorId: user.uid,
+                  actorName: user.displayName || "Someone",
+                  actorPhotoURL: user.photoURL,
+                  contentLabel: "your post",
+                  linkURL: `/?post=${post.id}`,
+                }).catch(() => {});
+              }
               // Send mention notifications (fire-and-forget)
               if (mentionedUids?.length) {
                 mentionedUids.forEach((uid) => {
