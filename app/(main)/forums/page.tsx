@@ -13,7 +13,6 @@ import {
   type ForumThread,
   type GetThreadsResult,
 } from "@/lib/firestore/forums";
-import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import type { DocumentSnapshot } from "firebase/firestore";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -21,19 +20,6 @@ import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
 import { timeAgo } from "@/lib/utils";
-
-const TAG_OPTIONS = [
-  "Classroom Management",
-  "Lesson Planning",
-  "Student Engagement",
-  "Technology",
-  "Assessment",
-  "Differentiation",
-  "SEL",
-  "STEM",
-  "Literacy",
-  "Professional Development",
-];
 
 export default function ForumsPage() {
   const { user } = useAuth();
@@ -383,144 +369,6 @@ export default function ForumsPage() {
           )}
         </div>
       )}
-
-      {/* New Discussion Modal */}
-      <Modal
-        open={showNewThread}
-        onClose={resetForm}
-        title="New Discussion"
-        className="max-w-2xl"
-      >
-        <div className="p-6 space-y-4">
-          {/* Category selector */}
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-1.5">
-              Category
-            </label>
-            <select
-              value={selectedCategory || ""}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus-ring cursor-pointer hover:border-border-strong"
-            >
-              {FORUM_CATEGORIES.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.icon} {cat.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Title */}
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-1.5">
-              Title
-            </label>
-            <input
-              type="text"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="What do you want to discuss?"
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
-            />
-          </div>
-
-          {/* Content */}
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-1.5">
-              Content
-            </label>
-            <textarea
-              value={newContent}
-              onChange={(e) => setNewContent(e.target.value)}
-              placeholder="Share your thoughts, questions, or ideas..."
-              rows={5}
-              className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong min-h-24"
-            />
-          </div>
-
-          {/* Grade Level + Subject row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">
-                Grade Level{" "}
-                <span className="text-muted font-normal">(optional)</span>
-              </label>
-              <select
-                value={newGrade}
-                onChange={(e) => setNewGrade(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus-ring cursor-pointer hover:border-border-strong"
-              >
-                <option value="">Any grade</option>
-                {GRADE_LEVELS.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">
-                Subject{" "}
-                <span className="text-muted font-normal">(optional)</span>
-              </label>
-              <select
-                value={newSubject}
-                onChange={(e) => setNewSubject(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus-ring cursor-pointer hover:border-border-strong"
-              >
-                <option value="">Any subject</option>
-                {SUBJECTS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-1.5">
-              Tags <span className="text-muted font-normal">(optional)</span>
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {TAG_OPTIONS.map((tag) => (
-                <Tag
-                  key={tag}
-                  label={tag}
-                  selected={newTags.includes(tag)}
-                  onToggle={() =>
-                    setNewTags((prev) =>
-                      prev.includes(tag)
-                        ? prev.filter((t) => t !== tag)
-                        : [...prev, tag]
-                    )
-                  }
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Error */}
-          {formError && (
-            <p className="text-sm text-error-500">{formError}</p>
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={resetForm}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreateThread}
-              isLoading={submitting}
-              disabled={!newTitle.trim() || !newContent.trim()}
-            >
-              Post Discussion
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

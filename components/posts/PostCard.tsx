@@ -127,8 +127,12 @@ export default function PostCard({ post }: PostCardProps) {
         </div>
       </div>
 
-      {/* Content */}
-      <p className="mt-3 text-sm text-foreground whitespace-pre-wrap">
+      {/* Content — click to expand comments */}
+      <p
+        className="mt-3 text-sm text-foreground whitespace-pre-wrap cursor-pointer"
+        onClick={toggleComments}
+        title="Click to view comments"
+      >
         {post.content}
       </p>
 
@@ -149,9 +153,13 @@ export default function PostCard({ post }: PostCardProps) {
           </span>
         )}
         {commentsCount > 0 && (
-          <span>
+          <button
+            type="button"
+            onClick={toggleComments}
+            className="hover:underline cursor-pointer"
+          >
             {commentsCount} {commentsCount === 1 ? "comment" : "comments"}
-          </span>
+          </button>
         )}
       </div>
 

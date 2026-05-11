@@ -698,28 +698,44 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 - **Reply to post comments**: Allow nested replies on home feed post comments (currently flat).
 - **User tagging in posts/comments**: `@username` mentions that send notifications to tagged users.
 - **Sort forum replies by upvotes**: Highest-upvoted top-level replies float to the top.
-- **Dedicated New Thread page**: Replace the forums "New Discussion" modal with a full page at `/forums/new`.
+- **Dedicated New Thread page**: ~~Replace the forums "New Discussion" modal with a full page at `/forums/new`.~~ **Done in Phase 8.8.**
 - **Notification system**: In-app notification bell for likes, comments, mentions, and replies.
 - **Auto-generated resource PDF**: When a resource is uploaded without a file attachment, generate a formatted PDF from the form data (title, description, grade level, subject, type, tags) using `@react-pdf/renderer` (client-side, no server needed). The generated PDF becomes the downloadable file, so the download button always works. Resources uploaded with a real file continue to use that file as-is. The PDF would be generated at upload time, uploaded to Firebase Storage, and stored as `fileURL` just like a manually uploaded file.
+- **Rich text / hyperlinks in content**: Allow educators to add clickable hyperlinks inside posts (discussions), inspirations, and lesson builder steps/objectives. Implement using a lightweight rich text editor (e.g. `tiptap` or `@uiw/react-md-editor`).
+- **Share improvements**: Share buttons should link to the specific content item (post, resource, lesson, forum thread) so the recipient lands on that exact page. Audit share functionality across all content types.
+- **Download improvements**: Improve the lesson download feature to produce a properly formatted document (PDF). Use `@react-pdf/renderer` or a similar library so downloaded lessons look clean and professional.
+- **User roles system**: Site Admin + School Admin roles. School Admin requires approval by a Site Admin (with notification flow). Relevant for controlling who can post jobs. Currently left open — anyone can post.
+- **Responsive styling fixes**: Full audit and fix of layout issues on mobile viewports. Priority areas: Navbar, profile header, card grids, filter bars.
+- **Profile header scroll lock**: On the educator profile page, the header/avatar section should only scroll horizontally with the page — not jump or shift vertically during navigation transitions.
+- **Notification system enhancements**: In-app notifications for: new comment on your post, reply to your comment, someone downloads/shares your resource or lesson, new follower. Show unread count badge on the bell icon.
+- **Google OAuth fix**: Ensure Google Sign-In popup works in production. Requires localhost and production domain in Firebase Console → Authentication → Authorized Domains. Check OAuth consent screen configuration in Google Cloud Console.
 
+---
 
-additional notes:
-- forum creations should open a new window rather than the modal its opening.
-- google authentication didnt work.
-- different roles for users? visitor, registered users (given roles: site admin, school admin (needs to be approved by site admin, but site admin would get some kind of notification to reach out to the person who requested school admin priveledges) This is mostly thinking about the job posting feature, should we allow everyone to post there or a school admin approved account? Might be best to leave it open actually.)
+## Phase 8: User Testing Fixes
 
-Feedback from user testing:
-- Remove resource discussion modal
-- Fix responsive styling 
-- Notifications for comments, replies, downloads, shares, new followers.
-- Forgot password feature missing
-- Filters for main feed missing (idea, resource, etc..)
-- On profile page, the header when navigating could be moved vertically, should be locked to horizontal movement only.
-- Be able to click on post to view comments.
-- Share functionality should link to feed with the post shared, review share functionality for other content as well.
-- Lesson duration to be added on the lesson builder.
-- Download feature needs to be improved to be setup as a proper document or similar.
-- Be able to add hyperlinks on discussions/inspirations/lesson builder.
-- Privacy considerations, what can you see and what should be locked. If not signed in you shouldn't be able to see what an educator has posted or created on their profile page. The profile page should be limited.
-- Privacy on home feed if you are not a registered user, maybe limit what you can see. This should be the same across the whole site.
-- Couldn't create a job post.
+> **Goal**: Address feedback from initial user testing.
+
+- [x] **8.1 Forgot password**: Add "Forgot password?" link on login page that sends a password reset email via Firebase Auth `sendPasswordResetEmail`. Shows email input, success confirmation, and error states.
+
+- [x] **8.2 Home feed type filters**: Add pill-button filters (All / 💡 Ideas / 📚 Resources / 💬 Discussions) above the feed. Filters pass a `type` param to `getPosts()`. Added composite Firestore index for `posts.type + createdAt`.
+
+- [x] **8.3 Lesson duration field**: Added `duration` text field to the lesson builder form (e.g. "45 minutes", "2 class periods"). Stored in Firestore. Displayed in lesson preview with ⏱ icon.
+
+- [x] **8.4 Privacy gating — profile page**: Unauthenticated visitors see the public profile info (name, bio, stats) but the content tabs (Posts, Resources, Lessons, Discussions) show a "Sign in to view" wall instead of real data.
+
+- [x] **8.5 Privacy gating — home feed**: Unauthenticated visitors see the first 3 posts, then a "Sign in to see more" wall with links to sign up or log in.
+
+- [x] **8.6 Job post creation fix**: Fixed redirect after posting a job — now uses `jobSlug(title, id)` to navigate to the correct detail URL.
+
+- [x] **8.7 Click post to expand comments**: Clicking the post content text now toggles the comments section open/closed (same as the Comment button). The comment count in the stats bar is also clickable.
+
+- [x] **8.8 Forum new discussion page**: Replaced the "New Discussion" modal with navigation to `/forums/new` — a dedicated full-page form with category selector, title, content, grade level, subject, and tags. The modal and its state were removed from the forums listing page.
+
+- [ ] **8.9 Resource discussion modal removed**: Remove the resource detail page's "Discussion" modal or inline discussion section for simplification.
+
+- [ ] **8.10 Responsive styling audit**: Systematic review and fix of responsive layout issues across all pages (mobile-first review at 375px, 768px, and 1280px breakpoints).
+
+- [ ] **8.11 Profile page header scroll behavior**: Lock the profile header to horizontal-only scrolling so it doesn't shift vertically during in-page navigation.
+
+- [ ] **8.12 Google OAuth debugging**: Test and fix Google Sign-In. Verify authorized domains in Firebase Console and OAuth consent screen in Google Cloud Console.
