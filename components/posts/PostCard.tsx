@@ -84,15 +84,11 @@ export default function PostCard({ post }: PostCardProps) {
   }
 
   function handleShare() {
+    const url = `${window.location.origin}/?post=${post.id}`;
     if (navigator.share) {
-      navigator.share({
-        title: `Post by ${post.authorName}`,
-        url: `${window.location.origin}/post/${post.id}`,
-      });
+      navigator.share({ title: `Post by ${post.authorName}`, url });
     } else {
-      navigator.clipboard.writeText(
-        `${window.location.origin}/post/${post.id}`
-      );
+      navigator.clipboard.writeText(url);
     }
   }
 
