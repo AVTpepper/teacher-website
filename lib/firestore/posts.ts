@@ -54,6 +54,7 @@ export interface PostInput {
 export interface PostComment {
   id: string;
   postId: string;
+  parentId: string | null;
   authorId: string;
   authorName: string;
   authorPhotoURL: string | null;
@@ -62,6 +63,7 @@ export interface PostComment {
 }
 
 export interface PostCommentInput {
+  parentId?: string | null;
   authorId: string;
   authorName: string;
   authorPhotoURL: string | null;
@@ -205,6 +207,7 @@ export async function commentOnPost(
     ...data,
     id: ref.id,
     postId,
+    parentId: data.parentId ?? null,
     createdAt: serverTimestamp(),
   });
 

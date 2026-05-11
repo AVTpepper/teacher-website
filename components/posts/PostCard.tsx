@@ -241,7 +241,7 @@ export default function PostCard({ post }: PostCardProps) {
             comments={comments.map(
               (c): CommentData => ({
                 id: c.id,
-                parentId: null,
+                parentId: c.parentId ?? null,
                 authorId: c.authorId,
                 authorName: c.authorName,
                 authorPhotoURL: c.authorPhotoURL,
@@ -250,20 +250,21 @@ export default function PostCard({ post }: PostCardProps) {
               })
             )}
             loading={loadingComments}
-            maxDepth={0}
+            maxDepth={1}
             mode="like"
-            onAddComment={async (content) => {
+            onAddComment={async (content, parentId) => {
               if (!user) throw new Error("Not authenticated");
-              await commentOnPost(post.id, {
+              const newId = await commentOnPost(post.id, {
+                parentId: parentId ?? null,
                 authorId: user.uid,
                 authorName: user.displayName || "Anonymous",
                 authorPhotoURL: user.photoURL,
                 content,
               });
-              setCommentsCount((c) => c + 1);
+              if (!parentId) setCommentsCount((c) => c + 1);
               const result = await getPostComments(post.id);
               setComments(result);
-              return result[result.length - 1]?.id || "temp";
+              return newId;
             }}
           />
         </div>
