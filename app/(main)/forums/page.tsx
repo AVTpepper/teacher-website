@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   getCategories,
   getThreads,
-  createThread,
   threadSlug,
   FORUM_CATEGORIES,
   type ForumCategory,
@@ -17,7 +17,6 @@ import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import type { DocumentSnapshot } from "firebase/firestore";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import Modal from "@/components/ui/Modal";
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
@@ -38,6 +37,7 @@ const TAG_OPTIONS = [
 
 export default function ForumsPage() {
   const { user } = useAuth();
+  const router = useRouter();
 
   // Category listing state
   const [categories, setCategories] = useState<ForumCategory[]>([]);
@@ -49,16 +49,6 @@ export default function ForumsPage() {
   const [threadsCursor, setThreadsCursor] = useState<DocumentSnapshot | null>(null);
   const [loadingThreads, setLoadingThreads] = useState(false);
   const [hasMoreThreads, setHasMoreThreads] = useState(false);
-
-  // New thread modal
-  const [showNewThread, setShowNewThread] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newContent, setNewContent] = useState("");
-  const [newGrade, setNewGrade] = useState("");
-  const [newSubject, setNewSubject] = useState("");
-  const [newTags, setNewTags] = useState<string[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     getCategories()
@@ -113,58 +103,8 @@ export default function ForumsPage() {
   }
 
   function openNewThread(categoryId?: string) {
-    if (categoryId) setSelectedCategory(categoryId);
-    setShowNewThread(true);
-    setFormError("");
-  }
-
-  function resetForm() {
-    setNewTitle("");
-    setNewContent("");
-    setNewGrade("");
-    setNewSubject("");
-    setNewTags([]);
-    setFormError("");
-    setShowNewThread(false);
-  }
-
-  async function handleCreateThread() {
-    if (!user || !selectedCategory) return;
-    const trimmedTitle = newTitle.trim();
-    const trimmedContent = newContent.trim();
-
-    if (!trimmedTitle) {
-      setFormError("Title is required.");
-      return;
-    }
-    if (!trimmedContent) {
-      setFormError("Content is required.");
-      return;
-    }
-
-    setSubmitting(true);
-    setFormError("");
-    try {
-      await createThread({
-        categoryId: selectedCategory,
-        title: trimmedTitle,
-        content: trimmedContent,
-        authorId: user.uid,
-        authorName: user.displayName || "Anonymous",
-        authorPhotoURL: user.photoURL,
-        tags: newTags,
-        gradeLevel: newGrade,
-        subject: newSubject,
-      });
-      resetForm();
-      // Reload threads and categories
-      loadThreads(selectedCategory);
-      getCategories().then(setCategories).catch(() => {});
-    } catch {
-      setFormError("Failed to create thread. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
+    const cat = categoryId || selectedCategory || FORUM_CATEGORIES[0].id;
+    router.push(`/forums/new?category=${cat}`);
   }
 
   const selectedCategoryData = FORUM_CATEGORIES.find(

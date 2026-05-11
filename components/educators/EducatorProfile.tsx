@@ -439,6 +439,26 @@ export default function EducatorProfile({ userId }: { userId: string }) {
           onChange={setActiveTab}
         />
         <Card className="mt-4 min-h-50" padding="lg">
+          {!user ? (
+            <div className="py-12 text-center">
+              <div className="text-4xl mb-3">🔒</div>
+              <h3 className="text-base font-semibold text-foreground">
+                Sign in to view {isOwnProfile ? "your" : `${profile.displayName}'s`} content
+              </h3>
+              <p className="text-sm text-muted mt-1">
+                Create a free account to see posts, resources, and lessons from educators on EduConnect.
+              </p>
+              <div className="mt-4 flex justify-center gap-3">
+                <Button variant="primary" onClick={() => window.location.href = "/auth/signup"}>
+                  Create Account
+                </Button>
+                <Button variant="outline" onClick={() => window.location.href = `/auth/login?redirect=/educators/${userId}`}>
+                  Sign In
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
           {activeTab === "posts" && (
             <PostsTabContent
               posts={posts}
@@ -470,6 +490,8 @@ export default function EducatorProfile({ userId }: { userId: string }) {
               isOwnProfile={isOwnProfile}
               displayName={profile.displayName}
             />
+          )}
+            </>
           )}
         </Card>
       </div>

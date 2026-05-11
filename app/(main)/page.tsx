@@ -1,59 +1,77 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
   getPosts,
   type Post,
   type GetPostsResult,
+  type PostType,
 } from "@/lib/firestore/posts";
 import type { DocumentSnapshot } from "firebase/firestore";
 import CreatePost from "@/components/posts/CreatePost";
 import PostCard from "@/components/posts/PostCard";
 import Button from "@/components/ui/Button";
 
+const TYPE_FILTERS: { label: string; value: PostType | "" }[] = [
+  { label: "All", value: "" },
+  { label: "💡 Ideas", value: "idea" },
+  { label: "📚 Resources", value: "resource" },
+  { label: "💬 Discussions", value: "discussion" },
+];
+
+const GUEST_POST_LIMIT = 3;
+
 export default function HomePage() {
   const { user, loading: authLoading } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
-  const [cursor, setCursor] = useState<DocumentSnapshot | null>(null);
+  const cursorRef = useRef<DocumentSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [typeFilter, setTypeFilter] = useState<PostType | "">("");
 
-  const loadPosts = useCallback(async () => {
-    setLoading(true);
+  const loadPosts = useCallback(async (reset: boolean, type: PostType | "") => {
+    if (reset) {
+      cursorRef.current = null;
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     try {
-      const result: GetPostsResult = await getPosts();
-      setPosts(result.posts);
-      setCursor(result.lastDoc);
+      const result: GetPostsResult = await getPosts(
+        reset ? null : cursorRef.current,
+        type || null
+      );
+      cursorRef.current = result.lastDoc;
+      setPosts((prev) => (reset ? result.posts : [...prev, ...result.posts]));
       setHasMore(result.lastDoc !== null);
     } catch {
       // ignore
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
   useEffect(() => {
     if (!authLoading) {
-      loadPosts();
+      loadPosts(true, typeFilter);
     }
-  }, [authLoading, loadPosts]);
+  }, [authLoading, typeFilter, loadPosts]);
+
+  function handleTypeChange(value: PostType | "") {
+    setTypeFilter(value);
+  }
 
   async function loadMore() {
-    if (!cursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const result: GetPostsResult = await getPosts(cursor);
-      setPosts((prev) => [...prev, ...result.posts]);
-      setCursor(result.lastDoc);
-      setHasMore(result.lastDoc !== null);
-    } catch {
-      // ignore
-    } finally {
-      setLoadingMore(false);
-    }
+    if (!cursorRef.current || loadingMore) return;
+    loadPosts(false, typeFilter);
   }
+
+  // For guests: only show limited posts
+  const visiblePosts = !user ? posts.slice(0, GUEST_POST_LIMIT) : posts;
+  const showGuestWall = !user && posts.length > 0;
 
   return (
     <div className="space-y-6">
@@ -66,7 +84,25 @@ export default function HomePage() {
       </div>
 
       {/* Create post (logged in only) */}
-      {user && <CreatePost onPostCreated={loadPosts} />}
+      {user && <CreatePost onPostCreated={() => loadPosts(true, typeFilter)} />}
+
+      {/* Type filters */}
+      <div className="flex flex-wrap gap-2">
+        {TYPE_FILTERS.map((f) => (
+          <button
+            key={f.value}
+            type="button"
+            onClick={() => handleTypeChange(f.value)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
+              typeFilter === f.value
+                ? "bg-primary-900 text-white border-primary-900"
+                : "bg-surface border-border text-muted hover:border-primary-900 hover:text-primary-900"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
       {/* Feed */}
       {loading ? (
@@ -104,11 +140,33 @@ export default function HomePage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {posts.map((post) => (
+          {visiblePosts.map((post) => (
             <PostCard key={post.id} post={post} />
           ))}
 
-          {hasMore && (
+          {/* Guest wall */}
+          {showGuestWall && (
+            <div className="rounded-xl border border-border bg-surface shadow-card p-8 text-center">
+              <div className="text-4xl mb-3">🔒</div>
+              <h3 className="text-lg font-semibold text-foreground">
+                Sign in to see more
+              </h3>
+              <p className="text-sm text-muted mt-1">
+                Create a free account to view the full educator feed and join the conversation.
+              </p>
+              <div className="mt-4 flex justify-center gap-3">
+                <Button variant="primary" onClick={() => window.location.href = "/auth/signup"}>
+                  Create Account
+                </Button>
+                <Button variant="outline" onClick={() => window.location.href = "/auth/login"}>
+                  Sign In
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Load more (only for authenticated users) */}
+          {user && hasMore && (
             <div className="text-center pt-2">
               <Button
                 variant="outline"

@@ -95,7 +95,8 @@ export interface GetPostsResult {
 }
 
 export async function getPosts(
-  cursor?: DocumentSnapshot | null
+  cursor?: DocumentSnapshot | null,
+  type?: PostType | null
 ): Promise<GetPostsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
@@ -103,6 +104,10 @@ export async function getPosts(
     orderBy("createdAt", "desc"),
     limit(PAGE_SIZE),
   ];
+
+  if (type) {
+    constraints.unshift(where("type", "==", type));
+  }
 
   if (cursor) {
     constraints.push(startAfter(cursor));

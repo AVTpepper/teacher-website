@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
-import { createJob, JOB_TYPES, type JobType } from "@/lib/firestore/jobs";
+import { createJob, JOB_TYPES, jobSlug, type JobType } from "@/lib/firestore/jobs";
 import { Button, Card, Input, Select, Textarea } from "@/components/ui";
 
 export default function PostJobPage() {
@@ -57,7 +57,7 @@ export default function PostJobPage() {
         applyURL: applyURL.trim() || "#",
         postedBy: user.uid,
       });
-      router.push(`/jobs/${job.id}`);
+      router.push(`/jobs/${jobSlug(job.title, job.id)}`);
     } catch (err) {
       console.error(err);
       setError("Failed to post job. Please try again.");

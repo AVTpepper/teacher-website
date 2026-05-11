@@ -705,3 +705,21 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 
 additional notes:
 - forum creations should open a new window rather than the modal its opening.
+- google authentication didnt work.
+- different roles for users? visitor, registered users (given roles: site admin, school admin (needs to be approved by site admin, but site admin would get some kind of notification to reach out to the person who requested school admin priveledges) This is mostly thinking about the job posting feature, should we allow everyone to post there or a school admin approved account? Might be best to leave it open actually.)
+
+Feedback from user testing:
+- Remove resource discussion modal
+- Fix responsive styling 
+- Notifications for comments, replies, downloads, shares, new followers.
+- Forgot password feature missing
+- Filters for main feed missing (idea, resource, etc..)
+- On profile page, the header when navigating could be moved vertically, should be locked to horizontal movement only.
+- Be able to click on post to view comments.
+- Share functionality should link to feed with the post shared, review share functionality for other content as well.
+- Lesson duration to be added on the lesson builder.
+- Download feature needs to be improved to be setup as a proper document or similar.
+- Be able to add hyperlinks on discussions/inspirations/lesson builder.
+- Privacy considerations, what can you see and what should be locked. If not signed in you shouldn't be able to see what an educator has posted or created on their profile page. The profile page should be limited.
+- Privacy on home feed if you are not a registered user, maybe limit what you can see. This should be the same across the whole site.
+- Couldn't create a job post.

@@ -66,6 +66,7 @@ function LessonBuilderNewInner() {
   const [title, setTitle] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
+  const [duration, setDuration] = useState("");
 
   // Lists
   const [objectives, setObjectives] = useState<string[]>([""]);
@@ -117,6 +118,7 @@ function LessonBuilderNewInner() {
         setTitle(sourceLesson.title);
         setGradeLevel(sourceLesson.gradeLevel);
         setSubject(sourceLesson.subject);
+        setDuration(sourceLesson.duration ?? "");
         setObjectives(
           sourceLesson.objectives.length > 0 ? sourceLesson.objectives : [""]
         );
@@ -290,6 +292,7 @@ function LessonBuilderNewInner() {
         authorPhotoURL: user.photoURL,
         gradeLevel,
         subject,
+        duration: duration.trim(),
         objectives: cleanObjectives,
         materials: cleanMaterials,
         steps: cleanSteps.map((s) => ({
@@ -355,6 +358,12 @@ function LessonBuilderNewInner() {
             </h1>
             <div className="mt-2 flex items-center gap-2 text-sm text-muted">
               <span>By {user?.displayName || "Anonymous"}</span>
+              {duration.trim() && (
+                <>
+                  <span>·</span>
+                  <span>⏱ {duration.trim()}</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -546,6 +555,13 @@ function LessonBuilderNewInner() {
               options={SUBJECTS.map((s) => ({ value: s, label: s }))}
             />
           </div>
+
+          <Input
+            label="Duration"
+            placeholder="e.g. 45 minutes, 2 class periods"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+          />
         </Card>
 
         {/* Learning objectives */}

@@ -37,6 +37,7 @@ export interface Lesson {
   authorPhotoURL: string | null;
   gradeLevel: string;
   subject: string;
+  duration: string;
   objectives: string[];
   materials: string[];
   steps: LessonStep[];
@@ -55,6 +56,7 @@ export interface LessonInput {
   authorPhotoURL: string | null;
   gradeLevel: string;
   subject: string;
+  duration: string;
   objectives: string[];
   materials: string[];
   steps: LessonStep[];
