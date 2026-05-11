@@ -207,3 +207,29 @@ export async function searchEducators(
 
   return { educators, lastDoc };
 }
+
+// --- Mention / @username search ---
+
+export async function searchUsersByDisplayName(
+  prefix: string,
+  max = 5
+): Promise<{ uid: string; displayName: string; photoURL: string | null }[]> {
+  if (!db || !prefix.trim()) return [];
+
+  // Capitalize first letter so "@j" finds "John" etc.
+  const normalized = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+  const end = normalized + "\uf8ff";
+
+  const q = query(
+    collection(db, "users"),
+    orderBy("displayName"),
+    where("displayName", ">=", normalized),
+    where("displayName", "<=", end),
+    limit(max)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data() as UserProfile;
+    return { uid: data.uid, displayName: data.displayName, photoURL: data.photoURL };
+  });
+}

@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { createPost, type PostType } from "@/lib/firestore/posts";
+import { notifyMention } from "@/lib/notifications";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import Tag from "@/components/ui/Tag";
+import MentionInput, { type MentionedUser } from "@/components/ui/MentionInput";
 
 const POST_TYPES: { value: PostType; label: string }[] = [
   { value: "idea", label: "💡 Idea" },
@@ -41,6 +43,7 @@ interface CreatePostProps {
 export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const { user } = useAuth();
   const [content, setContent] = useState("");
+  const [mentions, setMentions] = useState<MentionedUser[]>([]);
   const [type, setType] = useState<PostType>("idea");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [gradeLevel, setGradeLevel] = useState("");
@@ -66,7 +69,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     setError("");
     setSubmitting(true);
     try {
-      await createPost({
+      const postId = await createPost({
         authorId: user!.uid,
         authorName: user!.displayName || "Anonymous",
         authorPhotoURL: user!.photoURL,
@@ -75,7 +78,19 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
         tags: selectedTags,
         gradeLevel,
       });
+      // Send mention notifications (fire-and-forget)
+      mentions.forEach((m) => {
+        notifyMention({
+          recipientId: m.uid,
+          actorId: user!.uid,
+          actorName: user!.displayName || "Anonymous",
+          actorPhotoURL: user!.photoURL,
+          linkURL: `/`,
+        }).catch(() => {});
+      });
+      void postId;
       setContent("");
+      setMentions([]);
       setType("idea");
       setSelectedTags([]);
       setGradeLevel("");
@@ -97,9 +112,11 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
           size="md"
         />
         <div className="flex-1 min-w-0">
-          <textarea
+          <MentionInput
+            multiline
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={setContent}
+            onMentionsChange={setMentions}
             onFocus={() => setExpanded(true)}
             placeholder="Share an idea, resource, or start a discussion..."
             rows={expanded ? 4 : 2}

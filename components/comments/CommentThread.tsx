@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import BadgeIcon from "@/components/badges/BadgeIcon";
+import MentionInput, { type MentionedUser } from "@/components/ui/MentionInput";
 
 // ─── Generic comment type ───
 
@@ -39,7 +40,7 @@ export interface CommentThreadProps {
   // --- Callbacks ---
 
   /** Called when user submits a new comment. Return the new comment ID. */
-  onAddComment: (content: string, parentId: string | null) => Promise<string>;
+  onAddComment: (content: string, parentId: string | null, mentionedUids?: string[]) => Promise<string>;
   /** Called when user upvotes a comment. Only used when mode="upvote". */
   onUpvote?: (commentId: string) => Promise<void>;
   /** Get the current user's vote on a comment. Only used when mode="upvote". */
@@ -81,6 +82,7 @@ function CommentItem({
   const [voteLoading, setVoteLoading] = useState(false);
   const [showReply, setShowReply] = useState(false);
   const [replyText, setReplyText] = useState("");
+  const [replyMentions, setReplyMentions] = useState<MentionedUser[]>([]);
   const [submittingReply, setSubmittingReply] = useState(false);
   const [localReplies, setLocalReplies] = useState<CommentData[]>(replies);
 
@@ -117,7 +119,11 @@ function CommentItem({
     if (!user || !replyText.trim()) return;
     setSubmittingReply(true);
     try {
-      const newId = await onAddComment(replyText.trim(), comment.id);
+      const newId = await onAddComment(
+        replyText.trim(),
+        comment.id,
+        replyMentions.map((m) => m.uid)
+      );
       setLocalReplies((prev) => [
         ...prev,
         {
@@ -133,6 +139,7 @@ function CommentItem({
         },
       ]);
       setReplyText("");
+      setReplyMentions([]);
       setShowReply(false);
     } catch {
       // ignore
@@ -224,18 +231,18 @@ function CommentItem({
           {/* Reply input */}
           {showReply && (
             <div className="mt-2 flex gap-2">
-              <input
-                type="text"
+              <MentionInput
                 value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
+                onChange={setReplyText}
+                onMentionsChange={setReplyMentions}
+                placeholder="Write a reply..."
+                className="w-full rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     handleReply();
                   }
                 }}
-                placeholder="Write a reply..."
-                className="flex-1 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
               />
               <Button
                 size="sm"
@@ -286,6 +293,7 @@ export default function CommentThread({
 }: CommentThreadProps) {
   const { user } = useAuth();
   const [replyText, setReplyText] = useState("");
+  const [topLevelMentions, setTopLevelMentions] = useState<MentionedUser[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [localComments, setLocalComments] = useState<CommentData[]>(comments);
 
@@ -299,7 +307,11 @@ export default function CommentThread({
     if (!user || !replyText.trim()) return;
     setSubmitting(true);
     try {
-      const newId = await onAddComment(replyText.trim(), null);
+      const newId = await onAddComment(
+        replyText.trim(),
+        null,
+        topLevelMentions.map((m) => m.uid)
+      );
       setLocalComments((prev) => [
         ...prev,
         {
@@ -315,6 +327,7 @@ export default function CommentThread({
         },
       ]);
       setReplyText("");
+      setTopLevelMentions([]);
     } catch {
       // ignore
     } finally {
@@ -333,18 +346,18 @@ export default function CommentThread({
             size="sm"
           />
           <div className="flex-1 flex gap-2">
-            <input
-              type="text"
+            <MentionInput
               value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
+              onChange={setReplyText}
+              onMentionsChange={setTopLevelMentions}
+              placeholder="Write a comment..."
+              className="w-full rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   handleTopLevelComment();
                 }
               }}
-              placeholder="Write a comment..."
-              className="flex-1 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
             />
             <Button
               size="sm"

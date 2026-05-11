@@ -25,7 +25,8 @@ export type NotificationType =
   | "comment"
   | "upvote"
   | "badge-earned"
-  | "resource-liked";
+  | "resource-liked"
+  | "mention";
 
 export interface Notification {
   id: string;
@@ -242,6 +243,24 @@ export function notifyResourceLiked(params: {
     actorName: params.actorName,
     actorPhotoURL: params.actorPhotoURL,
     message: `${params.actorName} saved your resource "${params.resourceTitle}".`,
+    linkURL: params.linkURL,
+  });
+}
+
+export function notifyMention(params: {
+  recipientId: string;
+  actorId: string;
+  actorName: string;
+  actorPhotoURL: string | null;
+  linkURL: string;
+}): Promise<void> {
+  return createNotification({
+    recipientId: params.recipientId,
+    type: "mention",
+    actorId: params.actorId,
+    actorName: params.actorName,
+    actorPhotoURL: params.actorPhotoURL,
+    message: `${params.actorName} mentioned you.`,
     linkURL: params.linkURL,
   });
 }

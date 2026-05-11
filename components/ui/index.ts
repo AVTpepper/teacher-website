@@ -13,3 +13,5 @@ export { default as Textarea } from "./Textarea";
 export { default as Spinner } from "./Spinner";
 export { default as PageHeader } from "./PageHeader";
 export { default as SearchResultCard } from "./SearchResultCard";
+export { default as MentionInput } from "./MentionInput";
+export type { MentionedUser } from "./MentionInput";

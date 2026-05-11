@@ -696,7 +696,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 ## Future Features (Backlog)
 
 - [x] **Reply to post comments**: Allow nested replies on home feed post comments (currently flat). Added `parentId` to `PostComment`/`PostCommentInput`, stored in Firestore. `PostCard` now maps `parentId` correctly and uses `maxDepth={1}` so the Reply button appears on top-level comments.
-- **User tagging in posts/comments**: `@username` mentions that send notifications to tagged users.
+- [x] **User tagging in posts/comments**: `@username` mentions that send notifications to tagged users. Added `searchUsersByDisplayName` (Firestore prefix query) to `users.ts`. Created `MentionInput` component — detects `@query` at cursor, shows a floating user dropdown (arrow-key navigable), inserts `@DisplayName` on select, tracks selected UIDs. Used in `CreatePost` (textarea) and `CommentThread` (both top-level and reply inputs). `onAddComment` signature extended with optional `mentionedUids[]`. Mention notifications fire-and-forget via new `notifyMention()` helper (`"mention"` type added to `NotificationType`).
 - **Sort forum replies by upvotes**: Highest-upvoted top-level replies float to the top.
 - **Dedicated New Thread page**: ~~Replace the forums "New Discussion" modal with a full page at `/forums/new`.~~ **Done in Phase 8.8.**
 - **Notification system**: In-app notification bell for likes, comments, mentions, and replies.

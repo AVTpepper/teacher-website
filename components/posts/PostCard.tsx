@@ -16,6 +16,7 @@ import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
+import { notifyMention } from "@/lib/notifications";
 import { timeAgo } from "@/lib/utils";
 import Tag from "@/components/ui/Tag";
 
@@ -252,7 +253,7 @@ export default function PostCard({ post }: PostCardProps) {
             loading={loadingComments}
             maxDepth={1}
             mode="like"
-            onAddComment={async (content, parentId) => {
+            onAddComment={async (content, parentId, mentionedUids) => {
               if (!user) throw new Error("Not authenticated");
               const newId = await commentOnPost(post.id, {
                 parentId: parentId ?? null,
@@ -262,6 +263,18 @@ export default function PostCard({ post }: PostCardProps) {
                 content,
               });
               if (!parentId) setCommentsCount((c) => c + 1);
+              // Send mention notifications (fire-and-forget)
+              if (mentionedUids?.length) {
+                mentionedUids.forEach((uid) => {
+                  notifyMention({
+                    recipientId: uid,
+                    actorId: user.uid,
+                    actorName: user.displayName || "Anonymous",
+                    actorPhotoURL: user.photoURL,
+                    linkURL: `/`,
+                  }).catch(() => {});
+                });
+              }
               const result = await getPostComments(post.id);
               setComments(result);
               return newId;
