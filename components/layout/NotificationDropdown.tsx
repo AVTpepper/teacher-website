@@ -139,7 +139,7 @@ export default function NotificationDropdown() {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-xl border border-border bg-surface shadow-xl z-50 overflow-hidden"
+          className="fixed left-4 right-4 top-14 rounded-xl border border-border bg-surface shadow-xl z-50 overflow-hidden sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">

@@ -154,13 +154,13 @@ function HomePageInner() {
       {user && <CreatePost onPostCreated={() => loadPosts(true, typeFilter)} />}
 
       {/* Type filters */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5">
         {TYPE_FILTERS.map((f) => (
           <button
             key={f.value}
             type="button"
             onClick={() => handleTypeChange(f.value)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
+            className={`shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
               typeFilter === f.value
                 ? "bg-primary-900 text-white border-primary-900"
                 : "bg-surface border-border text-muted hover:border-primary-900 hover:text-primary-900"

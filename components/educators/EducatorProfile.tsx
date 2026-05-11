@@ -69,6 +69,13 @@ export default function EducatorProfile({ userId }: { userId: string }) {
 
   const [activeTab, setActiveTab] = useState("posts");
   const tabsSectionRef = useRef<HTMLDivElement>(null);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 160);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   function handleTabChange(tab: string) {
     setActiveTab(tab);
@@ -247,7 +254,51 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   return (
     <div className="mx-auto max-w-3xl py-8">
       {/* Profile Header */}
-      <Card padding="lg" className="sticky top-14 z-10">
+      <Card
+        padding="none"
+        className={`sticky top-14 z-10 ${isScrolled ? "p-3 sm:p-6" : "p-6"}`}
+      >
+        {/* Compact header — mobile only, visible when scrolled past full header */}
+        {isScrolled && (
+          <div className="flex sm:hidden items-center gap-3">
+            <Avatar src={profile.photoURL} alt={profile.displayName} size="sm" />
+            <div className="flex-1 min-w-0 flex items-center gap-1.5">
+              <span className="text-sm font-semibold text-foreground truncate">
+                {profile.displayName}
+              </span>
+              {profile.isVerified && (
+                <svg className="h-3.5 w-3.5 shrink-0 text-success-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+            {!authLoading && (
+              <div className="shrink-0">
+                {!isOwnProfile ? (
+                  <Button
+                    size="sm"
+                    variant={following ? "outline" : "primary"}
+                    onClick={handleFollowToggle}
+                    isLoading={followLoading}
+                  >
+                    {following ? "Following" : "Follow"}
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => router.push("/profile/edit")}
+                  >
+                    Edit
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Full header — always on sm+, mobile only when not scrolled */}
+        <div className={isScrolled ? "hidden sm:block" : undefined}>
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
           {/* Avatar */}
           <Avatar
@@ -426,6 +477,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
             </Button>
           </div>
         )}
+        </div> {/* /full header wrapper */}
       </Card>
 
       {/* Badges Section */}
