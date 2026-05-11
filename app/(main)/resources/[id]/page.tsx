@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -12,20 +12,14 @@ import {
   hasSavedResource,
   rateResource,
   getUserRating,
-  getResourceComments,
-  addResourceComment,
   getRelatedResources,
   parseResourceSlug,
   resourceSlug,
   RESOURCE_TYPES,
   type Resource,
-  type ResourceComment,
 } from "@/lib/firestore/resources";
 import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { Avatar, Badge, Button, Card } from "@/components/ui";
-import CommentThread, {
-  type CommentData,
-} from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
 
 export default function ResourceDetailPage({
@@ -54,24 +48,8 @@ export default function ResourceDetailPage({
   // Download
   const [localDownloadCount, setLocalDownloadCount] = useState(0);
 
-  // Comments
-  const [comments, setComments] = useState<ResourceComment[]>([]);
-  const [commentsLoading, setCommentsLoading] = useState(false);
-
   // Related
   const [related, setRelated] = useState<Resource[]>([]);
-
-  const loadComments = useCallback(async () => {
-    setCommentsLoading(true);
-    try {
-      const result = await getResourceComments(id);
-      setComments(result);
-    } catch {
-      // ignore
-    } finally {
-      setCommentsLoading(false);
-    }
-  }, [id]);
 
   useEffect(() => {
     async function load() {
@@ -85,10 +63,9 @@ export default function ResourceDetailPage({
         setLocalDownloadCount(res.downloadCount);
         setLocalSavedCount(res.savedByCount);
 
-        // Load author, comments, related in parallel — failures are non-fatal
+        // Load author + related in parallel — failures are non-fatal
         const [authorData] = await Promise.all([
           getUser(res.authorId).catch(() => null),
-          loadComments().catch(() => {}),
           getRelatedResources(res).then(setRelated).catch(() => {}),
         ]);
         setAuthor(authorData);
@@ -100,7 +77,7 @@ export default function ResourceDetailPage({
       }
     }
     load();
-  }, [id, loadComments]);
+  }, [id]);
 
   // Load user-specific states
   useEffect(() => {
@@ -162,17 +139,6 @@ export default function ResourceDetailPage({
       setRatingLoading(false);
     }
   }
-
-  // Map comments for the CommentThread component
-  const commentData: CommentData[] = comments.map((c) => ({
-    id: c.id,
-    parentId: c.parentId,
-    authorId: c.authorId,
-    authorName: c.authorName,
-    authorPhotoURL: c.authorPhotoURL,
-    content: c.content,
-    createdAt: c.createdAt as { seconds: number } | null,
-  }));
 
   // ─── Loading ───
   if (loading) {
@@ -396,30 +362,6 @@ export default function ResourceDetailPage({
             </div>
           </Card>
 
-          {/* Comments section */}
-          <Card padding="lg">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Discussion
-            </h2>
-            <CommentThread
-              comments={commentData}
-              loading={commentsLoading}
-              mode="like"
-              maxDepth={2}
-              onAddComment={async (content, parentId) => {
-                if (!user) throw new Error("Must be logged in");
-                const newId = await addResourceComment(resource.id, {
-                  parentId,
-                  authorId: user.uid,
-                  authorName: user.displayName || "Anonymous",
-                  authorPhotoURL: user.photoURL,
-                  content,
-                });
-                await loadComments();
-                return newId;
-              }}
-            />
-          </Card>
         </div>
 
         {/* Right sidebar */}
