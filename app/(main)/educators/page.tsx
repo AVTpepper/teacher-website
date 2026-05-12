@@ -2,16 +2,20 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { type DocumentSnapshot } from "firebase/firestore";
+import { collection, getDocs, type DocumentSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import {
   searchEducators,
+  followUser,
+  unfollowUser,
   GRADE_LEVELS,
   SUBJECTS,
   type UserProfile,
   type SearchEducatorsFilters,
 } from "@/lib/firestore/users";
 import { Avatar, Badge, Button, Card, Select } from "@/components/ui";
+import { notifyNewFollower } from "@/lib/notifications";
+import { db } from "@/lib/firebase";
 
 export default function EducatorsPage() {
   const { user } = useAuth();
@@ -24,6 +28,7 @@ export default function EducatorsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
 
   const filters: SearchEducatorsFilters = {
     gradeLevel: gradeLevel || undefined,
@@ -68,6 +73,61 @@ export default function EducatorsPage() {
     fetchEducators(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gradeLevel, subject]);
+
+  // Load which educators the current user is already following
+  useEffect(() => {
+    if (!user || !db) return;
+    getDocs(collection(db, "users", user.uid, "following"))
+      .then((snap) => setFollowingSet(new Set(snap.docs.map((d) => d.id))))
+      .catch(() => {});
+  }, [user]);
+
+  async function handleFollowToggle(educator: UserProfile) {
+    if (!user) return;
+    const isCurrentlyFollowing = followingSet.has(educator.uid);
+    // Optimistic updates
+    setFollowingSet((prev) => {
+      const next = new Set(prev);
+      if (isCurrentlyFollowing) next.delete(educator.uid);
+      else next.add(educator.uid);
+      return next;
+    });
+    setEducators((prev) =>
+      prev.map((e) =>
+        e.uid === educator.uid
+          ? { ...e, followerCount: e.followerCount + (isCurrentlyFollowing ? -1 : 1) }
+          : e
+      )
+    );
+    try {
+      if (isCurrentlyFollowing) {
+        await unfollowUser(user.uid, educator.uid);
+      } else {
+        await followUser(user.uid, educator.uid);
+        notifyNewFollower({
+          recipientId: educator.uid,
+          actorId: user.uid,
+          actorName: user.displayName ?? "Someone",
+          actorPhotoURL: user.photoURL ?? null,
+        }).catch(() => {});
+      }
+    } catch {
+      // Revert on error
+      setFollowingSet((prev) => {
+        const next = new Set(prev);
+        if (isCurrentlyFollowing) next.add(educator.uid);
+        else next.delete(educator.uid);
+        return next;
+      });
+      setEducators((prev) =>
+        prev.map((e) =>
+          e.uid === educator.uid
+            ? { ...e, followerCount: e.followerCount + (isCurrentlyFollowing ? 1 : -1) }
+            : e
+        )
+      );
+    }
+  }
 
   return (
     <div className="py-8">
@@ -154,6 +214,9 @@ export default function EducatorsPage() {
                 key={educator.uid}
                 educator={educator}
                 isOwnProfile={user?.uid === educator.uid}
+                currentUid={user?.uid ?? null}
+                isFollowed={followingSet.has(educator.uid)}
+                onFollowToggle={handleFollowToggle}
               />
             ))}
           </div>
@@ -178,13 +241,31 @@ export default function EducatorsPage() {
 function EducatorCard({
   educator,
   isOwnProfile,
+  currentUid,
+  isFollowed,
+  onFollowToggle,
 }: {
   educator: UserProfile;
   isOwnProfile: boolean;
+  currentUid: string | null;
+  isFollowed: boolean;
+  onFollowToggle: (educator: UserProfile) => Promise<void>;
 }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleFollow() {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await onFollowToggle(educator);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <Link href={`/educators/${educator.uid}`}>
-      <Card hoverable className="flex flex-col items-center text-center">
+    <Card hoverable className="flex flex-col items-center text-center">
+      <Link href={`/educators/${educator.uid}`} className="flex flex-col items-center w-full">
         <Avatar
           src={educator.photoURL}
           alt={educator.displayName}
@@ -255,12 +336,24 @@ function EducatorCard({
             )}
           </div>
         )}
+      </Link>
 
-        <p className="mt-2 text-xs text-muted">
-          {educator.followerCount}{" "}
-          {educator.followerCount === 1 ? "follower" : "followers"}
-        </p>
-      </Card>
-    </Link>
+      <p className="mt-2 text-xs text-muted">
+        {educator.followerCount}{" "}
+        {educator.followerCount === 1 ? "follower" : "followers"}
+      </p>
+
+      {currentUid && !isOwnProfile && (
+        <Button
+          size="sm"
+          variant={isFollowed ? "outline" : "primary"}
+          className="mt-3 w-full"
+          onClick={handleFollow}
+          isLoading={loading}
+        >
+          {isFollowed ? "Following" : "Follow"}
+        </Button>
+      )}
+    </Card>
   );
 }
