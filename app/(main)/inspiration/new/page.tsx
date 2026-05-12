@@ -76,6 +76,10 @@ export default function NewInspirationPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!user) {
+      showError("You must be logged in to submit.");
+      return;
+    }
     const errors: Record<string, boolean> = {};
     if (!title.trim()) errors.title = true;
     if (!description.trim()) errors.description = true;
