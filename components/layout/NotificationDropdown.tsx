@@ -108,7 +108,7 @@ export default function NotificationDropdown() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative rounded-lg p-2 text-muted hover:bg-surface-hover hover:text-foreground transition-colors cursor-pointer"
+        className={`relative rounded-lg p-2 transition-colors cursor-pointer hover:bg-surface-hover ${unreadCount > 0 ? "text-primary-900 hover:text-primary-900" : "text-muted hover:text-foreground"}`}
         aria-label="Notifications"
         aria-expanded={open}
         aria-haspopup="true"
@@ -128,8 +128,8 @@ export default function NotificationDropdown() {
         </svg>
         {/* Unread badge */}
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-white text-[10px] font-bold leading-none">
-            {unreadCount > 9 ? "9+" : unreadCount}
+          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary-900 text-white text-[10px] font-bold leading-none">
+            {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
