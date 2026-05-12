@@ -122,9 +122,12 @@ function HomePageInner() {
         </p>
       </div>
 
-      {/* Shared / linked post — pinned at top */}
+      {/* Create post (logged in only) */}
+      {user && <CreatePost onPostCreated={() => loadPosts(true, typeFilter)} />}
+
+      {/* Shared / linked post — pinned below the create form */}
       {sharedPostId && (
-        <div ref={sharedPostRef} className="scroll-mt-20">
+        <div ref={sharedPostRef} className="scroll-mt-28">
           {sharedPostLoading ? (
             <div className="rounded-xl border border-info-300 bg-info-50 shadow-card p-4 animate-pulse">
               <div className="flex gap-3">
@@ -152,9 +155,6 @@ function HomePageInner() {
           )}
         </div>
       )}
-
-      {/* Create post (logged in only) */}
-      {user && <CreatePost onPostCreated={() => loadPosts(true, typeFilter)} />}
 
       {/* Type filters */}
       <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5">
