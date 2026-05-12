@@ -60,7 +60,7 @@ interface CommentItemProps {
   depth: number;
   maxDepth: number;
   mode: "like" | "upvote";
-  onAddComment: (content: string, parentId: string | null) => Promise<string>;
+  onAddComment: (content: string, parentId: string | null, mentionedUids?: string[]) => Promise<string>;
   onUpvote?: (commentId: string) => Promise<void>;
   getUserVote?: (commentId: string) => Promise<"up" | "down" | null>;
 }

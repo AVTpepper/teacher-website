@@ -256,7 +256,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
       {/* Profile Header */}
       <Card
         padding="none"
-        className={`sticky top-14 z-10 ${isScrolled ? "p-3 sm:p-6" : "p-6"}`}
+        className={isScrolled ? "p-3 sm:p-6" : "p-6"}
       >
         {/* Compact header — mobile only, visible when scrolled past full header */}
         {isScrolled && (
