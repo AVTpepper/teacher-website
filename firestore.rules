@@ -22,7 +22,11 @@ service cloud.firestore {
       // Anyone (even unauthenticated) can read profiles — public directory
       allow read: if true;
       // Only the owner can create or update their own profile
-      allow create, update: if isOwner(userId);
+      allow create: if isOwner(userId);
+      // Owner can update anything; any authenticated user can increment/decrement followerCount (follow/unfollow)
+      allow update: if isOwner(userId)
+                    || (isAuth() && request.resource.data.diff(resource.data)
+                           .affectedKeys().hasOnly(['followerCount']));
       allow delete: if false;
 
       // followers sub-collection — users/{userId}/followers/{followerId}

@@ -136,8 +136,22 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
 
       {expanded && (
         <div className="mt-3 space-y-3">
+          {/* Toolbar: @Mention + attach link — immediately below textarea */}
+          <div className="flex flex-wrap items-start gap-4 border-b border-border pb-3">
+            <button
+              type="button"
+              onClick={() => mentionInputRef.current?.insertText("@")}
+              className="flex items-center gap-1 text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer"
+              title="Mention someone"
+            >
+              <span className="text-base leading-none">@</span>
+              <span>Mention</span>
+            </button>
+            <LinkAttacher links={links} onChange={setLinks} />
+          </div>
+
           {/* Post type selector */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {POST_TYPES.map((pt) => (
               <button
                 key={pt.value}
@@ -194,55 +208,33 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
             </div>
           </div>
 
-          {/* Links */}
-          <div>
-            <label className="text-xs font-medium text-muted mb-1.5 block">
-              Links (optional)
-            </label>
-            <LinkAttacher links={links} onChange={setLinks} />
-          </div>
-
           {/* Error + submit */}
           {error && <p className="text-xs text-error-500">{error}</p>}
 
-          <div className="flex items-center justify-between gap-2">
-            <button
-              type="button"
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
-                mentionInputRef.current?.insertText("@");
-                setExpanded(true);
+                setExpanded(false);
+                setContent("");
+                setSelectedTags([]);
+                setGradeLevel("");
+                setLinks([]);
+                setType("general");
+                setError("");
               }}
-              className="flex items-center gap-1 text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer"
-              title="Mention someone"
             >
-              <span className="text-base leading-none">@</span>
-              <span>Mention</span>
-            </button>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setExpanded(false);
-                  setContent("");
-                  setSelectedTags([]);
-                  setGradeLevel("");
-                  setLinks([]);
-                  setType("idea");
-                  setError("");
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSubmit}
-                isLoading={submitting}
-                disabled={!content.trim()}
-              >
-                Post
-              </Button>
-            </div>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSubmit}
+              isLoading={submitting}
+              disabled={!content.trim()}
+            >
+              Post
+            </Button>
           </div>
         </div>
       )}

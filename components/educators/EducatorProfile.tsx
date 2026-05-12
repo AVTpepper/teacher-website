@@ -612,9 +612,10 @@ function PostsTabContent({
   return (
     <div className="space-y-3">
       {posts.map((post) => (
-        <div
+        <Link
           key={post.id}
-          className="rounded-lg border border-border px-4 py-3"
+          href={`/?post=${post.id}`}
+          className="block rounded-lg border border-border px-4 py-3 hover:bg-surface-hover transition-colors"
         >
           <div className="mb-1 flex items-center gap-2">
             <Badge variant="primary">{post.type}</Badge>
@@ -642,7 +643,7 @@ function PostsTabContent({
               </span>
             ))}
           </div>
-        </div>
+        </Link>
       ))}
     </div>
   );
@@ -777,7 +778,7 @@ function DiscussionsTabContent({
       {threads.map((thread) => (
         <Link
           key={thread.id}
-          href={`/forums/${thread.categoryId}/${threadSlug(thread.title, thread.id)}`}
+          href={`/forums/${threadSlug(thread.title, thread.id)}`}
         >
           <div className="rounded-lg border border-border px-4 py-3 transition-colors hover:border-primary-300 hover:bg-primary-50/40">
             <p className="text-sm font-medium text-foreground line-clamp-2">

@@ -780,18 +780,12 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 - [x] **9.7 Profile discussions tab — fixed**: The Discussions tab on educator profiles was silently empty for all users. Root cause: `getThreadsByAuthor` uses a Firestore **collection group query** (`collectionGroup(db, "threads")`) across all forum category subcollections. This type of query requires an explicit **collection group index** for the queried field — Firestore does not auto-create collection group scope indexes. The index was missing from `firestore.indexes.json`, causing the query to fail silently (the catch block swallowed the error and set an empty array). Fixed by adding a `fieldOverride` for `threads/authorId` with `COLLECTION_GROUP` query scope to `firestore.indexes.json`. Deploy the index with `firebase deploy --only firestore:indexes`.
   - **Test**: Visit `/educators/{your-uid}` and click the "Discussions" tab — your forum threads should now load and display. Visit someone else's profile who has posted threads — their Discussions tab should also populate correctly. 
 
+- [x] **9.8 Profile posts clickable**: Post cards on the educator profile Posts tab were not clickable. Fixed by converting each post card from a plain `<div>` to a `<Link href="/?post={id}">` so clicking navigates to the home feed with that post highlighted.
+  - **Test**: Visit your profile page → Posts tab. Click any post card — should navigate to `/?post={id}` on the home feed with that post shown.
 
-notes
-- i should be able to click one of my created posts that I can see on my profile page and it should bring me to that post on the feed.
-- Got a couple errors:
-0257pdz1-imal.js:1  GET https://teacher-website--educonnect-60b69.europe-west4.hosted.app/forums/teacher-support/just-checking-display-of-multiple-threads--Jztk1PhU6ZeWdEx1Gg2g?_rsc=1xs2o 404 (Not Found)
-T @ 0257pdz1-imal.js:1
-eR @ 0257pdz1-imal.js:1
-ep @ 0257pdz1-imal.js:1
-(anonymous) @ 0257pdz1-imal.js:1
-(anonymous) @ 0257pdz1-imal.js:1
-C @ 0257pdz1-imal.js:1Understand this error
-0257pdz1-imal.js:1  GET https://teacher-website--educonnect-60b69.europe-west4.hosted.app/forums/teacher-support/i-need-support--Ei4fTwqqM0bPg6fzbWCf?_rsc=1xs2o 404 (Not Found)
+- [x] **9.9 Forum thread URLs 404 from profile page**: The Discussions tab in `EducatorProfile.tsx` was generating forum thread URLs as `/forums/{categoryId}/{slug}` (e.g. `/forums/teacher-support/my-thread--abc123`). The actual route is `/forums/[id]` (no category segment), so these links 404'd. Fixed by removing the `thread.categoryId/` prefix from the href — now matches the `/forums/${threadSlug(...)}` format used everywhere else.
+  - **Test**: Visit your profile page → Discussions tab. Click a thread — should navigate correctly to `/forums/{slug}` without a 404.
 
-- was not able to follow a user.
+- [x] **9.10 Follow button not working**: Following a user silently failed. Root cause: `followUser` uses a batch write that includes `batch.update(users/{targetUserId}, { followerCount: increment(1) })`. The Firestore `users` security rule only allowed `update` with `isOwner(userId)` — meaning a user can only update their own document. The target user's `followerCount` increment was blocked, causing the entire batch to fail. Fixed by updating the security rule to additionally allow updates that touch only the `followerCount` field from any authenticated user. Deployed with `firebase deploy --only firestore:rules`.
+  - **Test**: Open another user's profile page. Click "Follow" — the button should switch to "Following" and the follower count should increment. Refresh — state should persist. Click "Following" to unfollow — count decrements and button reverts.
 
