@@ -779,3 +779,19 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 
 - [x] **9.7 Profile discussions tab — fixed**: The Discussions tab on educator profiles was silently empty for all users. Root cause: `getThreadsByAuthor` uses a Firestore **collection group query** (`collectionGroup(db, "threads")`) across all forum category subcollections. This type of query requires an explicit **collection group index** for the queried field — Firestore does not auto-create collection group scope indexes. The index was missing from `firestore.indexes.json`, causing the query to fail silently (the catch block swallowed the error and set an empty array). Fixed by adding a `fieldOverride` for `threads/authorId` with `COLLECTION_GROUP` query scope to `firestore.indexes.json`. Deploy the index with `firebase deploy --only firestore:indexes`.
   - **Test**: Visit `/educators/{your-uid}` and click the "Discussions" tab — your forum threads should now load and display. Visit someone else's profile who has posted threads — their Discussions tab should also populate correctly. 
+
+
+notes
+- i should be able to click one of my created posts that I can see on my profile page and it should bring me to that post on the feed.
+- Got a couple errors:
+0257pdz1-imal.js:1  GET https://teacher-website--educonnect-60b69.europe-west4.hosted.app/forums/teacher-support/just-checking-display-of-multiple-threads--Jztk1PhU6ZeWdEx1Gg2g?_rsc=1xs2o 404 (Not Found)
+T @ 0257pdz1-imal.js:1
+eR @ 0257pdz1-imal.js:1
+ep @ 0257pdz1-imal.js:1
+(anonymous) @ 0257pdz1-imal.js:1
+(anonymous) @ 0257pdz1-imal.js:1
+C @ 0257pdz1-imal.js:1Understand this error
+0257pdz1-imal.js:1  GET https://teacher-website--educonnect-60b69.europe-west4.hosted.app/forums/teacher-support/i-need-support--Ei4fTwqqM0bPg6fzbWCf?_rsc=1xs2o 404 (Not Found)
+
+- was not able to follow a user.
+

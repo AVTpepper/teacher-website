@@ -16,7 +16,8 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 interface AuthContextValue {
   user: User | null;
@@ -52,6 +53,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Sync a thin session cookie for proxy-level route protection
       if (firebaseUser) {
         document.cookie = `__session=1; path=/; max-age=${60 * 60 * 24 * 14}; SameSite=Lax`;
+
+        // Ensure displayNameLower is set so @mention search works for all accounts.
+        // Fire-and-forget: only patches documents that are missing the field.
+        if (db && firebaseUser.displayName) {
+          const userRef = doc(db, "users", firebaseUser.uid);
+          getDoc(userRef).then((snap) => {
+            if (snap.exists() && !snap.data().displayNameLower) {
+              updateDoc(userRef, {
+                displayNameLower: firebaseUser.displayName!.toLowerCase(),
+              }).catch(() => {});
+            }
+          }).catch(() => {});
+        }
       } else {
         document.cookie = "__session=; path=/; max-age=0";
       }

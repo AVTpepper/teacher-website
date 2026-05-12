@@ -50,7 +50,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const [content, setContent] = useState("");
   const [mentions, setMentions] = useState<MentionedUser[]>([]);
   const [links, setLinks] = useState<AttachedLink[]>([]);
-  const [type, setType] = useState<PostType>("idea");
+  const [type, setType] = useState<PostType>("general");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [gradeLevel, setGradeLevel] = useState("");
   const [expanded, setExpanded] = useState(false);
@@ -92,7 +92,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
           actorId: user!.uid,
           actorName: user!.displayName || "Anonymous",
           actorPhotoURL: user!.photoURL,
-          linkURL: `/`,
+          linkURL: `/?post=${postId}`,
         }).catch(() => {});
       });
       void postId;
