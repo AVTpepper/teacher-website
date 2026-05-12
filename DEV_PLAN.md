@@ -739,3 +739,24 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 - [x] **8.11 Profile page header scroll behavior**: Added `tabsSectionRef` to the Content Tabs section. When a tab is switched via `handleTabChange`, `requestAnimationFrame` scrolls the tab container into view (`scrollIntoView block:nearest`) so the profile header stays at a predictable vertical position and doesn't jump. Increased tab content card min-height to `min-h-[320px]` to prevent layout collapse when content loads.
 
 - [x] **8.12 Google OAuth debugging**: Code-side improvements: (1) Added `email` + `profile` scopes to `GoogleAuthProvider` so `displayName` and `photoURL` are always populated. (2) Added `prompt: select_account` custom parameter to always show the Google account picker. (3) Added `auth/popup-blocked`, `auth/operation-not-allowed`, `auth/network-request-failed` to the error message maps on both login and signup pages. (4) Added `auth/cancelled-popup-request` to the ignored-error list alongside `auth/popup-closed-by-user`. **Authorized Domains confirmed OK**: `localhost`, `educonnect-60b69.firebaseapp.com`, and `educonnect-60b69.web.app` are all present — domain config is not the issue. **Remaining action**: Go to Firebase Console → Authentication → Sign-in Providers and enable the **Google** provider. If it's already enabled, check Google Cloud Console → APIs & Services → OAuth consent screen to ensure the app is configured and not in a blocked state.
+
+
+---
+
+## Phase 9: User Testing Feedback (Round 2)
+
+> **Goal**: Address discoverability gaps and content-type expansion surfaced during second round of user testing.
+
+- [ ] **9.1 Follow button on educator discovery cards**: Add a Follow/Following button directly on each educator card in `/educators` so users can follow without navigating to the full profile. Verify the underlying follow/unfollow Firestore logic is reliable (correct follower/following count increments, toggle state reflects reality after page reload).
+
+- [ ] **9.2 @mention bug — dropdown not appearing**: During testing, no autocomplete dropdown appeared when typing `@` in a post or comment box. The `MentionInput` component and `searchUsersByDisplayName` Firestore query need to be debugged. Likely causes: (1) `displayName` not stored in lowercase/prefix-queryable form in Firestore, (2) the `searchUsersByDisplayName` query using wrong field name, (3) component `@` detection regex not triggering, or (4) Firestore index missing. Fix the bug first, then add a `@ Mention` button in the post/comment action bar that inserts `@` at the cursor as a discoverability aid.
+
+- [ ] **9.3 Notification system — test steps**: No code changes. How to manually verify the system works:
+  1. Open two browser windows — sign in as User A in one, User B in the other.
+  2. **New follower**: User B visits `/educators/{UserA-uid}` and clicks Follow → User A should see a "👤 User B is now following you" notification.
+  3. **Post comment**: User A creates a post. User B adds a comment → User A sees a "💬" notification.
+  4. **Forum upvote**: User A posts a forum thread. User B upvotes it → User A sees a "⬆️" notification.
+  5. **Resource saved**: User A uploads a resource. User B saves it → User A sees a "❤️" notification.
+  6. **@mention**: User B writes a post and types `@UserA` in the body → User A sees a "@" notification.
+
+- [ ] **9.4 New home feed post types — General, Question, Other**: Add three new values to the post `type` field: `general`, `question`, `other`. Update the `PostType` union, `TYPE_LABELS` map in `PostCard`, the type selector in `CreatePost`, and the filter pill row on the home feed. Each new type needs a label and emoji badge (e.g., 🌐 General, ❓ Question, 💭 Other). The filter bar will have 7 pills total: All / 💡 Ideas / 📚 Resources / 💬 Discussions / 🌐 General / ❓ Question / 💭 Other. A new Firestore composite index for `posts.type + createdAt` will be needed for the new types (same pattern as existing index).
