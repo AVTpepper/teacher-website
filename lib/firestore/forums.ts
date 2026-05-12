@@ -79,6 +79,18 @@ export const FORUM_CATEGORIES: Omit<ForumCategory, "threadCount" | "lastActivity
     description: "Conversations specific to your grade level and age group.",
     icon: "📚",
   },
+  {
+    id: "general-discussion",
+    name: "General Discussion",
+    description: "Anything that doesn't fit elsewhere — open conversations for the educator community.",
+    icon: "💬",
+  },
+  {
+    id: "questions-answers",
+    name: "Q&A",
+    description: "Ask a question, get answers from fellow educators.",
+    icon: "❓",
+  },
 ];
 
 // --- Thread types ---

@@ -20,10 +20,13 @@ import { notifyMention, notifyComment } from "@/lib/notifications";
 import { timeAgo } from "@/lib/utils";
 import Tag from "@/components/ui/Tag";
 
-const TYPE_LABELS: Record<string, { label: string; variant: "info" | "success" | "warning" }> = {
+const TYPE_LABELS: Record<string, { label: string; variant: "info" | "success" | "warning" | "default" }> = {
   idea: { label: "💡 Idea", variant: "info" },
   resource: { label: "📚 Resource", variant: "success" },
   discussion: { label: "💬 Discussion", variant: "warning" },
+  general: { label: "🌐 General", variant: "default" },
+  question: { label: "❓ Question", variant: "info" },
+  other: { label: "💭 Other", variant: "default" },
 };
 
 interface PostCardProps {

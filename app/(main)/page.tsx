@@ -20,6 +20,9 @@ const TYPE_FILTERS: { label: string; value: PostType | "" }[] = [
   { label: "💡 Ideas", value: "idea" },
   { label: "📚 Resources", value: "resource" },
   { label: "💬 Discussions", value: "discussion" },
+  { label: "🌐 General", value: "general" },
+  { label: "❓ Questions", value: "question" },
+  { label: "💭 Other", value: "other" },
 ];
 
 const GUEST_POST_LIMIT = 3;

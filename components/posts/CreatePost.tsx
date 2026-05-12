@@ -14,6 +14,9 @@ const POST_TYPES: { value: PostType; label: string }[] = [
   { value: "idea", label: "💡 Idea" },
   { value: "resource", label: "📚 Resource" },
   { value: "discussion", label: "💬 Discussion" },
+  { value: "general", label: "🌐 General" },
+  { value: "question", label: "❓ Question" },
+  { value: "other", label: "💭 Other" },
 ];
 
 const TAG_OPTIONS = [

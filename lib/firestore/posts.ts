@@ -22,7 +22,7 @@ import { byCreatedAtDesc } from "@/lib/utils";
 
 // --- Post types ---
 
-export type PostType = "idea" | "resource" | "discussion";
+export type PostType = "idea" | "resource" | "discussion" | "general" | "question" | "other";
 
 export interface Post {
   id: string;
