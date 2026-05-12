@@ -116,7 +116,7 @@ export default function NewInspirationPage() {
       let thumbnailStorageURL: string | null = null;
 
       // Upload file if provided (takes priority over URL)
-      if (thumbnailFile && storage) {
+      if (thumbnailFile && storage && user) {
         const path = `inspiration/${user.uid}/${Date.now()}_${thumbnailFile.name}`;
         const fileRef = storageRef(storage, path);
         const snap = await uploadBytes(fileRef, thumbnailFile);
