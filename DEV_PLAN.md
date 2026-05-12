@@ -789,3 +789,7 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 - [x] **9.10 Follow button not working**: Following a user silently failed. Root cause: `followUser` uses a batch write that includes `batch.update(users/{targetUserId}, { followerCount: increment(1) })`. The Firestore `users` security rule only allowed `update` with `isOwner(userId)` — meaning a user can only update their own document. The target user's `followerCount` increment was blocked, causing the entire batch to fail. Fixed by updating the security rule to additionally allow updates that touch only the `followerCount` field from any authenticated user. Deployed with `firebase deploy --only firestore:rules`.
   - **Test**: Open another user's profile page. Click "Follow" — the button should switch to "Following" and the follower count should increment. Refresh — state should persist. Click "Following" to unfollow — count decrements and button reverts.
 
+
+notes
+- so if you click on a post to view it, it should view as any other post in the feed, but it should be displayed at the top. Give me your suggestions about this.
+- when tagging another user, the tag should be visibly different than the rest of the text in the post, like give it the color blue or something, or the red to keep in style with the website. Give me your suggestions here too.
