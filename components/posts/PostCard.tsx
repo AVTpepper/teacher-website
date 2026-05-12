@@ -19,6 +19,38 @@ import CommentThread, { type CommentData } from "@/components/comments/CommentTh
 import { notifyMention, notifyComment } from "@/lib/notifications";
 import { timeAgo } from "@/lib/utils";
 import Tag from "@/components/ui/Tag";
+import type { MentionedUserRef } from "@/lib/firestore/posts";
+
+function escapeRegex(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderContent(
+  content: string,
+  mentionedUsers?: MentionedUserRef[]
+): React.ReactNode {
+  if (!mentionedUsers?.length) return content;
+  const sorted = [...mentionedUsers].sort((a, b) => b.displayName.length - a.displayName.length);
+  const pattern = sorted.map((u) => `@${escapeRegex(u.displayName)}`).join("|");
+  const regex = new RegExp(`(${pattern})`, "g");
+  const segments = content.split(regex);
+  return segments.map((seg, i) => {
+    const match = sorted.find((u) => seg === `@${u.displayName}`);
+    if (match) {
+      return (
+        <Link
+          key={i}
+          href={`/educators/${match.uid}`}
+          className="text-blue-600 font-medium hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {seg}
+        </Link>
+      );
+    }
+    return seg;
+  });
+}
 
 const TYPE_LABELS: Record<string, { label: string; variant: "info" | "success" | "warning" | "default" }> = {
   idea: { label: "💡 Idea", variant: "info" },
@@ -136,7 +168,7 @@ export default function PostCard({ post }: PostCardProps) {
         onClick={toggleComments}
         title="Click to view comments"
       >
-        {post.content}
+        {renderContent(post.content, post.mentionedUsers)}
       </p>
 
       {/* Tags */}

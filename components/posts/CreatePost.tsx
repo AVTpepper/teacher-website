@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { createPost, type PostType } from "@/lib/firestore/posts";
+import { createPost, type PostType, type MentionedUserRef } from "@/lib/firestore/posts";
 import { notifyMention } from "@/lib/notifications";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
@@ -84,6 +84,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
         tags: selectedTags,
         gradeLevel,
         links,
+        mentionedUsers: mentions.map((m): MentionedUserRef => ({ uid: m.uid, displayName: m.displayName })),
       });
       // Send mention notifications (fire-and-forget)
       mentions.forEach((m) => {

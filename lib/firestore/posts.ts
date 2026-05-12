@@ -24,6 +24,11 @@ import { byCreatedAtDesc } from "@/lib/utils";
 
 export type PostType = "idea" | "resource" | "discussion" | "general" | "question" | "other";
 
+export interface MentionedUserRef {
+  uid: string;
+  displayName: string;
+}
+
 export interface Post {
   id: string;
   authorId: string;
@@ -34,6 +39,7 @@ export interface Post {
   tags: string[];
   gradeLevel: string;
   links: AttachedLink[];
+  mentionedUsers?: MentionedUserRef[];
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
   likesCount: number;
@@ -49,6 +55,7 @@ export interface PostInput {
   tags: string[];
   gradeLevel: string;
   links?: AttachedLink[];
+  mentionedUsers?: MentionedUserRef[];
 }
 
 // --- Comment types ---
@@ -90,6 +97,7 @@ export async function createPost(data: PostInput): Promise<string> {
     ...data,
     id: ref.id,
     links: data.links ?? [],
+    mentionedUsers: data.mentionedUsers ?? [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     likesCount: 0,
