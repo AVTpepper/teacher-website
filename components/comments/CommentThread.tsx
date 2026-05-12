@@ -23,6 +23,8 @@ export interface CommentData {
   /** Used for upvote-based interactions (forums). */
   upvotes?: number;
   downvotes?: number;
+  /** Used for like-based interactions (posts). */
+  likesCount?: number;
 }
 
 // ─── Callback props ───
@@ -45,6 +47,10 @@ export interface CommentThreadProps {
   onUpvote?: (commentId: string) => Promise<void>;
   /** Get the current user's vote on a comment. Only used when mode="upvote". */
   getUserVote?: (commentId: string) => Promise<"up" | "down" | null>;
+  /** Called when user likes a comment. Only used when mode="like". */
+  onLikeComment?: (commentId: string) => Promise<void>;
+  /** Whether the current user has already liked a comment. Only used when mode="like". */
+  hasLikedComment?: (commentId: string) => Promise<boolean>;
 }
 
 // ─── Helper ───
@@ -63,6 +69,8 @@ interface CommentItemProps {
   onAddComment: (content: string, parentId: string | null, mentionedUids?: string[]) => Promise<string>;
   onUpvote?: (commentId: string) => Promise<void>;
   getUserVote?: (commentId: string) => Promise<"up" | "down" | null>;
+  onLikeComment?: (commentId: string) => Promise<void>;
+  hasLikedComment?: (commentId: string) => Promise<boolean>;
 }
 
 function CommentItem({
@@ -75,11 +83,16 @@ function CommentItem({
   onAddComment,
   onUpvote,
   getUserVote,
+  onLikeComment,
+  hasLikedComment,
 }: CommentItemProps) {
   const { user } = useAuth();
   const [vote, setVote] = useState<"up" | "down" | null>(null);
   const [upvotes, setUpvotes] = useState(comment.upvotes ?? 0);
   const [voteLoading, setVoteLoading] = useState(false);
+  const [commentLiked, setCommentLiked] = useState(false);
+  const [commentLikesCount, setCommentLikesCount] = useState(comment.likesCount ?? 0);
+  const [commentLikeLoading, setCommentLikeLoading] = useState(false);
   const [showReply, setShowReply] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replyMentions, setReplyMentions] = useState<MentionedUser[]>([]);
@@ -93,8 +106,33 @@ function CommentItem({
   }, [comment.id, user, mode, getUserVote]);
 
   useEffect(() => {
+    if (user && mode === "like" && hasLikedComment) {
+      hasLikedComment(comment.id).then(setCommentLiked).catch(() => {});
+    }
+  }, [comment.id, user, mode, hasLikedComment]);
+
+  useEffect(() => {
     setLocalReplies(replies);
   }, [replies]);
+
+  async function handleCommentLike() {
+    if (!user || commentLikeLoading || !onLikeComment) return;
+    setCommentLikeLoading(true);
+    try {
+      await onLikeComment(comment.id);
+      if (commentLiked) {
+        setCommentLiked(false);
+        setCommentLikesCount((c) => c - 1);
+      } else {
+        setCommentLiked(true);
+        setCommentLikesCount((c) => c + 1);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setCommentLikeLoading(false);
+    }
+  }
 
   async function handleUpvote() {
     if (!user || voteLoading || !onUpvote) return;
@@ -190,6 +228,33 @@ function CommentItem({
 
           {/* Actions */}
           <div className="flex items-center gap-3 mt-2">
+            {mode === "like" && (
+              <button
+                type="button"
+                onClick={handleCommentLike}
+                disabled={!user || commentLikeLoading}
+                className={`flex items-center gap-1 text-xs font-medium transition-colors cursor-pointer disabled:cursor-not-allowed ${
+                  commentLiked
+                    ? "text-error-500"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill={commentLiked ? "currentColor" : "none"}
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                  />
+                </svg>
+                {commentLikesCount > 0 && commentLikesCount}
+              </button>
+            )}
             {mode === "upvote" && (
               <button
                 type="button"
@@ -272,6 +337,8 @@ function CommentItem({
               onAddComment={onAddComment}
               onUpvote={onUpvote}
               getUserVote={getUserVote}
+              onLikeComment={onLikeComment}
+              hasLikedComment={hasLikedComment}
             />
           ))}
         </div>
@@ -290,6 +357,8 @@ export default function CommentThread({
   onAddComment,
   onUpvote,
   getUserVote,
+  onLikeComment,
+  hasLikedComment,
 }: CommentThreadProps) {
   const { user } = useAuth();
   const [replyText, setReplyText] = useState("");
@@ -392,6 +461,8 @@ export default function CommentThread({
               onAddComment={onAddComment}
               onUpvote={onUpvote}
               getUserVote={getUserVote}
+              onLikeComment={onLikeComment}
+              hasLikedComment={hasLikedComment}
             />
           ))}
         </div>

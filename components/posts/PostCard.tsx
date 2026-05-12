@@ -9,12 +9,18 @@ import {
   hasLikedPost,
   commentOnPost,
   getPostComments,
+  likeComment,
+  unlikeComment,
+  hasLikedComment,
+  updatePost,
+  deletePost,
   type Post,
   type PostComment,
 } from "@/lib/firestore/posts";
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import Dropdown from "@/components/ui/Dropdown";
 import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
 import { notifyMention, notifyComment } from "@/lib/notifications";
 import { timeAgo } from "@/lib/utils";
@@ -63,9 +69,11 @@ const TYPE_LABELS: Record<string, { label: string; variant: "info" | "success" |
 
 interface PostCardProps {
   post: Post;
+  onDelete?: (postId: string) => void;
+  onUpdate?: (updated: Post) => void;
 }
 
-export default function PostCard({ post }: PostCardProps) {
+export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
   const { user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likesCount);
@@ -75,6 +83,14 @@ export default function PostCard({ post }: PostCardProps) {
   const [loadingComments, setLoadingComments] = useState(false);
   const [likeLoading, setLikeLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content);
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [localContent, setLocalContent] = useState(post.content);
+  const isAuthor = user?.uid === post.authorId;
 
   useEffect(() => {
     if (user) {
@@ -130,7 +146,45 @@ export default function PostCard({ post }: PostCardProps) {
     }
   }
 
+  async function handleSaveEdit() {
+    const trimmed = editContent.trim();
+    if (!trimmed || editSaving) return;
+    setEditSaving(true);
+    try {
+      await updatePost(post.id, {
+        content: trimmed,
+        type: post.type,
+        tags: post.tags,
+        gradeLevel: post.gradeLevel,
+        links: post.links,
+      });
+      setLocalContent(trimmed);
+      setEditing(false);
+      onUpdate?.({ ...post, content: trimmed });
+    } catch {
+      // ignore
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deletePost(post.id);
+      setDeleted(true);
+      onDelete?.(post.id);
+    } catch {
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const typeInfo = TYPE_LABELS[post.type] || TYPE_LABELS.idea;
+
+  if (deleted) return null;
 
   return (
     <div className="rounded-xl border border-border bg-surface shadow-card p-4">
@@ -160,16 +214,91 @@ export default function PostCard({ post }: PostCardProps) {
             {timeAgo(post.createdAt as { seconds: number } | null)}
           </p>
         </div>
+        {isAuthor && (
+          <Dropdown
+            align="right"
+            trigger={
+              <span className="flex items-center justify-center w-7 h-7 rounded-full text-muted hover:bg-surface-hover hover:text-foreground transition-colors text-lg leading-none">
+                ···
+              </span>
+            }
+            items={[
+              {
+                label: "Edit",
+                onClick: () => {
+                  setEditContent(localContent);
+                  setEditing(true);
+                },
+              },
+              {
+                label: "Delete",
+                destructive: true,
+                onClick: () => setConfirmDelete(true),
+              },
+            ]}
+          />
+        )}
       </div>
 
+      {/* Inline edit form */}
+      {editing && (
+        <div className="mt-3">
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            rows={4}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
+            autoFocus
+          />
+          <div className="mt-2 flex gap-2 justify-end">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSaveEdit}
+              disabled={!editContent.trim()}
+              isLoading={editSaving}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="mt-3 rounded-lg border border-error-200 bg-error-50 px-4 py-3 flex items-center gap-3">
+          <p className="flex-1 text-sm text-error-700">Delete this post? This cannot be undone.</p>
+          <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleDelete}
+            isLoading={deleting}
+            className="text-error-600 border-error-300 hover:bg-error-50"
+          >
+            Delete
+          </Button>
+        </div>
+      )}
+
       {/* Content — click to expand comments */}
-      <p
-        className="mt-3 text-sm text-foreground whitespace-pre-wrap cursor-pointer"
-        onClick={toggleComments}
-        title="Click to view comments"
-      >
-        {renderContent(post.content, post.mentionedUsers)}
-      </p>
+      {!editing && (
+        <p
+          className="mt-3 text-sm text-foreground whitespace-pre-wrap cursor-pointer"
+          onClick={toggleComments}
+          title="Click to view comments"
+        >
+          {renderContent(localContent, post.mentionedUsers)}
+        </p>
+      )}
 
       {/* Tags */}
       {post.tags.length > 0 && (
@@ -303,11 +432,25 @@ export default function PostCard({ post }: PostCardProps) {
                 authorPhotoURL: c.authorPhotoURL,
                 content: c.content,
                 createdAt: c.createdAt as { seconds: number } | null,
+                likesCount: c.likesCount ?? 0,
               })
             )}
             loading={loadingComments}
             maxDepth={1}
             mode="like"
+            onLikeComment={async (commentId) => {
+              if (!user) return;
+              const alreadyLiked = await hasLikedComment(post.id, commentId, user.uid);
+              if (alreadyLiked) {
+                await unlikeComment(post.id, commentId, user.uid);
+              } else {
+                await likeComment(post.id, commentId, user.uid);
+              }
+            }}
+            hasLikedComment={async (commentId) => {
+              if (!user) return false;
+              return hasLikedComment(post.id, commentId, user.uid);
+            }}
             onAddComment={async (content, parentId, mentionedUids) => {
               if (!user) throw new Error("Not authenticated");
               const newId = await commentOnPost(post.id, {

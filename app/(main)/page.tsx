@@ -211,7 +211,11 @@ function HomePageInner() {
       ) : (
         <div className="space-y-4">
           {visiblePosts.map((post) => (
-            <PostCard key={post.id} post={post} />
+            <PostCard
+              key={post.id}
+              post={post}
+              onDelete={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))}
+            />
           ))}
 
           {/* Guest wall */}

@@ -74,6 +74,7 @@ export interface PostComment {
   authorPhotoURL: string | null;
   content: string;
   createdAt: Timestamp | null;
+  likesCount: number;
 }
 
 export interface PostCommentInput {
@@ -224,6 +225,7 @@ export async function commentOnPost(
     id: ref.id,
     postId,
     parentId: data.parentId ?? null,
+    likesCount: 0,
     createdAt: serverTimestamp(),
   });
 
@@ -246,4 +248,56 @@ export async function getPostComments(
   const snapshot = await getDocs(q);
 
   return snapshot.docs.map((d) => d.data() as PostComment);
+}
+
+export async function likeComment(
+  postId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await setDoc(doc(db, "posts", postId, "comments", commentId, "likes", userId), {
+    likedAt: serverTimestamp(),
+  });
+  await updateDoc(doc(db, "posts", postId, "comments", commentId), {
+    likesCount: increment(1),
+  });
+}
+
+export async function unlikeComment(
+  postId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "posts", postId, "comments", commentId, "likes", userId));
+  await updateDoc(doc(db, "posts", postId, "comments", commentId), {
+    likesCount: increment(-1),
+  });
+}
+
+export async function hasLikedComment(
+  postId: string,
+  commentId: string,
+  userId: string
+): Promise<boolean> {
+  if (!db) throw new Error("Firestore is not initialized");
+  const snap = await getDoc(doc(db, "posts", postId, "comments", commentId, "likes", userId));
+  return snap.exists();
+}
+
+export async function updatePost(
+  postId: string,
+  updates: Pick<PostInput, "content" | "type" | "tags" | "gradeLevel" | "links">
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(doc(db, "posts", postId), {
+    ...updates,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deletePost(postId: string): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "posts", postId));
 }

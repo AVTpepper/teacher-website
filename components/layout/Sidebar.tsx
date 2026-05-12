@@ -69,12 +69,17 @@ export default function Sidebar() {
           <ul className="space-y-2">
             {trendingPosts.map((post) => (
               <li key={post.id}>
-                <p className="text-xs text-foreground line-clamp-2 leading-relaxed">
-                  {post.content}
-                </p>
-                <p className="text-xs text-muted mt-0.5">
-                  {post.authorName} · {post.likesCount} likes
-                </p>
+                <Link
+                  href={`/?post=${post.id}`}
+                  className="group block rounded-md hover:bg-surface-hover transition-colors -mx-1 px-1 py-0.5"
+                >
+                  <p className="text-xs text-foreground line-clamp-2 leading-relaxed group-hover:text-primary-900">
+                    {post.content}
+                  </p>
+                  <p className="text-xs text-muted mt-0.5">
+                    {post.authorName} · {post.likesCount} likes
+                  </p>
+                </Link>
               </li>
             ))}
           </ul>
