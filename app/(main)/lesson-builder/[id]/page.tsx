@@ -234,7 +234,7 @@ export default function LessonDetailPage({
                   <Badge variant="warning">Draft</Badge>
                 )}
                 {lesson.remixedFromId && (
-                  <Badge variant="success">Remixed</Badge>
+                  <Badge variant="success">Modified</Badge>
                 )}
               </div>
 
@@ -413,11 +413,7 @@ export default function LessonDetailPage({
                           d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3"
                         />
                       </svg>
-                      Remix
-                    </Button>
-                  )}
-
-                  {isOwner && (
+                      Modify
                     <Link href={`/lesson-builder/new?edit=${lesson.id}`}>
                       <Button variant="outline">Edit</Button>
                     </Link>
@@ -600,7 +596,7 @@ export default function LessonDetailPage({
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
             </svg>
-            Remix
+            Modify
           </Button>
           <Button variant="outline" onClick={handleShare} className="flex-1 justify-center">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

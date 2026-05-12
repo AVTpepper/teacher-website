@@ -771,5 +771,5 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
   - **Test**: Open the Create Post form and check the type selector — it should list all 6 options (Idea, Resource, Discussion, General, Question, Other). Create one post of each new type. On the home feed, the filter bar should show 7 pills. Click "❓ Question" — only Question posts should appear. Click "🌐 General" — only General posts. Click "All" — all posts return. Each post card should show the correct emoji badge for its type.
 
 
-  more notes:
-  - REMIX feature of lessons created should have a different name, more school oriented name, such as modified or something else, not quite sure, open for suggestions.
+- [x] **9.5 Rename "Remix" to "Modify"**: The lesson detail page action button labelled "Remix" has been renamed to "Modify" — more appropriate language for an education platform. Updated in both the desktop action bar and the mobile sticky bottom bar. The "Remixed" badge on lessons that were derived from another lesson is also renamed to "Modified". Internal function name (`handleRemix`), URL param (`?remix=`), and Firestore field (`remixedFromId`) are unchanged — these are implementation details not visible to users.
+  - **Test**: Visit any lesson detail page (`/lesson-builder/{id}`) that you don't own. The action buttons should show "Download", "Modify", and "Share" (not "Remix"). Click "Modify" — should open the lesson builder pre-filled with the original lesson as a new draft. Save the draft — the resulting lesson detail page should show a "Modified" badge in the header.
