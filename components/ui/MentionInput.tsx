@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { searchUsersByDisplayName } from "@/lib/firestore/users";
 import Avatar from "@/components/ui/Avatar";
 
 export interface MentionedUser {
   uid: string;
   displayName: string;
+}
+
+/** Imperative handle — call insertText("@") from parent to trigger a mention. */
+export interface MentionInputHandle {
+  insertText: (text: string) => void;
 }
 
 interface MentionInputProps {
@@ -24,7 +29,7 @@ interface MentionInputProps {
 
 type SearchResult = { uid: string; displayName: string; photoURL: string | null };
 
-export default function MentionInput({
+const MentionInput = forwardRef<MentionInputHandle, MentionInputProps>(function MentionInput({
   value,
   onChange,
   onMentionsChange,
@@ -34,7 +39,7 @@ export default function MentionInput({
   rows = 3,
   onKeyDown,
   onFocus,
-}: MentionInputProps) {
+}: MentionInputProps, ref) {
   const [dropdownUsers, setDropdownUsers] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [mentionStart, setMentionStart] = useState(-1);
@@ -51,6 +56,27 @@ export default function MentionInput({
       ? (textareaRef.current as HTMLTextAreaElement | null)
       : (inputRef.current as HTMLInputElement | null);
   }
+
+  // Expose insertText so a parent can programmatically insert "@" at the cursor.
+  useImperativeHandle(ref, () => ({
+    insertText(text: string) {
+      const el = getEl();
+      const start = el?.selectionStart ?? value.length;
+      const end = el?.selectionEnd ?? value.length;
+      const before = value.slice(0, start);
+      const after = value.slice(end);
+      const newValue = before + text + after;
+      onChange(newValue);
+      setTimeout(() => {
+        const el2 = getEl();
+        if (el2) {
+          const pos = start + text.length;
+          el2.focus();
+          el2.setSelectionRange(pos, pos);
+        }
+      }, 0);
+    },
+  }));
 
   // Derive an @mention query from text at the given cursor position.
   function getMentionAt(text: string, cursor: number): { query: string; start: number } | null {
@@ -90,7 +116,8 @@ export default function MentionInput({
           const results = await searchUsersByDisplayName(mention.query);
           setDropdownUsers(results);
           setShowDropdown(results.length > 0);
-        } catch {
+        } catch (err) {
+          console.error("[MentionInput] searchUsersByDisplayName failed:", err);
           setShowDropdown(false);
         }
       }, 250);
@@ -206,4 +233,8 @@ export default function MentionInput({
       )}
     </div>
   );
-}
+});
+
+MentionInput.displayName = "MentionInput";
+
+export default MentionInput;

@@ -20,6 +20,8 @@ import { db } from "@/lib/firebase";
 export interface UserProfile {
   uid: string;
   displayName: string;
+  /** Lowercase version of displayName used for case-insensitive prefix search. */
+  displayNameLower?: string;
   email: string;
   photoURL: string | null;
   gradeLevel: string;
@@ -37,7 +39,7 @@ export interface UserProfile {
 
 export type UserProfileInput = Omit<
   UserProfile,
-  "createdAt" | "badges" | "followerCount" | "followingCount" | "isVerified"
+  "createdAt" | "badges" | "followerCount" | "followingCount" | "isVerified" | "displayNameLower"
 >;
 
 export const GRADE_LEVELS = [
@@ -72,6 +74,7 @@ export async function createUser(data: UserProfileInput): Promise<void> {
 
   await setDoc(doc(db, "users", data.uid), {
     ...data,
+    displayNameLower: data.displayName.toLowerCase(),
     isVerified: false,
     createdAt: serverTimestamp(),
     badges: [],
@@ -94,7 +97,11 @@ export async function updateUser(
 ): Promise<void> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  await updateDoc(doc(db, "users", uid), data);
+  const payload: Record<string, unknown> = { ...data };
+  if (data.displayName !== undefined) {
+    payload.displayNameLower = data.displayName.toLowerCase();
+  }
+  await updateDoc(doc(db, "users", uid), payload);
 }
 
 export async function followUser(
@@ -216,15 +223,15 @@ export async function searchUsersByDisplayName(
 ): Promise<{ uid: string; displayName: string; photoURL: string | null }[]> {
   if (!db || !prefix.trim()) return [];
 
-  // Capitalize first letter so "@j" finds "John" etc.
-  const normalized = prefix.charAt(0).toUpperCase() + prefix.slice(1);
-  const end = normalized + "\uf8ff";
+  // Query against displayNameLower for case-insensitive prefix matching.
+  const lower = prefix.toLowerCase();
+  const end = lower + "\uf8ff";
 
   const q = query(
     collection(db, "users"),
-    orderBy("displayName"),
-    where("displayName", ">=", normalized),
-    where("displayName", "<=", end),
+    orderBy("displayNameLower"),
+    where("displayNameLower", ">=", lower),
+    where("displayNameLower", "<=", end),
     limit(max)
   );
   const snap = await getDocs(q);
