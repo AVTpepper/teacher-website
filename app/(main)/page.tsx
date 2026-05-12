@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   getPosts,
   getPost,
@@ -37,8 +37,10 @@ export default function HomePage() {
 
 function HomePageInner() {
   const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const sharedPostId = searchParams.get("post");
+  // Capture the linked post ID once at mount — stays stable even after we strip the URL param
+  const [pinnedPostId] = useState<string | null>(() => searchParams.get("post"));
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [sharedPost, setSharedPost] = useState<Post | null>(null);
@@ -79,22 +81,24 @@ function HomePageInner() {
     }
   }, [authLoading, typeFilter, loadPosts]);
 
-  // Fetch and pin the shared post when ?post= is present
+  // Fetch the linked post on mount (once only)
   useEffect(() => {
-    if (!sharedPostId) { setSharedPost(null); return; }
+    if (!pinnedPostId) return;
     setSharedPostLoading(true);
-    getPost(sharedPostId)
+    getPost(pinnedPostId)
       .then(setSharedPost)
       .catch(() => setSharedPost(null))
       .finally(() => setSharedPostLoading(false));
-  }, [sharedPostId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Scroll to the pinned post once it loads
+  // Once the post loads: scroll to it, then strip ?post= so refresh shows normal feed
   useEffect(() => {
     if (sharedPost && sharedPostRef.current) {
       sharedPostRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      router.replace("/");
     }
-  }, [sharedPost]);
+  }, [sharedPost, router]);
 
   function handleTypeChange(value: PostType | "") {
     setTypeFilter(value);
@@ -106,8 +110,8 @@ function HomePageInner() {
   }
 
   // For guests: only show limited posts
-  const feedPosts = sharedPostId
-    ? posts.filter((p) => p.id !== sharedPostId)
+  const feedPosts = pinnedPostId
+    ? posts.filter((p) => p.id !== pinnedPostId)
     : posts;
   const visiblePosts = !user ? feedPosts.slice(0, GUEST_POST_LIMIT) : feedPosts;
   const showGuestWall = !user && feedPosts.length > 0;
@@ -126,7 +130,7 @@ function HomePageInner() {
       {user && <CreatePost onPostCreated={() => loadPosts(true, typeFilter)} />}
 
       {/* Shared / linked post — pinned below the create form */}
-      {sharedPostId && (
+      {pinnedPostId && (
         <div ref={sharedPostRef} className="scroll-mt-28">
           {sharedPostLoading ? (
             <div className="rounded-xl border border-info-300 bg-info-50 shadow-card p-4 animate-pulse">
@@ -139,12 +143,12 @@ function HomePageInner() {
               </div>
             </div>
           ) : sharedPost ? (
-            <div className="rounded-xl ring-2 ring-info-400 ring-offset-2">
-              <div className="rounded-t-xl bg-info-50 border border-info-200 border-b-0 px-4 py-2 flex items-center gap-2 text-xs font-medium text-info-700">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="rounded-xl ring-1 ring-info-200">
+              <div className="rounded-t-xl bg-info-50 border-b border-info-100 px-3 py-1 flex items-center gap-1.5 text-xs text-info-500">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
-                Shared post
+                Linked post
               </div>
               <PostCard post={sharedPost} />
             </div>

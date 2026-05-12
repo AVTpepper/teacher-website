@@ -47,7 +47,7 @@ function renderContent(
         <Link
           key={i}
           href={`/educators/${match.uid}`}
-          className="text-blue-600 font-medium hover:underline"
+          className="text-primary-900 font-semibold hover:underline"
           onClick={(e) => e.stopPropagation()}
         >
           {seg}
