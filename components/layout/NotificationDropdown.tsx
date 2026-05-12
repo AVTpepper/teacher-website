@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   subscribeToNotifications,
-  markAsRead,
   markAllAsRead,
   type Notification,
   type NotificationType,
@@ -42,6 +41,9 @@ export default function NotificationDropdown() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+  // Keep a ref so the open-effect can read it without adding it to deps
+  const unreadCountRef = useRef(unreadCount);
+  unreadCountRef.current = unreadCount;
 
   // Real-time listener — only runs when user is logged in
   useEffect(() => {
@@ -49,9 +51,19 @@ export default function NotificationDropdown() {
       setNotifications([]);
       return;
     }
-    const unsub = subscribeToNotifications(user.uid, 20, setNotifications);
+    const unsub = subscribeToNotifications(user.uid, 5, setNotifications);
     return unsub;
   }, [user]);
+
+  // Auto-mark all as read when the dropdown is opened — clears the bell badge
+  useEffect(() => {
+    if (!open || !user) return;
+    if (unreadCountRef.current > 0) {
+      markAllAsRead(user.uid).catch(console.error);
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Close on outside click
   useEffect(() => {
@@ -75,14 +87,8 @@ export default function NotificationDropdown() {
     return () => document.removeEventListener("keydown", handleKey);
   }, [open]);
 
-  async function handleNotificationClick(n: Notification) {
+  function handleNotificationClick(n: Notification) {
     setOpen(false);
-    if (!n.read && user) {
-      await markAsRead(user.uid, n.id).catch(console.error);
-      setNotifications((prev) =>
-        prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
-      );
-    }
     router.push(n.linkURL);
   }
 
@@ -143,14 +149,7 @@ export default function NotificationDropdown() {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <h2 className="text-sm font-semibold text-foreground">
-              Notifications
-              {unreadCount > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center h-5 min-w-5 rounded-full bg-error text-white text-[10px] font-bold px-1">
-                  {unreadCount}
-                </span>
-              )}
-            </h2>
+            <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
             {unreadCount > 0 && (
               <button
                 type="button"
@@ -164,7 +163,7 @@ export default function NotificationDropdown() {
           </div>
 
           {/* List */}
-          <div className="max-h-105 overflow-y-auto">
+          <div className="overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="py-12 text-center">
                 <p className="text-3xl mb-2">🔔</p>
@@ -218,15 +217,15 @@ export default function NotificationDropdown() {
             )}
           </div>
 
-          {/* Footer */}
+          {/* Footer — always show when there are notifications */}
           {notifications.length > 0 && (
             <div className="border-t border-border px-4 py-2.5 text-center">
               <Link
-                href="/profile"
+                href="/notifications"
                 onClick={() => setOpen(false)}
                 className="text-xs text-primary hover:underline"
               >
-                View profile & activity
+                View all notifications
               </Link>
             </div>
           )}
