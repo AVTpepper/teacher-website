@@ -140,7 +140,7 @@ export default function SignupPage() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-9.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute right-3 top-[38px] text-muted-foreground hover:text-foreground transition-colors"
             tabIndex={-1}
           >
             {showPassword ? (
@@ -168,7 +168,7 @@ export default function SignupPage() {
           <button
             type="button"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute right-3 top-9.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute right-3 top-[38px] text-muted-foreground hover:text-foreground transition-colors"
             tabIndex={-1}
           >
             {showConfirmPassword ? (

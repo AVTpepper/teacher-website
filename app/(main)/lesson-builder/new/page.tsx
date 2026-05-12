@@ -17,6 +17,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
+import { checkAndAwardBadges } from "@/lib/badges";
 import {
   createLesson,
   getLesson,
@@ -314,6 +315,9 @@ function LessonBuilderNewInner() {
         remixedFromId: remixLessonId || null,
       });
 
+      if (publish) {
+        checkAndAwardBadges(user!.uid).catch(() => {});
+      }
       router.push(`/lesson-builder/${lessonId}`);
     } catch (err) {
       console.error("Create lesson error:", err);

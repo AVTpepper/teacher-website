@@ -147,7 +147,7 @@ export default function PostJobPage() {
           />
 
           {error && (
-            <p className="text-sm text-error font-medium">{error}</p>
+            <p className="text-sm text-error-700 font-medium">{error}</p>
           )}
 
           <div className="flex items-center justify-end gap-3 pt-1">
@@ -159,8 +159,8 @@ export default function PostJobPage() {
             >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={saving}>
-              {saving ? "Posting…" : "Post Job"}
+            <Button type="submit" variant="primary" isLoading={saving}>
+              Post Job
             </Button>
           </div>
         </form>

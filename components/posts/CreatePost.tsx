@@ -100,7 +100,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       setContent("");
       setMentions([]);
       setLinks([]);
-      setType("idea");
+      setType("general");
       setSelectedTags([]);
       setGradeLevel("");
       setExpanded(false);

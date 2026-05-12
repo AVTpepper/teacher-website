@@ -10,6 +10,7 @@ import {
   FORUM_CATEGORIES,
 } from "@/lib/firestore/forums";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
+import { checkAndAwardBadges } from "@/lib/badges";
 import { Button, Card, Input, Select, Textarea } from "@/components/ui";
 import LinkAttacher, { type AttachedLink } from "@/components/ui/LinkAttacher";
 
@@ -108,6 +109,7 @@ function NewDiscussionForm() {
         subject,
         links,
       });
+      checkAndAwardBadges(user!.uid).catch(() => {});
       router.push(`/forums/${threadSlug(title.trim(), threadId)}`);
     } catch {
       setError("Failed to post discussion. Please try again.");

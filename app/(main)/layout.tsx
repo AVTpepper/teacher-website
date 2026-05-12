@@ -1,5 +1,5 @@
 import Navbar from "@/components/layout/Navbar";
-import Sidebar from "@/components/layout/Sidebar";
+import Sidebar, { SidebarDrawerButton } from "@/components/layout/Sidebar";
 import Footer from "@/components/layout/Footer";
 
 export default function MainLayout({
@@ -17,6 +17,7 @@ export default function MainLayout({
         </div>
       </div>
       <Footer />
+      <SidebarDrawerButton />
     </>
   );
 }

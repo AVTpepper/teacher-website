@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import { getPosts, type Post } from "@/lib/firestore/posts";
@@ -8,7 +8,11 @@ import { getResources, type Resource } from "@/lib/firestore/resources";
 import { getPublicLessons, type Lesson } from "@/lib/firestore/lessons";
 import { getInspirationItems, type InspirationItem } from "@/lib/firestore/inspiration";
 
-export default function Sidebar() {
+interface SidebarContentsProps {
+  onClose?: () => void;
+}
+
+function SidebarContents({ onClose }: SidebarContentsProps) {
   const [trendingPosts, setTrendingPosts] = useState<Post[]>([]);
   const [loadedTrending, setLoadedTrending] = useState(false);
 
@@ -51,7 +55,7 @@ export default function Sidebar() {
   }, []);
 
   return (
-    <aside className="hidden lg:block w-72 shrink-0 space-y-4">
+    <div className="space-y-4">
       {/* Trending Discussions */}
       <Card padding="md">
         <h3 className="text-sm font-semibold text-foreground mb-3">
@@ -211,6 +215,7 @@ export default function Sidebar() {
             <li key={link.href}>
               <Link
                 href={link.href}
+                onClick={onClose}
                 className="text-sm text-muted hover:text-primary-900 transition-colors"
               >
                 {link.label}
@@ -219,6 +224,95 @@ export default function Sidebar() {
           ))}
         </ul>
       </Card>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mobile drawer button — rendered in the main layout on small screens
+// ---------------------------------------------------------------------------
+
+export function SidebarDrawerButton() {
+  const [open, setOpen] = useState(false);
+
+  // Close on route changes
+  const handleClose = useCallback(() => setOpen(false), []);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  // Lock body scroll when open
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
+  return (
+    <>
+      {/* Toggle button — only visible on mobile */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Open sidebar"
+        className="lg:hidden fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary-900 text-white shadow-lg hover:bg-primary-800 transition-colors"
+      >
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
+        </svg>
+      </button>
+
+      {/* Backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={handleClose}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Drawer panel */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sidebar"
+        className={`fixed inset-y-0 right-0 z-50 w-80 max-w-full overflow-y-auto bg-background shadow-xl transition-transform duration-300 lg:hidden ${open ? "translate-x-0" : "translate-x-full"}`}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <span className="text-sm font-semibold text-foreground">Explore</span>
+          <button
+            type="button"
+            onClick={handleClose}
+            aria-label="Close sidebar"
+            className="text-muted hover:text-foreground transition-colors cursor-pointer"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-4">
+          <SidebarContents onClose={handleClose} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Default export — desktop aside (hidden on mobile)
+// ---------------------------------------------------------------------------
+
+export default function Sidebar() {
+  return (
+    <aside className="hidden lg:block w-72 shrink-0">
+      <SidebarContents />
     </aside>
   );
 }

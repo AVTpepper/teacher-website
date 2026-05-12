@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   subscribeToNotifications,
+  markAsRead,
   markAllAsRead,
   type Notification,
   type NotificationType,
@@ -38,9 +39,14 @@ export default function NotificationDropdown() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [markingAll, setMarkingAll] = useState(false);
+  // Tracks when the dropdown was last opened — used to reset the badge count
+  const [lastSeenAt, setLastSeenAt] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // Badge count: only unread notifications that arrived after the dropdown was last opened
+  const unreadCount = notifications.filter(
+    (n) => !n.read && (n.createdAt?.seconds ?? 0) * 1000 > lastSeenAt
+  ).length;
   // Keep a ref so the open-effect can read it without adding it to deps
   const unreadCountRef = useRef(unreadCount);
   unreadCountRef.current = unreadCount;
@@ -55,13 +61,10 @@ export default function NotificationDropdown() {
     return unsub;
   }, [user]);
 
-  // Auto-mark all as read when the dropdown is opened — clears the bell badge
+  // Reset the badge count when the dropdown is opened (record current time)
   useEffect(() => {
-    if (!open || !user) return;
-    if (unreadCountRef.current > 0) {
-      markAllAsRead(user.uid).catch(console.error);
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    }
+    if (!open) return;
+    setLastSeenAt(Date.now());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -88,6 +91,13 @@ export default function NotificationDropdown() {
   }, [open]);
 
   function handleNotificationClick(n: Notification) {
+    // Mark this individual notification as read
+    if (!n.read && user) {
+      markAsRead(user.uid, n.id).catch(console.error);
+      setNotifications((prev) =>
+        prev.map((item) => item.id === n.id ? { ...item, read: true } : item)
+      );
+    }
     setOpen(false);
     router.push(n.linkURL);
   }

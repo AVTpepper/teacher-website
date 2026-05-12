@@ -47,7 +47,7 @@ function FeaturedCard({ item }: { item: InspirationItem }) {
           {/* Thumbnail / colour swatch */}
           <div
             className="h-48 sm:h-auto sm:w-64 shrink-0 flex items-center justify-center text-6xl"
-            style={{ background: "var(--color-secondary-50, #f3f4f6))" }}
+            style={{ background: "var(--color-secondary-50, #f3f4f6)" }}
           >
             {thumb ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -215,7 +215,7 @@ export default function InspirationPage() {
           onClick={() => setActiveCategory("all")}
           className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
             activeCategory === "all"
-              ? "bg-primary text-white"
+              ? "bg-primary-900 text-white"
               : "bg-secondary-100 text-foreground hover:bg-secondary-200"
           }`}
         >
@@ -229,7 +229,7 @@ export default function InspirationPage() {
             onClick={() => setActiveCategory(cat.value)}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
               activeCategory === cat.value
-                ? "bg-primary text-white"
+                ? "bg-primary-900 text-white"
                 : "bg-secondary-100 text-foreground hover:bg-secondary-200"
             }`}
           >
@@ -240,7 +240,9 @@ export default function InspirationPage() {
 
       {/* Loading state */}
       {loading && (
-        <div className="py-16 text-center text-muted text-sm">Loading content…</div>
+        <div className="py-16 flex items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+        </div>
       )}
 
       {/* Empty state */}

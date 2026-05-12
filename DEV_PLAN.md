@@ -793,3 +793,5 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 notes
 - so if you click on a post to view it, it should view as any other post in the feed, but it should be displayed at the top. Give me your suggestions about this.
 - when tagging another user, the tag should be visibly different than the rest of the text in the post, like give it the color blue or something, or the red to keep in style with the website. Give me your suggestions here too.
+
+- add the ability to search for educators /users

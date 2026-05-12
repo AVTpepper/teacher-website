@@ -233,10 +233,10 @@ function HomePageInner() {
                 Create a free account to view the full educator feed and join the conversation.
               </p>
               <div className="mt-4 flex justify-center gap-3">
-                <Button variant="primary" onClick={() => window.location.href = "/auth/signup"}>
+                <Button variant="primary" onClick={() => router.push("/auth/signup")}>
                   Create Account
                 </Button>
-                <Button variant="outline" onClick={() => window.location.href = "/auth/login"}>
+                <Button variant="outline" onClick={() => router.push("/auth/login")}>
                   Sign In
                 </Button>
               </div>

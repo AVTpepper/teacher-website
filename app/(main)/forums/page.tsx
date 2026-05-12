@@ -34,6 +34,7 @@ export default function ForumsPage() {
   const [threads, setThreads] = useState<ForumThread[]>([]);
   const [threadsCursor, setThreadsCursor] = useState<DocumentSnapshot | null>(null);
   const [loadingThreads, setLoadingThreads] = useState(false);
+  const [loadingMoreThreads, setLoadingMoreThreads] = useState(false);
   const [hasMoreThreads, setHasMoreThreads] = useState(false);
 
   useEffect(() => {
@@ -71,11 +72,12 @@ export default function ForumsPage() {
     setSelectedCategory(null);
     setThreads([]);
     setThreadsCursor(null);
+    setHasMoreThreads(false);
   }
 
   async function loadMoreThreads() {
     if (!selectedCategory || !threadsCursor) return;
-    setLoadingThreads(true);
+    setLoadingMoreThreads(true);
     try {
       const result = await getThreads(selectedCategory, threadsCursor);
       setThreads((prev) => [...prev, ...result.threads]);
@@ -84,7 +86,7 @@ export default function ForumsPage() {
     } catch {
       // ignore
     } finally {
-      setLoadingThreads(false);
+      setLoadingMoreThreads(false);
     }
   }
 
@@ -359,7 +361,7 @@ export default function ForumsPage() {
                   <Button
                     variant="outline"
                     onClick={loadMoreThreads}
-                    isLoading={loadingThreads}
+                    isLoading={loadingMoreThreads}
                   >
                     Load More
                   </Button>

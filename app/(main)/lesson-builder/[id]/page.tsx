@@ -19,6 +19,8 @@ import CommentThread, {
 } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
 import { notifyComment } from "@/lib/notifications";
+import { pdf } from "@react-pdf/renderer";
+import LessonPDFDocument from "@/components/lessons/LessonPDFDocument";
 
 export default function LessonDetailPage({
   params,
@@ -87,52 +89,12 @@ export default function LessonDetailPage({
       setLocalDownloadCount((c) => c + 1);
     }
 
-    // Build a text representation of the lesson and trigger download
-    const lines: string[] = [];
-    lines.push(lesson.title);
-    lines.push("=".repeat(lesson.title.length));
-    lines.push("");
-    if (lesson.gradeLevel) lines.push(`Grade Level: ${lesson.gradeLevel}`);
-    if (lesson.subject) lines.push(`Subject: ${lesson.subject}`);
-    lines.push(`Author: ${lesson.authorName}`);
-    lines.push("");
-
-    if (lesson.objectives.length > 0) {
-      lines.push("LEARNING OBJECTIVES");
-      lines.push("-".repeat(20));
-      lesson.objectives.forEach((o, i) => lines.push(`${i + 1}. ${o}`));
-      lines.push("");
-    }
-
-    if (lesson.materials.length > 0) {
-      lines.push("MATERIALS NEEDED");
-      lines.push("-".repeat(16));
-      lesson.materials.forEach((m) => lines.push(`• ${m}`));
-      lines.push("");
-    }
-
-    if (lesson.steps.length > 0) {
-      lines.push("LESSON PLAN");
-      lines.push("-".repeat(11));
-      lesson.steps.forEach((s, i) => {
-        lines.push(`Step ${i + 1}: ${s.title}`);
-        if (s.description) lines.push(`  ${s.description}`);
-        lines.push("");
-      });
-    }
-
-    if (lesson.attachments.length > 0) {
-      lines.push("ATTACHMENTS");
-      lines.push("-".repeat(11));
-      lesson.attachments.forEach((a) => lines.push(`• ${a.name}: ${a.url}`));
-      lines.push("");
-    }
-
-    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    // Generate a PDF and trigger download
+    const blob = await pdf(<LessonPDFDocument lesson={lesson} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${lesson.title.replace(/[^a-zA-Z0-9 ]/g, "").trim()}.txt`;
+    a.download = `${lesson.title.replace(/[^a-zA-Z0-9 ]/g, "").trim()}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -281,16 +243,31 @@ export default function LessonDetailPage({
             )}
 
             {/* Materials */}
-            {user && lesson.materials.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold text-foreground mb-2">
-                  📦 Materials Needed
-                </h3>
-                <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                  {lesson.materials.map((mat, i) => (
-                    <li key={i}>{mat}</li>
-                  ))}
-                </ul>
+            {user ? (
+              lesson.materials.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">
+                    📦 Materials Needed
+                  </h3>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
+                    {lesson.materials.map((mat, i) => (
+                      <li key={i}>{mat}</li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            ) : (
+              <div className="rounded-lg border border-dashed border-border bg-secondary-50 p-5 text-center">
+                <p className="text-sm font-medium text-foreground mb-1">📦 Materials &amp; Lesson Steps are members-only</p>
+                <p className="text-xs text-muted mb-3">Create a free account to view the full lesson plan.</p>
+                <div className="flex justify-center gap-2">
+                  <Link href="/auth/signup">
+                    <Button variant="primary" size="sm">Create Account</Button>
+                  </Link>
+                  <Link href="/auth/login">
+                    <Button variant="outline" size="sm">Sign In</Button>
+                  </Link>
+                </div>
               </div>
             )}
 

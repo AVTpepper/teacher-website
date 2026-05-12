@@ -17,6 +17,7 @@ import {
 import { Button, Card, Input, Select, Textarea, Tag } from "@/components/ui";
 import ResourcePDFDocument from "@/components/resources/ResourcePDFDocument";
 import LinkAttacher, { type AttachedLink } from "@/components/ui/LinkAttacher";
+import { checkAndAwardBadges } from "@/lib/badges";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
@@ -162,6 +163,7 @@ export default function UploadResourcePage() {
         links,
       });
 
+      checkAndAwardBadges(user.uid).catch(() => {});
       router.push(`/resources/${resourceSlug(title, id)}`);  
     } catch (err) {
       console.error("Upload resource error:", err);
