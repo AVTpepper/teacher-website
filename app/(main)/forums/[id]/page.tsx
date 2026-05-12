@@ -7,7 +7,6 @@ import {
   findThreadById,
   parseThreadSlug,
   upvoteThread,
-  downvoteThread,
   getUserVote,
   getThreadComments,
   addThreadComment,
@@ -44,7 +43,6 @@ export default function ForumThreadPage({
   // Thread voting
   const [vote, setVote] = useState<"up" | "down" | null>(null);
   const [upvotes, setUpvotes] = useState(0);
-  const [downvotes, setDownvotes] = useState(0);
   const [voteLoading, setVoteLoading] = useState(false);
 
   // Comments
@@ -79,7 +77,6 @@ export default function ForumThreadPage({
         setThread(result.thread);
         setCategoryId(result.categoryId);
         setUpvotes(result.thread.upvotes);
-        setDownvotes(result.thread.downvotes);
         loadComments(result.categoryId);
       } catch {
         setNotFound(true);
@@ -101,16 +98,13 @@ export default function ForumThreadPage({
 
   async function handleUpvote() {
     if (!user || !categoryId || voteLoading) return;
+    if (thread?.authorId === user.uid) return; // no self-voting
     setVoteLoading(true);
     try {
       await upvoteThread(categoryId, threadId, user.uid);
       if (vote === "up") {
         setVote(null);
         setUpvotes((c) => c - 1);
-      } else if (vote === "down") {
-        setVote("up");
-        setUpvotes((c) => c + 1);
-        setDownvotes((c) => c - 1);
       } else {
         setVote("up");
         setUpvotes((c) => c + 1);
@@ -125,29 +119,6 @@ export default function ForumThreadPage({
             linkURL: window.location.href,
           }).catch(() => {});
         }
-      }
-    } catch {
-      // ignore
-    } finally {
-      setVoteLoading(false);
-    }
-  }
-
-  async function handleDownvote() {
-    if (!user || !categoryId || voteLoading) return;
-    setVoteLoading(true);
-    try {
-      await downvoteThread(categoryId, threadId, user.uid);
-      if (vote === "down") {
-        setVote(null);
-        setDownvotes((c) => c - 1);
-      } else if (vote === "up") {
-        setVote("down");
-        setUpvotes((c) => c - 1);
-        setDownvotes((c) => c + 1);
-      } else {
-        setVote("down");
-        setDownvotes((c) => c + 1);
       }
     } catch {
       // ignore
@@ -208,7 +179,7 @@ export default function ForumThreadPage({
   }
 
   const categoryData = FORUM_CATEGORIES.find((c) => c.id === categoryId);
-  const score = upvotes - downvotes;
+  const isOwnThread = user?.uid === thread.authorId;
 
   // Build CommentData — sort top-level by score when replySort === "top"
   const commentData: CommentData[] = comments.map((c) => ({
@@ -320,47 +291,23 @@ export default function ForumThreadPage({
 
         {/* Vote bar */}
         <div className="px-6 py-3 border-t border-border flex items-center gap-4">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleUpvote}
-              disabled={!user}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer disabled:cursor-not-allowed ${
+              disabled={!user || isOwnThread}
+              title={isOwnThread ? "You can't upvote your own discussion" : !user ? "Sign in to upvote" : undefined}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
                 vote === "up"
                   ? "text-primary-900 bg-primary-100"
                   : "text-muted hover:text-foreground hover:bg-surface-hover"
               }`}
               aria-label="Upvote"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
               </svg>
-            </button>
-            <span
-              className={`text-sm font-semibold min-w-[2ch] text-center ${
-                score > 0
-                  ? "text-primary-900"
-                  : score < 0
-                    ? "text-error-500"
-                    : "text-muted"
-              }`}
-            >
-              {score}
-            </span>
-            <button
-              type="button"
-              onClick={handleDownvote}
-              disabled={!user}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer disabled:cursor-not-allowed ${
-                vote === "down"
-                  ? "text-error-500 bg-error-50"
-                  : "text-muted hover:text-foreground hover:bg-surface-hover"
-              }`}
-              aria-label="Downvote"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
+              <span>{upvotes}</span>
             </button>
           </div>
 
