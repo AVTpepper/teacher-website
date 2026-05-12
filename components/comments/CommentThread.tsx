@@ -282,7 +282,7 @@ function CommentItem({
                 {score !== 0 && score}
               </button>
             )}
-            {user && canNest && (
+            {user && canNest && localReplies.length === 0 && (
               <button
                 type="button"
                 onClick={() => setShowReply(!showReply)}
@@ -293,8 +293,8 @@ function CommentItem({
             )}
           </div>
 
-          {/* Reply input */}
-          {showReply && (
+          {/* Reply input — only shown inline when there are no existing replies yet */}
+          {showReply && localReplies.length === 0 && (
             <div className="mt-2 flex gap-2">
               <MentionInput
                 value={replyText}
@@ -341,6 +341,44 @@ function CommentItem({
               hasLikedComment={hasLikedComment}
             />
           ))}
+          {/* Reply button/input sits below all existing replies */}
+          {user && canNest && (
+            <div className="ml-6 sm:ml-10 border-l-2 border-border pl-4 py-1">
+              {!showReply ? (
+                <button
+                  type="button"
+                  onClick={() => setShowReply(true)}
+                  className="text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Reply
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <MentionInput
+                    value={replyText}
+                    onChange={setReplyText}
+                    onMentionsChange={setReplyMentions}
+                    placeholder="Write a reply..."
+                    className="w-full rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleReply();
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleReply}
+                    disabled={!replyText.trim()}
+                    isLoading={submittingReply}
+                  >
+                    Reply
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
