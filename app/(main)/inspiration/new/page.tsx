@@ -29,7 +29,7 @@ export default function NewInspirationPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
-  const formTopRef = useRef<HTMLDivElement>(null);
+  const formTopRef = useRef<HTMLFormElement>(null);
 
   if (!user) {
     return (
