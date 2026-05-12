@@ -46,7 +46,8 @@ export interface InspirationItem {
   description: string;
   category: InspirationCategory;
   sourceURL: string;
-  thumbnailURL: string | null;
+  thumbnailURL: string | null;       // URL-pasted thumbnail
+  thumbnailStorageURL: string | null; // uploaded file thumbnail (takes priority)
   creator: string; // name of creator / publication / source
   submittedBy: string | null; // uid — null for seeded/admin content
   createdAt: Timestamp | null;
@@ -64,6 +65,7 @@ export async function createInspirationItem(
   const ref = doc(collection(db, "inspiration"));
   const item: Omit<InspirationItem, "id"> = {
     ...input,
+    thumbnailStorageURL: input.thumbnailStorageURL ?? null,
     isApproved: true, // community-submitted content is auto-approved for MVP
     createdAt: null,
   };
