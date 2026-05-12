@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { SearchBar } from "@/components/ui";
+import NavSearchBar from "@/components/layout/NavSearchBar";
 import Avatar from "@/components/ui/Avatar";
 import Dropdown from "@/components/ui/Dropdown";
 import NotificationDropdown from "@/components/layout/NotificationDropdown";
@@ -24,11 +24,6 @@ export default function Navbar() {
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  function handleSearch(q: string) {
-    const trimmed = q.trim();
-    if (trimmed) router.push(`/search?q=${encodeURIComponent(trimmed)}`);
-  }
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
@@ -51,10 +46,7 @@ export default function Navbar() {
 
           {/* Search — hidden on mobile, shown md+ */}
           <div className="hidden md:block flex-1 max-w-md mx-4">
-            <SearchBar
-              placeholder="Search educators, resources, discussions..."
-              onSearch={handleSearch}
-            />
+            <NavSearchBar placeholder="Search educators, resources, discussions..." />
           </div>
 
           {/* Right actions */}
@@ -183,12 +175,9 @@ export default function Navbar() {
         <div className="absolute left-0 right-0 top-0 border-t border-border bg-surface shadow-lg">
           {/* Mobile search */}
           <div className="px-4 py-3 md:hidden">
-            <SearchBar
+            <NavSearchBar
               placeholder="Search..."
-              onSearch={(q) => {
-                handleSearch(q);
-                setMobileMenuOpen(false);
-              }}
+              onNavigate={() => setMobileMenuOpen(false)}
             />
           </div>
 

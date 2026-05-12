@@ -124,7 +124,7 @@ export default function NotificationDropdown() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`relative rounded-lg p-2 transition-colors cursor-pointer hover:bg-surface-hover ${unreadCount > 0 ? "text-error-500 hover:text-error-500" : "text-muted hover:text-foreground"}`}
+        className="relative rounded-lg p-2 transition-colors cursor-pointer hover:bg-surface-hover text-foreground"
         aria-label="Notifications"
         aria-expanded={open}
         aria-haspopup="true"
