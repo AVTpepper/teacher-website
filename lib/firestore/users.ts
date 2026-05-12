@@ -171,6 +171,8 @@ export async function isFollowing(
 export interface SearchEducatorsFilters {
   gradeLevel?: string;
   subject?: string;
+  /** Prefix match on displayNameLower for case-insensitive name search. */
+  nameQuery?: string;
 }
 
 export interface SearchEducatorsResult {
@@ -186,6 +188,33 @@ export async function searchEducators(
 ): Promise<SearchEducatorsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
+  // --- Name search path ---
+  // Uses a prefix-range query on displayNameLower (no composite index needed).
+  // gradeLevel / subject are applied client-side.
+  if (filters.nameQuery?.trim()) {
+    const lower = filters.nameQuery.trim().toLowerCase();
+    const upper = lower + "\uf8ff";
+    const q = query(
+      collection(db, "users"),
+      where("displayNameLower", ">=", lower),
+      where("displayNameLower", "<=", upper),
+      orderBy("displayNameLower"),
+      limit(PAGE_SIZE * 4) // fetch extra to account for client-side filtering
+    );
+    const snapshot = await getDocs(q);
+    let educators = snapshot.docs.map((d) => d.data() as UserProfile);
+
+    if (filters.gradeLevel) {
+      educators = educators.filter((e) => e.gradeLevel === filters.gradeLevel);
+    }
+    if (filters.subject) {
+      educators = educators.filter((e) => e.subjects?.includes(filters.subject!));
+    }
+
+    return { educators: educators.slice(0, PAGE_SIZE), lastDoc: null };
+  }
+
+  // --- Filter path (no name query) ---
   const constraints = [];
 
   if (filters.gradeLevel) {

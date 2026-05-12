@@ -13,15 +13,23 @@ import {
   type UserProfile,
   type SearchEducatorsFilters,
 } from "@/lib/firestore/users";
-import { Avatar, Badge, Button, Card, Select } from "@/components/ui";
+import { Avatar, Badge, Button, Card, Input, Select } from "@/components/ui";
 import { notifyNewFollower } from "@/lib/notifications";
 import { db } from "@/lib/firebase";
 
 export default function EducatorsPage() {
   const { user } = useAuth();
 
+  const [nameInput, setNameInput] = useState("");
+  const [nameQuery, setNameQuery] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
+
+  // Debounce name input → nameQuery (400 ms)
+  useEffect(() => {
+    const timer = setTimeout(() => setNameQuery(nameInput), 400);
+    return () => clearTimeout(timer);
+  }, [nameInput]);
 
   const [educators, setEducators] = useState<UserProfile[]>([]);
   const [cursor, setCursor] = useState<DocumentSnapshot | null>(null);
@@ -33,6 +41,7 @@ export default function EducatorsPage() {
   const filters: SearchEducatorsFilters = {
     gradeLevel: gradeLevel || undefined,
     subject: subject || undefined,
+    nameQuery: nameQuery.trim() || undefined,
   };
 
   const fetchEducators = useCallback(
@@ -64,7 +73,7 @@ export default function EducatorsPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gradeLevel, subject, cursor]
+    [gradeLevel, subject, nameQuery, cursor]
   );
 
   // Initial load + re-fetch on filter change
@@ -72,7 +81,7 @@ export default function EducatorsPage() {
     setCursor(null);
     fetchEducators(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gradeLevel, subject]);
+  }, [gradeLevel, subject, nameQuery]);
 
   // Load which educators the current user is already following
   useEffect(() => {
@@ -143,37 +152,52 @@ export default function EducatorsPage() {
 
       {/* Filters */}
       <Card className="mb-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <Select
-              label="Grade Level"
-              value={gradeLevel}
-              onChange={(e) => setGradeLevel(e.target.value)}
-              placeholder="All Grade Levels"
-              options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
+        <div className="flex flex-col gap-4">
+          {/* Name search row */}
+          <div>
+            <Input
+              label="Search by name"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="Type an educator's name…"
+              type="search"
             />
           </div>
-          <div className="flex-1">
-            <Select
-              label="Subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="All Subjects"
-              options={SUBJECTS.map((s) => ({ value: s, label: s }))}
-            />
+          {/* Grade + Subject row */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <Select
+                label="Grade Level"
+                value={gradeLevel}
+                onChange={(e) => setGradeLevel(e.target.value)}
+                placeholder="All Grade Levels"
+                options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
+              />
+            </div>
+            <div className="flex-1">
+              <Select
+                label="Subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="All Subjects"
+                options={SUBJECTS.map((s) => ({ value: s, label: s }))}
+              />
+            </div>
+            {(gradeLevel || subject || nameInput) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setGradeLevel("");
+                  setSubject("");
+                  setNameInput("");
+                  setNameQuery("");
+                }}
+              >
+                Clear Filters
+              </Button>
+            )}
           </div>
-          {(gradeLevel || subject) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setGradeLevel("");
-                setSubject("");
-              }}
-            >
-              Clear Filters
-            </Button>
-          )}
         </div>
       </Card>
 
@@ -201,8 +225,8 @@ export default function EducatorsPage() {
             No educators found
           </h3>
           <p className="mt-1 text-xs text-muted">
-            {gradeLevel || subject
-              ? "Try adjusting your filters."
+            {gradeLevel || subject || nameQuery
+              ? "Try adjusting your search or filters."
               : "Be the first to create a profile!"}
           </p>
         </div>
