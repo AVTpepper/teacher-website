@@ -431,6 +431,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
                 authorName: c.authorName,
                 authorPhotoURL: c.authorPhotoURL,
                 content: c.content,
+                mentionedUsers: c.mentionedUsers,
                 createdAt: c.createdAt as { seconds: number } | null,
                 likesCount: c.likesCount ?? 0,
               })
@@ -451,7 +452,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
               if (!user) return false;
               return hasLikedComment(post.id, commentId, user.uid);
             }}
-            onAddComment={async (content, parentId, mentionedUids) => {
+            onAddComment={async (content, parentId, mentionedUsers) => {
               if (!user) throw new Error("Not authenticated");
               const newId = await commentOnPost(post.id, {
                 parentId: parentId ?? null,
@@ -459,6 +460,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
                 authorName: user.displayName || "Anonymous",
                 authorPhotoURL: user.photoURL,
                 content,
+                mentionedUsers: mentionedUsers ?? [],
               });
               if (!parentId) setCommentsCount((c) => c + 1);
               // Notify post author (fire-and-forget, skip if self-comment)
@@ -473,15 +475,17 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
                 }).catch(() => {});
               }
               // Send mention notifications (fire-and-forget)
-              if (mentionedUids?.length) {
-                mentionedUids.forEach((uid) => {
-                  notifyMention({
-                    recipientId: uid,
-                    actorId: user.uid,
-                    actorName: user.displayName || "Anonymous",
-                    actorPhotoURL: user.photoURL,
-                    linkURL: `/`,
-                  }).catch(() => {});
+              if (mentionedUsers?.length) {
+                mentionedUsers.forEach(({ uid }) => {
+                  if (uid !== user.uid) {
+                    notifyMention({
+                      recipientId: uid,
+                      actorId: user.uid,
+                      actorName: user.displayName || "Anonymous",
+                      actorPhotoURL: user.photoURL,
+                      linkURL: `/`,
+                    }).catch(() => {});
+                  }
                 });
               }
               const result = await getPostComments(post.id);

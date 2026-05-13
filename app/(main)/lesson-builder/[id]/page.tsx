@@ -18,7 +18,7 @@ import CommentThread, {
   type CommentData,
 } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
-import { notifyComment } from "@/lib/notifications";
+import { notifyComment, notifyMention } from "@/lib/notifications";
 import { pdf } from "@react-pdf/renderer";
 import LessonPDFDocument from "@/components/lessons/LessonPDFDocument";
 
@@ -125,6 +125,7 @@ export default function LessonDetailPage({
     authorName: c.authorName,
     authorPhotoURL: c.authorPhotoURL,
     content: c.content,
+    mentionedUsers: c.mentionedUsers,
     createdAt: c.createdAt as { seconds: number } | null,
   }));
 
@@ -438,7 +439,7 @@ export default function LessonDetailPage({
               loading={commentsLoading}
               mode="like"
               maxDepth={2}
-              onAddComment={async (content, parentId) => {
+              onAddComment={async (content, parentId, mentionedUsers) => {
                 if (!user) throw new Error("Must be logged in");
                 const newId = await addLessonComment(lesson.id, {
                   parentId,
@@ -446,6 +447,7 @@ export default function LessonDetailPage({
                   authorName: user.displayName || "Anonymous",
                   authorPhotoURL: user.photoURL,
                   content,
+                  mentionedUsers: mentionedUsers ?? [],
                 });
                 // Notify lesson author (fire-and-forget)
                 if (lesson.authorId !== user.uid && !parentId) {
@@ -457,6 +459,20 @@ export default function LessonDetailPage({
                     contentLabel: `your lesson "${lesson.title}"`,
                     linkURL: window.location.href,
                   }).catch(() => {});
+                }
+                // Notify mentioned users (fire-and-forget)
+                if (mentionedUsers?.length) {
+                  mentionedUsers.forEach(({ uid }) => {
+                    if (uid !== user.uid) {
+                      notifyMention({
+                        recipientId: uid,
+                        actorId: user.uid,
+                        actorName: user.displayName || "Anonymous",
+                        actorPhotoURL: user.photoURL,
+                        linkURL: window.location.href,
+                      }).catch(() => {});
+                    }
+                  });
                 }
                 await loadComments();
                 return newId;

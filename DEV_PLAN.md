@@ -795,3 +795,27 @@ notes
 - when tagging another user, the tag should be visibly different than the rest of the text in the post, like give it the color blue or something, or the red to keep in style with the website. Give me your suggestions here too.
 
 - add the ability to search for educators /users
+
+---
+
+## Phase 10: @Mention Tagging Completion + UX Fixes
+
+> **Goal**: Complete the @mention pipeline end-to-end — persist tagged users on all comment types, render mentions as clickable profile links, and send mention notifications across forums, lessons, and posts. Also includes educator name search, live navbar search suggestions, and several UX/bug fixes.
+
+- [x] **10.1 MentionRenderer component** (`components/ui/MentionRenderer.tsx`): Reusable component that parses `@Name` tokens in any text, links matched names to `/educators/{uid}` in maroon (`text-primary-900 font-medium hover:underline`), and falls back to styled-but-unlinked text for unresolved mentions. Exported from `components/ui/index.ts`.
+
+- [x] **10.2 Firestore comment types extended**: Added `mentionedUsers?: { uid: string; displayName: string }[]` to `ThreadComment`/`ThreadCommentInput` (`forums.ts`), `LessonComment`/`LessonCommentInput` (`lessons.ts`), and `PostComment`/`PostCommentInput` (`posts.ts`). All three `add*Comment` functions now persist the field to Firestore.
+
+- [x] **10.3 CommentThread updated**: `CommentData` gains `mentionedUsers?` field. `onAddComment` callback signature changed from `mentionedUids?: string[]` to `mentionedUsers?: { uid: string; displayName: string }[]`. Both `handleReply` and `handleTopLevelComment` pass the full objects through (and include them in optimistic local state). Comment body rendered via `<MentionRenderer>`.
+
+- [x] **10.4 Forums wired** (`app/(main)/forums/[id]/page.tsx`): `onAddComment` accepts and stores `mentionedUsers`, fires `notifyMention` per mentioned user (skip self). `CommentData` mapping includes `mentionedUsers`.
+
+- [x] **10.5 Lesson-builder wired** (`app/(main)/lesson-builder/[id]/page.tsx`): Same pattern as forums — `mentionedUsers` passed to `addLessonComment`, `notifyMention` fires per mentioned user, `CommentData` mapping updated.
+
+- [x] **10.6 PostCard wired** (`components/posts/PostCard.tsx`): `onAddComment` updated to pass `mentionedUsers` to `commentOnPost`. Mention notifications now use `{ uid, displayName }` objects rather than bare UIDs. `CommentData` mapping includes `mentionedUsers`.
+
+- [x] **10.7 Educator name search** (`app/(main)/educators/page.tsx`, `lib/firestore/users.ts`): Added a name search input above the grade/subject filters. Debounced 400 ms. Uses a Firestore prefix-range query on `displayNameLower` — returns case-insensitive prefix matches. When a name query is active, grade/subject filters are applied client-side on the results.
+
+- [x] **10.8 Live navbar search suggestions** (`components/layout/NavSearchBar.tsx`, `components/layout/Navbar.tsx`): Replaced the static `SearchBar` in the navbar with a new `NavSearchBar` component. Debounced 300 ms. Runs parallel Firestore queries across educators, resources, threads, lessons, and jobs (up to 3 results each). Shows a dropdown with icon, title, and path label per result. Arrow-key navigation, Enter goes to the highlighted item or the full `/search` page. Loading spinner while fetching. Closes on outside click or Escape.
+
+- [x] **10.9 UX/bug fixes**: (1) Bell icon always renders in `text-foreground` (was conditionally `text-error-500` when unread, now only the red dot badge indicates unread). (2) Firestore `threads/title` collection group index added to `firestore.indexes.json` and deployed — fixes silent query failure in navbar search suggestions. (3) Forum threads "Load More" now uses a separate `loadingMoreThreads` state so existing threads stay visible while the next page loads. (4) `Card` component: when both `hoverable` and `onClick` are set, adds `role="button"`, `tabIndex={0}`, and `onKeyDown` (Enter/Space) for keyboard accessibility. (5) `Modal` component: full focus management — stores trigger element on open, moves focus to first focusable element inside, traps Tab/Shift+Tab, restores focus on close. (6) Job listing owner can close their listing with a two-step confirm UI; closed listings show a "Listing Closed" banner and hide the apply button.

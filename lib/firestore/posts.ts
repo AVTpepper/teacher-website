@@ -73,6 +73,7 @@ export interface PostComment {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: MentionedUserRef[];
   createdAt: Timestamp | null;
   likesCount: number;
 }
@@ -83,6 +84,7 @@ export interface PostCommentInput {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: MentionedUserRef[];
 }
 
 // --- Post CRUD ---
@@ -225,6 +227,7 @@ export async function commentOnPost(
     id: ref.id,
     postId,
     parentId: data.parentId ?? null,
+    mentionedUsers: data.mentionedUsers ?? [],
     likesCount: 0,
     createdAt: serverTimestamp(),
   });

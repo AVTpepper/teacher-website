@@ -197,6 +197,7 @@ export interface LessonComment {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
   createdAt: Timestamp | null;
 }
 
@@ -206,6 +207,7 @@ export interface LessonCommentInput {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
 }
 
 export async function addLessonComment(
@@ -221,6 +223,7 @@ export async function addLessonComment(
     id: ref.id,
     lessonId,
     parentId: data.parentId ?? null,
+    mentionedUsers: data.mentionedUsers ?? [],
     createdAt: serverTimestamp(),
   });
 

@@ -7,6 +7,7 @@ import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import BadgeIcon from "@/components/badges/BadgeIcon";
 import MentionInput, { type MentionedUser } from "@/components/ui/MentionInput";
+import MentionRenderer from "@/components/ui/MentionRenderer";
 
 // ─── Generic comment type ───
 
@@ -19,6 +20,7 @@ export interface CommentData {
   /** Optional badges to show next to the author's name. */
   authorBadges?: string[];
   content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
   createdAt: { seconds: number } | null;
   /** Used for upvote-based interactions (forums). */
   upvotes?: number;
@@ -42,7 +44,7 @@ export interface CommentThreadProps {
   // --- Callbacks ---
 
   /** Called when user submits a new comment. Return the new comment ID. */
-  onAddComment: (content: string, parentId: string | null, mentionedUids?: string[]) => Promise<string>;
+  onAddComment: (content: string, parentId: string | null, mentionedUsers?: { uid: string; displayName: string }[]) => Promise<string>;
   /** Called when user upvotes a comment. Only used when mode="upvote". */
   onUpvote?: (commentId: string) => Promise<void>;
   /** Get the current user's vote on a comment. Only used when mode="upvote". */
@@ -66,7 +68,7 @@ interface CommentItemProps {
   depth: number;
   maxDepth: number;
   mode: "like" | "upvote";
-  onAddComment: (content: string, parentId: string | null, mentionedUids?: string[]) => Promise<string>;
+  onAddComment: (content: string, parentId: string | null, mentionedUsers?: { uid: string; displayName: string }[]) => Promise<string>;
   onUpvote?: (commentId: string) => Promise<void>;
   getUserVote?: (commentId: string) => Promise<"up" | "down" | null>;
   onLikeComment?: (commentId: string) => Promise<void>;
@@ -160,7 +162,7 @@ function CommentItem({
       const newId = await onAddComment(
         replyText.trim(),
         comment.id,
-        replyMentions.map((m) => m.uid)
+        replyMentions
       );
       setLocalReplies((prev) => [
         ...prev,
@@ -171,6 +173,7 @@ function CommentItem({
           authorName: user.displayName || "Anonymous",
           authorPhotoURL: user.photoURL,
           content: replyText.trim(),
+          mentionedUsers: [...replyMentions],
           createdAt: { seconds: Date.now() / 1000 },
           upvotes: 0,
           downvotes: 0,
@@ -223,7 +226,7 @@ function CommentItem({
             </span>
           </div>
           <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">
-            {comment.content}
+            <MentionRenderer text={comment.content} mentionedUsers={comment.mentionedUsers} />
           </p>
 
           {/* Actions */}
@@ -417,7 +420,7 @@ export default function CommentThread({
       const newId = await onAddComment(
         replyText.trim(),
         null,
-        topLevelMentions.map((m) => m.uid)
+        topLevelMentions
       );
       setLocalComments((prev) => [
         ...prev,
@@ -428,6 +431,7 @@ export default function CommentThread({
           authorName: user.displayName || "Anonymous",
           authorPhotoURL: user.photoURL,
           content: replyText.trim(),
+          mentionedUsers: [...topLevelMentions],
           createdAt: { seconds: Date.now() / 1000 },
           upvotes: 0,
           downvotes: 0,

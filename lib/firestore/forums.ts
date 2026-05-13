@@ -142,6 +142,7 @@ export interface ThreadComment {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
   createdAt: Timestamp | null;
   upvotes: number;
   downvotes: number;
@@ -153,6 +154,7 @@ export interface ThreadCommentInput {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
 }
 
 // --- Category helpers ---
@@ -425,6 +427,7 @@ export async function addThreadComment(
     id: ref.id,
     threadId,
     parentId: data.parentId ?? null,
+    mentionedUsers: data.mentionedUsers ?? [],
     createdAt: serverTimestamp(),
     upvotes: 0,
     downvotes: 0,

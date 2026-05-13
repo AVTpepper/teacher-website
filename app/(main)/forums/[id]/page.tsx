@@ -22,7 +22,7 @@ import Button from "@/components/ui/Button";
 import Tag from "@/components/ui/Tag";
 import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
-import { notifyUpvote, notifyComment } from "@/lib/notifications";
+import { notifyUpvote, notifyComment, notifyMention } from "@/lib/notifications";
 
 // ─── Main page component ───
 
@@ -189,6 +189,7 @@ export default function ForumThreadPage({
     authorName: c.authorName,
     authorPhotoURL: c.authorPhotoURL,
     content: c.content,
+    mentionedUsers: c.mentionedUsers,
     createdAt: c.createdAt as { seconds: number } | null,
     upvotes: c.upvotes,
     downvotes: c.downvotes,
@@ -361,7 +362,7 @@ export default function ForumThreadPage({
             loading={loadingComments}
             maxDepth={2}
             mode="upvote"
-            onAddComment={async (content, parentId) => {
+            onAddComment={async (content, parentId, mentionedUsers) => {
               if (!categoryId) throw new Error("No category");
               const newId = await addThreadComment(categoryId, threadId, {
                 parentId,
@@ -369,6 +370,7 @@ export default function ForumThreadPage({
                 authorName: user!.displayName || "Anonymous",
                 authorPhotoURL: user!.photoURL,
                 content,
+                mentionedUsers: mentionedUsers ?? [],
               });
               // Notify thread author when someone comments (fire-and-forget)
               if (thread && thread.authorId !== user!.uid && !parentId) {
@@ -380,6 +382,20 @@ export default function ForumThreadPage({
                   contentLabel: `your discussion "${thread.title}"`,
                   linkURL: window.location.href,
                 }).catch(() => {});
+              }
+              // Notify mentioned users (fire-and-forget)
+              if (mentionedUsers?.length) {
+                mentionedUsers.forEach(({ uid }) => {
+                  if (uid !== user!.uid) {
+                    notifyMention({
+                      recipientId: uid,
+                      actorId: user!.uid,
+                      actorName: user!.displayName || "Anonymous",
+                      actorPhotoURL: user!.photoURL,
+                      linkURL: window.location.href,
+                    }).catch(() => {});
+                  }
+                });
               }
               return newId;
             }}
