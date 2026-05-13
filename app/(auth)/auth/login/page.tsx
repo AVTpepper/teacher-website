@@ -233,7 +233,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => { setShowForgot(true); setForgotEmail(email); }}
-            className="text-xs text-primary-900 hover:text-primary-700 font-medium"
+            className="text-xs text-primary-900 hover:text-primary-700 font-medium cursor-pointer"
           >
             Forgot password?
           </button>
