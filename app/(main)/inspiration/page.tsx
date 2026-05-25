@@ -1,16 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type DocumentSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import {
-  createInspirationItem,
   getInspirationItems,
   INSPIRATION_CATEGORIES,
   type InspirationCategory,
   type InspirationItem,
 } from "@/lib/firestore/inspiration";
-import { Avatar, Badge, Button, Card, Input, Modal, Select, Textarea } from "@/components/ui";
+import { Button, Card } from "@/components/ui";
 
 
 
@@ -33,6 +34,7 @@ function categoryIcon(cat: InspirationCategory): string {
 // --- Featured card (large, hero-style) ---
 
 function FeaturedCard({ item }: { item: InspirationItem }) {
+  const thumb = item.thumbnailStorageURL || item.thumbnailURL;
   return (
     <a
       href={item.sourceURL}
@@ -47,10 +49,10 @@ function FeaturedCard({ item }: { item: InspirationItem }) {
             className="h-48 sm:h-auto sm:w-64 shrink-0 flex items-center justify-center text-6xl"
             style={{ background: "var(--color-secondary-50, #f3f4f6)" }}
           >
-            {item.thumbnailURL ? (
+            {thumb ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={item.thumbnailURL}
+                src={thumb}
                 alt=""
                 className="w-full h-full object-cover"
               />
@@ -86,6 +88,7 @@ function FeaturedCard({ item }: { item: InspirationItem }) {
 // --- Regular grid card ---
 
 function InspirationCard({ item }: { item: InspirationItem }) {
+  const thumb = item.thumbnailStorageURL || item.thumbnailURL;
   return (
     <a
       href={item.sourceURL}
@@ -99,10 +102,10 @@ function InspirationCard({ item }: { item: InspirationItem }) {
           className="h-36 flex items-center justify-center text-4xl shrink-0"
           style={{ background: "var(--color-secondary-50, #f3f4f6)" }}
         >
-          {item.thumbnailURL ? (
+          {thumb ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={item.thumbnailURL}
+              src={thumb}
               alt=""
               className="w-full h-full object-cover"
             />
@@ -134,147 +137,17 @@ function InspirationCard({ item }: { item: InspirationItem }) {
   );
 }
 
-// --- Submit Content Modal ---
-
-function SubmitModal({
-  open,
-  onClose,
-  onSubmitted,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSubmitted: () => void;
-}) {
-  const { user } = useAuth();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<string>("");
-  const [sourceURL, setSourceURL] = useState("");
-  const [thumbnailURL, setThumbnailURL] = useState("");
-  const [creator, setCreator] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  function reset() {
-    setTitle("");
-    setDescription("");
-    setCategory("");
-    setSourceURL("");
-    setThumbnailURL("");
-    setCreator("");
-    setError("");
-    setSaving(false);
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user) return;
-    if (!title.trim() || !description.trim() || !category || !sourceURL.trim() || !creator.trim()) {
-      setError("Please fill in all required fields.");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      await createInspirationItem({
-        title: title.trim(),
-        description: description.trim(),
-        category: category as InspirationCategory,
-        sourceURL: sourceURL.trim(),
-        thumbnailURL: thumbnailURL.trim() || null,
-        creator: creator.trim(),
-        submittedBy: user.uid,
-      });
-      reset();
-      onSubmitted();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      setError("Failed to submit. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal open={open} onClose={() => { reset(); onClose(); }} title="Submit Inspiration Content">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="Title *"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Teaching Tolerance Podcast"
-        />
-        <Textarea
-          label="Short Description *"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="A brief summary of what this is and why it's valuable…"
-          rows={3}
-        />
-        <Select
-          label="Category *"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          options={[
-            { value: "", label: "Select a category" },
-            ...INSPIRATION_CATEGORIES.map((c) => ({ value: c.value, label: c.label })),
-          ]}
-        />
-        <Input
-          label="Creator / Source *"
-          value={creator}
-          onChange={(e) => setCreator(e.target.value)}
-          placeholder="e.g. Edutopia, Jennifer Gonzalez, Your Name…"
-        />
-        <Input
-          label="Link / URL *"
-          value={sourceURL}
-          onChange={(e) => setSourceURL(e.target.value)}
-          placeholder="https://…"
-          type="url"
-        />
-        <Input
-          label="Thumbnail URL (optional)"
-          value={thumbnailURL}
-          onChange={(e) => setThumbnailURL(e.target.value)}
-          placeholder="https://… (image link)"
-          type="url"
-        />
-
-        {error && (
-          <p className="text-sm text-error font-medium">{error}</p>
-        )}
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => { reset(); onClose(); }}
-            disabled={saving}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" disabled={saving}>
-            {saving ? "Submitting…" : "Submit Content"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
 // --- Main page ---
 
 export default function InspirationPage() {
   const { user } = useAuth();
+  const router = useRouter();
 
   const [activeCategory, setActiveCategory] = useState<InspirationCategory | "all">("all");
   const [items, setItems] = useState<InspirationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [showSubmit, setShowSubmit] = useState(false);
   const cursorRef = useRef<DocumentSnapshot | null>(null);
 
   const fetchItems = useCallback(
@@ -310,9 +183,8 @@ export default function InspirationPage() {
     fetchItems(true);
   }, [fetchItems]);
 
-  const visibleItems = items;
-  const featured = visibleItems[0] ?? null;
-  const rest = visibleItems.slice(1);
+  const featured = items[0] ?? null;
+  const rest = items.slice(1);
 
   return (
     <div className="space-y-6">
@@ -324,15 +196,14 @@ export default function InspirationPage() {
             Curated podcasts, articles, videos, and stories to inspire your teaching.
           </p>
         </div>
-        {user && (
-          <Button variant="primary" onClick={() => setShowSubmit(true)}>
-            + Submit Content
+        {user ? (
+          <Link href="/inspiration/new">
+            <Button variant="primary">+ Submit Content</Button>
+          </Link>
+        ) : (
+          <Button variant="outline" onClick={() => router.push("/auth/login?redirect=/inspiration/new")}>
+            Sign In to Submit
           </Button>
-        )}
-        {!user && (
-          <p className="text-sm text-muted">
-            <a href="/auth/login" className="text-primary underline">Sign in</a> to submit content.
-          </p>
         )}
       </div>
 
@@ -344,7 +215,7 @@ export default function InspirationPage() {
           onClick={() => setActiveCategory("all")}
           className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
             activeCategory === "all"
-              ? "bg-primary text-white"
+              ? "bg-primary-900 text-white"
               : "bg-secondary-100 text-foreground hover:bg-secondary-200"
           }`}
         >
@@ -358,7 +229,7 @@ export default function InspirationPage() {
             onClick={() => setActiveCategory(cat.value)}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
               activeCategory === cat.value
-                ? "bg-primary text-white"
+                ? "bg-primary-900 text-white"
                 : "bg-secondary-100 text-foreground hover:bg-secondary-200"
             }`}
           >
@@ -369,11 +240,13 @@ export default function InspirationPage() {
 
       {/* Loading state */}
       {loading && (
-        <div className="py-16 text-center text-muted text-sm">Loading content…</div>
+        <div className="py-16 flex items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+        </div>
       )}
 
       {/* Empty state */}
-      {!loading && visibleItems.length === 0 && (
+      {!loading && items.length === 0 && (
         <div className="py-16 text-center">
           <p className="text-4xl mb-3">🔍</p>
           <p className="text-foreground font-medium">No content found</p>
@@ -386,12 +259,9 @@ export default function InspirationPage() {
       )}
 
       {/* Magazine layout */}
-      {!loading && visibleItems.length > 0 && (
+      {!loading && items.length > 0 && (
         <div className="space-y-6">
-          {/* Featured hero */}
           {featured && <FeaturedCard item={featured} />}
-
-          {/* Grid */}
           {rest.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {rest.map((item) => (
@@ -405,22 +275,11 @@ export default function InspirationPage() {
       {/* Load more */}
       {hasMore && (
         <div className="flex justify-center pt-2">
-          <Button
-            variant="outline"
-            onClick={() => fetchItems(false)}
-            disabled={loadingMore}
-          >
+          <Button variant="outline" onClick={() => fetchItems(false)} disabled={loadingMore}>
             {loadingMore ? "Loading…" : "Load More"}
           </Button>
         </div>
       )}
-
-      {/* Submit modal */}
-      <SubmitModal
-        open={showSubmit}
-        onClose={() => setShowSubmit(false)}
-        onSubmitted={() => fetchItems(true)}
-      />
     </div>
   );
 }

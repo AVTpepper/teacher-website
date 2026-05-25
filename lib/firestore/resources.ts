@@ -39,6 +39,11 @@ export type ResourceType =
   | "slides"
   | "tool";
 
+export interface AttachedLink {
+  url: string;
+  label: string;
+}
+
 export const RESOURCE_TYPES: { value: ResourceType; label: string }[] = [
   { value: "lessonPlan", label: "Lesson Plan" },
   { value: "worksheet", label: "Worksheet" },
@@ -88,6 +93,7 @@ export interface Resource {
   savedByCount: number;
   createdAt: Timestamp | null;
   tags: string[];
+  links: AttachedLink[];
 }
 
 export interface ResourceInput {
@@ -102,6 +108,7 @@ export interface ResourceInput {
   fileURL: string;
   fileName: string;
   tags: string[];
+  links?: AttachedLink[];
 }
 
 // --- Resource CRUD ---
@@ -116,6 +123,7 @@ export async function createResource(data: ResourceInput): Promise<string> {
   await setDoc(ref, {
     ...data,
     id: ref.id,
+    links: data.links ?? [],
     createdAt: serverTimestamp(),
     downloadCount: 0,
     ratingSum: 0,

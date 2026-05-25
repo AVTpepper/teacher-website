@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -12,21 +12,16 @@ import {
   hasSavedResource,
   rateResource,
   getUserRating,
-  getResourceComments,
-  addResourceComment,
   getRelatedResources,
   parseResourceSlug,
   resourceSlug,
   RESOURCE_TYPES,
   type Resource,
-  type ResourceComment,
 } from "@/lib/firestore/resources";
 import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { Avatar, Badge, Button, Card } from "@/components/ui";
-import CommentThread, {
-  type CommentData,
-} from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
+import { notifyResourceLiked } from "@/lib/notifications";
 
 export default function ResourceDetailPage({
   params,
@@ -35,7 +30,7 @@ export default function ResourceDetailPage({
 }) {
   const { id: rawId } = use(params);
   const id = parseResourceSlug(rawId);
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [resource, setResource] = useState<Resource | null>(null);
   const [author, setAuthor] = useState<UserProfile | null>(null);
@@ -54,24 +49,9 @@ export default function ResourceDetailPage({
   // Download
   const [localDownloadCount, setLocalDownloadCount] = useState(0);
 
-  // Comments
-  const [comments, setComments] = useState<ResourceComment[]>([]);
-  const [commentsLoading, setCommentsLoading] = useState(false);
-
   // Related
   const [related, setRelated] = useState<Resource[]>([]);
-
-  const loadComments = useCallback(async () => {
-    setCommentsLoading(true);
-    try {
-      const result = await getResourceComments(id);
-      setComments(result);
-    } catch {
-      // ignore
-    } finally {
-      setCommentsLoading(false);
-    }
-  }, [id]);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -85,10 +65,9 @@ export default function ResourceDetailPage({
         setLocalDownloadCount(res.downloadCount);
         setLocalSavedCount(res.savedByCount);
 
-        // Load author, comments, related in parallel - failures are non-fatal
+        // Load author + related in parallel — failures are non-fatal
         const [authorData] = await Promise.all([
           getUser(res.authorId).catch(() => null),
-          loadComments().catch(() => {}),
           getRelatedResources(res).then(setRelated).catch(() => {}),
         ]);
         setAuthor(authorData);
@@ -100,7 +79,7 @@ export default function ResourceDetailPage({
       }
     }
     load();
-  }, [id, loadComments]);
+  }, [id]);
 
   // Load user-specific states
   useEffect(() => {
@@ -127,6 +106,17 @@ export default function ResourceDetailPage({
     window.open(resource.fileURL, "_blank", "noopener,noreferrer");
   }
 
+  function handleShare() {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({ title: resource?.title ?? "Resource", url });
+    } else {
+      navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
   async function handleToggleSave() {
     if (!user || !resource || savingToggle) return;
     setSavingToggle(true);
@@ -139,6 +129,17 @@ export default function ResourceDetailPage({
         await saveResource(resource.id, user.uid);
         setSaved(true);
         setLocalSavedCount((c) => c + 1);
+        // Notify resource author (fire-and-forget)
+        if (resource.authorId !== user.uid) {
+          notifyResourceLiked({
+            recipientId: resource.authorId,
+            actorId: user.uid,
+            actorName: user.displayName || "Someone",
+            actorPhotoURL: user.photoURL,
+            resourceTitle: resource.title,
+            linkURL: window.location.href,
+          }).catch(() => {});
+        }
       }
     } catch {
       // ignore
@@ -162,17 +163,6 @@ export default function ResourceDetailPage({
       setRatingLoading(false);
     }
   }
-
-  // Map comments for the CommentThread component
-  const commentData: CommentData[] = comments.map((c) => ({
-    id: c.id,
-    parentId: c.parentId,
-    authorId: c.authorId,
-    authorName: c.authorName,
-    authorPhotoURL: c.authorPhotoURL,
-    content: c.content,
-    createdAt: c.createdAt as { seconds: number } | null,
-  }));
 
   // ─── Loading ───
   if (loading) {
@@ -214,7 +204,7 @@ export default function ResourceDetailPage({
     resource.type;
 
   return (
-    <div className="py-8 space-y-8">
+    <div className={`py-8 space-y-8 ${user ? "pb-24 sm:pb-8" : ""}`}>
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted">
         <Link
@@ -261,6 +251,27 @@ export default function ResourceDetailPage({
                   >
                     {tag}
                   </span>
+                ))}
+              </div>
+            )}
+
+            {/* Attached links */}
+            {resource.links?.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {resource.links.map((link, i) => (
+                  <a
+                    key={i}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-info-50 text-info-700 border border-info-200 hover:bg-info-100 transition-colors max-w-[260px] truncate"
+                    title={link.url}
+                  >
+                    <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    <span className="truncate">{link.label}</span>
+                  </a>
                 ))}
               </div>
             )}
@@ -340,46 +351,73 @@ export default function ResourceDetailPage({
             </div>
 
             {/* Action buttons */}
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Button onClick={handleDownload}>
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
-                  />
-                </svg>
-                Download
-              </Button>
-
-              {user && (
-                <Button
-                  variant={saved ? "secondary" : "outline"}
-                  onClick={handleToggleSave}
-                  isLoading={savingToggle}
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill={saved ? "currentColor" : "none"}
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
-                    />
-                  </svg>
-                  {saved ? "Saved" : "Save"}
-                </Button>
+            <div className="mt-4 space-y-3">
+              {!user && !authLoading && (
+                <div className="rounded-xl border border-border bg-secondary-50 p-4">
+                  <p className="text-sm font-semibold text-foreground mb-1">
+                    🔒 Sign in to download and save this resource
+                  </p>
+                  <p className="text-xs text-muted mb-3">
+                    Create a free account to access and save educational resources shared by real teachers.
+                  </p>
+                  <div className="flex gap-2">
+                    <Link href="/auth/login">
+                      <Button size="sm">Sign In</Button>
+                    </Link>
+                    <Link href="/auth/signup">
+                      <Button variant="outline" size="sm">Create Account</Button>
+                    </Link>
+                  </div>
+                </div>
               )}
+              <div className="flex flex-wrap gap-3">
+                {user && (
+                  <>
+                    <Button onClick={handleDownload}>
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+                        />
+                      </svg>
+                      Download
+                    </Button>
+                    <Button
+                      variant={saved ? "secondary" : "outline"}
+                      onClick={handleToggleSave}
+                      isLoading={savingToggle}
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill={saved ? "currentColor" : "none"}
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
+                        />
+                      </svg>
+                      {saved ? "Saved" : "Save"}
+                    </Button>
+                  </>
+                )}
+                <Button variant="outline" onClick={handleShare}>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+                  </svg>
+                  {copied ? "✓ Copied!" : "Share"}
+                </Button>
+              </div>
             </div>
 
             {/* File info */}
@@ -396,30 +434,6 @@ export default function ResourceDetailPage({
             </div>
           </Card>
 
-          {/* Comments section */}
-          <Card padding="lg">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Discussion
-            </h2>
-            <CommentThread
-              comments={commentData}
-              loading={commentsLoading}
-              mode="like"
-              maxDepth={2}
-              onAddComment={async (content, parentId) => {
-                if (!user) throw new Error("Must be logged in");
-                const newId = await addResourceComment(resource.id, {
-                  parentId,
-                  authorId: user.uid,
-                  authorName: user.displayName || "Anonymous",
-                  authorPhotoURL: user.photoURL,
-                  content,
-                });
-                await loadComments();
-                return newId;
-              }}
-            />
-          </Card>
         </div>
 
         {/* Right sidebar */}
@@ -477,6 +491,35 @@ export default function ResourceDetailPage({
           )}
         </div>
       </div>
+
+      {/* Mobile sticky action bar — logged-in only */}
+      {user && (
+        <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-surface/95 backdrop-blur-sm border-t border-border px-4 py-3 flex items-center gap-2">
+          <Button onClick={handleDownload} className="flex-1 justify-center">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Download
+          </Button>
+          <Button
+            variant={saved ? "secondary" : "outline"}
+            onClick={handleToggleSave}
+            isLoading={savingToggle}
+            className="flex-1 justify-center"
+          >
+            <svg className="h-4 w-4" fill={saved ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+            </svg>
+            {saved ? "Saved" : "Save"}
+          </Button>
+          <Button variant="outline" onClick={handleShare} className="flex-1 justify-center">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+            </svg>
+            {copied ? "✓" : "Share"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

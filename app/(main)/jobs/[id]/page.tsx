@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import {
   getJob,
+  deactivateJob,
   jobSlug,
   parseJobSlug,
   JOB_TYPES,
@@ -29,6 +30,8 @@ export default function JobDetailPage({
   const [poster, setPoster] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -57,7 +60,14 @@ export default function JobDetailPage({
   // --- Loading ---
   if (loading) {
     return (
-      <div className="py-20 text-center text-sm text-muted">Loading job…</div>
+      <div className="max-w-3xl mx-auto space-y-6 animate-pulse">
+        <div className="h-4 w-24 bg-secondary-100 rounded" />
+        <div className="rounded-xl border border-border bg-surface p-6 space-y-3">
+          <div className="h-6 w-2/3 bg-secondary-100 rounded" />
+          <div className="h-3 w-full bg-secondary-100 rounded" />
+          <div className="h-3 w-3/4 bg-secondary-100 rounded" />
+        </div>
+      </div>
     );
   }
 
@@ -81,6 +91,21 @@ export default function JobDetailPage({
 
   const jobTypeLabel = JOB_TYPES.find((t) => t.value === job.jobType)?.label ?? job.jobType;
   const isExternalApply = job.applyURL && job.applyURL !== "#";
+  const isOwner = user?.uid === job.postedBy;
+
+  async function handleCloseListings() {
+    if (!job) return;
+    setClosing(true);
+    try {
+      await deactivateJob(job.id);
+      setJob((prev) => prev ? { ...prev, isActive: false } : prev);
+      setConfirmClose(false);
+    } catch {
+      // non-critical
+    } finally {
+      setClosing(false);
+    }
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -125,27 +150,65 @@ export default function JobDetailPage({
           </div>
 
           {/* Apply button */}
-          <div className="pt-2 border-t border-border">
-            {user ? (
-              isExternalApply ? (
-                <a href={job.applyURL} target="_blank" rel="noopener noreferrer">
-                  <Button variant="primary" size="lg">
-                    Apply Now ↗
+          <div className="pt-2 border-t border-border space-y-3">
+            {!job.isActive && (
+              <div className="rounded-lg bg-secondary-100 px-4 py-2 text-sm text-secondary-700 font-medium">
+                This listing has been closed by the poster.
+              </div>
+            )}
+            {job.isActive && (
+              user ? (
+                isExternalApply ? (
+                  <a href={job.applyURL} target="_blank" rel="noopener noreferrer">
+                    <Button variant="primary" size="lg">
+                      Apply Now ↗
+                    </Button>
+                  </a>
+                ) : (
+                  <Button variant="primary" size="lg" disabled>
+                    Contact School Directly
                   </Button>
-                </a>
+                )
               ) : (
-                <Button variant="primary" size="lg" disabled>
-                  Contact School Directly
-                </Button>
+                <div className="flex items-center gap-3">
+                  <Link href="/auth/login">
+                    <Button variant="primary" size="lg">
+                      Sign In to Apply
+                    </Button>
+                  </Link>
+                  <p className="text-sm text-muted">You need an account to apply.</p>
+                </div>
               )
-            ) : (
-              <div className="flex items-center gap-3">
-                <Link href="/auth/login">
-                  <Button variant="primary" size="lg">
-                    Sign In to Apply
-                  </Button>
-                </Link>
-                <p className="text-sm text-muted">You need an account to apply.</p>
+            )}
+
+            {/* Owner: close listing */}
+            {isOwner && job.isActive && (
+              <div className="pt-1">
+                {confirmClose ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm text-muted">Close this listing? It won't appear in searches.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCloseListings}
+                      isLoading={closing}
+                      className="text-error-700 border-error-300 hover:bg-error-50"
+                    >
+                      Yes, Close Listing
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setConfirmClose(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClose(true)}
+                    className="text-sm text-error-600 hover:underline cursor-pointer"
+                  >
+                    Close this listing
+                  </button>
+                )}
               </div>
             )}
           </div>

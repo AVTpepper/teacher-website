@@ -9,27 +9,71 @@ import {
   hasLikedPost,
   commentOnPost,
   getPostComments,
+  likeComment,
+  unlikeComment,
+  hasLikedComment,
+  updatePost,
+  deletePost,
   type Post,
   type PostComment,
 } from "@/lib/firestore/posts";
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import Dropdown from "@/components/ui/Dropdown";
 import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
+import { notifyMention, notifyComment } from "@/lib/notifications";
 import { timeAgo } from "@/lib/utils";
 import Tag from "@/components/ui/Tag";
+import type { MentionedUserRef } from "@/lib/firestore/posts";
 
-const TYPE_LABELS: Record<string, { label: string; variant: "info" | "success" | "warning" }> = {
+function escapeRegex(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderContent(
+  content: string,
+  mentionedUsers?: MentionedUserRef[]
+): React.ReactNode {
+  if (!mentionedUsers?.length) return content;
+  const sorted = [...mentionedUsers].sort((a, b) => b.displayName.length - a.displayName.length);
+  const pattern = sorted.map((u) => `@${escapeRegex(u.displayName)}`).join("|");
+  const regex = new RegExp(`(${pattern})`, "g");
+  const segments = content.split(regex);
+  return segments.map((seg, i) => {
+    const match = sorted.find((u) => seg === `@${u.displayName}`);
+    if (match) {
+      return (
+        <Link
+          key={i}
+          href={`/educators/${match.uid}`}
+          className="text-primary-900 font-semibold hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {seg}
+        </Link>
+      );
+    }
+    return seg;
+  });
+}
+
+const TYPE_LABELS: Record<string, { label: string; variant: "info" | "success" | "warning" | "default" }> = {
   idea: { label: "💡 Idea", variant: "info" },
   resource: { label: "📚 Resource", variant: "success" },
   discussion: { label: "💬 Discussion", variant: "warning" },
+  general: { label: "🌐 General", variant: "default" },
+  question: { label: "❓ Question", variant: "info" },
+  other: { label: "💭 Other", variant: "default" },
 };
 
 interface PostCardProps {
   post: Post;
+  onDelete?: (postId: string) => void;
+  onUpdate?: (updated: Post) => void;
 }
 
-export default function PostCard({ post }: PostCardProps) {
+export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
   const { user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likesCount);
@@ -38,6 +82,15 @@ export default function PostCard({ post }: PostCardProps) {
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [likeLoading, setLikeLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content);
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [localContent, setLocalContent] = useState(post.content);
+  const isAuthor = user?.uid === post.authorId;
 
   useEffect(() => {
     if (user) {
@@ -83,19 +136,55 @@ export default function PostCard({ post }: PostCardProps) {
   }
 
   function handleShare() {
+    const url = `${window.location.origin}/?post=${post.id}`;
     if (navigator.share) {
-      navigator.share({
-        title: `Post by ${post.authorName}`,
-        url: `${window.location.origin}/post/${post.id}`,
-      });
+      navigator.share({ title: `Post by ${post.authorName}`, url });
     } else {
-      navigator.clipboard.writeText(
-        `${window.location.origin}/post/${post.id}`
-      );
+      navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  async function handleSaveEdit() {
+    const trimmed = editContent.trim();
+    if (!trimmed || editSaving) return;
+    setEditSaving(true);
+    try {
+      await updatePost(post.id, {
+        content: trimmed,
+        type: post.type,
+        tags: post.tags,
+        gradeLevel: post.gradeLevel,
+        links: post.links,
+      });
+      setLocalContent(trimmed);
+      setEditing(false);
+      onUpdate?.({ ...post, content: trimmed });
+    } catch {
+      // ignore
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deletePost(post.id);
+      setDeleted(true);
+      onDelete?.(post.id);
+    } catch {
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
     }
   }
 
   const typeInfo = TYPE_LABELS[post.type] || TYPE_LABELS.idea;
+
+  if (deleted) return null;
 
   return (
     <div className="rounded-xl border border-border bg-surface shadow-card p-4">
@@ -125,18 +214,118 @@ export default function PostCard({ post }: PostCardProps) {
             {timeAgo(post.createdAt as { seconds: number } | null)}
           </p>
         </div>
+        {isAuthor && (
+          <Dropdown
+            align="right"
+            trigger={
+              <span className="flex items-center justify-center w-7 h-7 rounded-full text-muted hover:bg-surface-hover hover:text-foreground transition-colors text-lg leading-none">
+                ···
+              </span>
+            }
+            items={[
+              {
+                label: "Edit",
+                onClick: () => {
+                  setEditContent(localContent);
+                  setEditing(true);
+                },
+              },
+              {
+                label: "Delete",
+                destructive: true,
+                onClick: () => setConfirmDelete(true),
+              },
+            ]}
+          />
+        )}
       </div>
 
-      {/* Content */}
-      <p className="mt-3 text-sm text-foreground whitespace-pre-wrap">
-        {post.content}
-      </p>
+      {/* Inline edit form */}
+      {editing && (
+        <div className="mt-3">
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            rows={4}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
+            autoFocus
+          />
+          <div className="mt-2 flex gap-2 justify-end">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSaveEdit}
+              disabled={!editContent.trim()}
+              isLoading={editSaving}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="mt-3 rounded-lg border border-error-200 bg-error-50 px-4 py-3 flex items-center gap-3">
+          <p className="flex-1 text-sm text-error-700">Delete this post? This cannot be undone.</p>
+          <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleDelete}
+            isLoading={deleting}
+            className="text-error-600 border-error-300 hover:bg-error-50"
+          >
+            Delete
+          </Button>
+        </div>
+      )}
+
+      {/* Content — click to expand comments */}
+      {!editing && (
+        <p
+          className="mt-3 text-sm text-foreground whitespace-pre-wrap cursor-pointer"
+          onClick={toggleComments}
+          title="Click to view comments"
+        >
+          {renderContent(localContent, post.mentionedUsers)}
+        </p>
+      )}
 
       {/* Tags */}
       {post.tags.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {post.tags.map((tag) => (
             <Tag key={tag} label={tag} />
+          ))}
+        </div>
+      )}
+
+      {/* Attached links */}
+      {post.links?.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {post.links.map((link, i) => (
+            <a
+              key={i}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-info-50 text-info-700 border border-info-200 hover:bg-info-100 transition-colors max-w-[220px] truncate"
+              title={link.url}
+            >
+              <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+              <span className="truncate">{link.label}</span>
+            </a>
           ))}
         </div>
       )}
@@ -149,14 +338,18 @@ export default function PostCard({ post }: PostCardProps) {
           </span>
         )}
         {commentsCount > 0 && (
-          <span>
+          <button
+            type="button"
+            onClick={toggleComments}
+            className="hover:underline cursor-pointer"
+          >
             {commentsCount} {commentsCount === 1 ? "comment" : "comments"}
-          </span>
+          </button>
         )}
       </div>
 
       {/* Action buttons */}
-      <div className="mt-2 pt-2 border-t border-border flex items-center gap-1">
+      <div className="mt-2 pt-2 border-t border-border flex flex-wrap items-center gap-1">
         <button
           type="button"
           onClick={handleLike}
@@ -222,7 +415,7 @@ export default function PostCard({ post }: PostCardProps) {
               d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
             />
           </svg>
-          Share
+          {copied ? "✓ Copied!" : "Share"}
         </button>
       </div>
 
@@ -233,29 +426,67 @@ export default function PostCard({ post }: PostCardProps) {
             comments={comments.map(
               (c): CommentData => ({
                 id: c.id,
-                parentId: null,
+                parentId: c.parentId ?? null,
                 authorId: c.authorId,
                 authorName: c.authorName,
                 authorPhotoURL: c.authorPhotoURL,
                 content: c.content,
                 createdAt: c.createdAt as { seconds: number } | null,
+                likesCount: c.likesCount ?? 0,
               })
             )}
             loading={loadingComments}
-            maxDepth={0}
+            maxDepth={1}
             mode="like"
-            onAddComment={async (content) => {
+            onLikeComment={async (commentId) => {
+              if (!user) return;
+              const alreadyLiked = await hasLikedComment(post.id, commentId, user.uid);
+              if (alreadyLiked) {
+                await unlikeComment(post.id, commentId, user.uid);
+              } else {
+                await likeComment(post.id, commentId, user.uid);
+              }
+            }}
+            hasLikedComment={async (commentId) => {
+              if (!user) return false;
+              return hasLikedComment(post.id, commentId, user.uid);
+            }}
+            onAddComment={async (content, parentId, mentionedUids) => {
               if (!user) throw new Error("Not authenticated");
-              await commentOnPost(post.id, {
+              const newId = await commentOnPost(post.id, {
+                parentId: parentId ?? null,
                 authorId: user.uid,
                 authorName: user.displayName || "Anonymous",
                 authorPhotoURL: user.photoURL,
                 content,
               });
-              setCommentsCount((c) => c + 1);
+              if (!parentId) setCommentsCount((c) => c + 1);
+              // Notify post author (fire-and-forget, skip if self-comment)
+              if (post.authorId !== user.uid) {
+                notifyComment({
+                  recipientId: post.authorId,
+                  actorId: user.uid,
+                  actorName: user.displayName || "Someone",
+                  actorPhotoURL: user.photoURL,
+                  contentLabel: "your post",
+                  linkURL: `/?post=${post.id}`,
+                }).catch(() => {});
+              }
+              // Send mention notifications (fire-and-forget)
+              if (mentionedUids?.length) {
+                mentionedUids.forEach((uid) => {
+                  notifyMention({
+                    recipientId: uid,
+                    actorId: user.uid,
+                    actorName: user.displayName || "Anonymous",
+                    actorPhotoURL: user.photoURL,
+                    linkURL: `/`,
+                  }).catch(() => {});
+                });
+              }
               const result = await getPostComments(post.id);
               setComments(result);
-              return result[result.length - 1]?.id || "temp";
+              return newId;
             }}
           />
         </div>

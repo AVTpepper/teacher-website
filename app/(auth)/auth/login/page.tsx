@@ -3,6 +3,8 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { getUser } from "@/lib/firestore/users";
 import Button from "@/components/ui/Button";
@@ -16,6 +18,9 @@ const firebaseErrorMessages: Record<string, string> = {
   "auth/wrong-password": "Incorrect password.",
   "auth/invalid-credential": "Invalid email or password.",
   "auth/too-many-requests": "Too many attempts. Please try again later.",
+  "auth/popup-blocked": "Popup was blocked. Please allow popups for this site in your browser settings, then try again.",
+  "auth/operation-not-allowed": "Google sign-in is not currently enabled. Please use email and password.",
+  "auth/network-request-failed": "Network error. Please check your connection and try again.",
 };
 
 export default function LoginPage() {
@@ -37,6 +42,45 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Forgot password view
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  async function handleForgotPassword(e: FormEvent) {
+    e.preventDefault();
+    setForgotError("");
+    const trimmed = forgotEmail.trim();
+    if (!trimmed) {
+      setForgotError("Please enter your email address.");
+      return;
+    }
+    if (!auth) {
+      setForgotError("Authentication is not available right now.");
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, trimmed);
+      setForgotSent(true);
+    } catch (err: unknown) {
+      const code =
+        err instanceof Error && "code" in err
+          ? (err as { code: string }).code
+          : "";
+      if (code === "auth/user-not-found" || code === "auth/invalid-email") {
+        // Don't reveal whether email exists — show generic success
+        setForgotSent(true);
+      } else {
+        setForgotError("Failed to send reset email. Please try again.");
+      }
+    } finally {
+      setForgotLoading(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -74,7 +118,7 @@ function LoginForm() {
         err instanceof Error && "code" in err
           ? (err as { code: string }).code
           : "";
-      if (code !== "auth/popup-closed-by-user") {
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
         setError(firebaseErrorMessages[code] || "Failed to sign in with Google.");
       }
     } finally {
@@ -84,6 +128,55 @@ function LoginForm() {
 
   return (
     <Card padding="lg">
+      {showForgot ? (
+        /* ===== Forgot Password View ===== */
+        <>
+          <h1 className="text-2xl font-bold text-foreground text-center">
+            Reset Password
+          </h1>
+          <p className="mt-1 text-sm text-muted text-center">
+            Enter your email and we&apos;ll send you a reset link.
+          </p>
+
+          {forgotSent ? (
+            <div className="mt-6 rounded-lg bg-success-50 px-4 py-3 text-sm text-success-700 text-center">
+              If an account exists for that email, a password reset link has been sent.
+            </div>
+          ) : (
+            <>
+              {forgotError && (
+                <div className="mt-4 rounded-lg bg-error-50 px-4 py-3 text-sm text-error-700">
+                  {forgotError}
+                </div>
+              )}
+              <form onSubmit={handleForgotPassword} className="mt-6 space-y-4">
+                <Input
+                  label="Email"
+                  type="email"
+                  placeholder="you@school.edu"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  autoComplete="email"
+                  required
+                />
+                <Button type="submit" className="w-full" isLoading={forgotLoading}>
+                  Send Reset Link
+                </Button>
+              </form>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => { setShowForgot(false); setForgotSent(false); setForgotError(""); }}
+            className="mt-5 w-full text-center text-sm text-primary-900 hover:text-primary-700 font-medium"
+          >
+            ← Back to Sign In
+          </button>
+        </>
+      ) : (
+        /* ===== Login View ===== */
+        <>
       <h1 className="text-2xl font-bold text-foreground text-center">
         Sign In
       </h1>
@@ -133,6 +226,16 @@ function LoginForm() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
             )}
+          </button>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => { setShowForgot(true); setForgotEmail(email); }}
+            className="text-xs text-primary-900 hover:text-primary-700 font-medium"
+          >
+            Forgot password?
           </button>
         </div>
 
@@ -188,6 +291,8 @@ function LoginForm() {
           Create one
         </Link>
       </p>
+        </>
+      )}
     </Card>
   );
 }

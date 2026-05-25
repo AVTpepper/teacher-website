@@ -240,8 +240,7 @@ export default function ResourcesPage() {
             }
           />
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <Select
                 label="Grade Level"
                 value={gradeLevel}
@@ -249,8 +248,6 @@ export default function ResourcesPage() {
                 placeholder="All Grade Levels"
                 options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
               />
-            </div>
-            <div className="flex-1">
               <Select
                 label="Subject"
                 value={subject}
@@ -258,8 +255,6 @@ export default function ResourcesPage() {
                 placeholder="All Subjects"
                 options={SUBJECTS.map((s) => ({ value: s, label: s }))}
               />
-            </div>
-            <div className="flex-1">
               <Select
                 label="Type"
                 value={resourceType}
@@ -270,8 +265,6 @@ export default function ResourcesPage() {
                   label: t.label,
                 }))}
               />
-            </div>
-            <div className="flex-1">
               <Select
                 label="Sort By"
                 value={sortBy}
@@ -281,8 +274,9 @@ export default function ResourcesPage() {
                   { value: "popular", label: "Most Popular" },
                 ]}
               />
-            </div>
-            {hasFilters && (
+          </div>
+          {hasFilters && (
+            <div className="mt-3 flex justify-end">
               <Button
                 variant="ghost"
                 size="sm"
@@ -294,8 +288,8 @@ export default function ResourcesPage() {
               >
                 Clear Filters
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </Card>
 

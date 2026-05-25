@@ -79,9 +79,26 @@ export const FORUM_CATEGORIES: Omit<ForumCategory, "threadCount" | "lastActivity
     description: "Conversations specific to your grade level and age group.",
     icon: "📚",
   },
+  {
+    id: "general-discussion",
+    name: "General Discussion",
+    description: "Anything that doesn't fit elsewhere — open conversations for the educator community.",
+    icon: "💬",
+  },
+  {
+    id: "questions-answers",
+    name: "Q&A",
+    description: "Ask a question, get answers from fellow educators.",
+    icon: "❓",
+  },
 ];
 
 // --- Thread types ---
+
+export interface AttachedLink {
+  url: string;
+  label: string;
+}
 
 export interface ForumThread {
   id: string;
@@ -94,6 +111,7 @@ export interface ForumThread {
   tags: string[];
   gradeLevel: string;
   subject: string;
+  links: AttachedLink[];
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
   upvotes: number;
@@ -111,6 +129,7 @@ export interface ForumThreadInput {
   tags: string[];
   gradeLevel: string;
   subject: string;
+  links?: AttachedLink[];
 }
 
 // --- Thread comment types ---
@@ -194,6 +213,7 @@ export async function createThread(data: ForumThreadInput): Promise<string> {
   await setDoc(ref, {
     ...data,
     id: ref.id,
+    links: data.links ?? [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     upvotes: 0,

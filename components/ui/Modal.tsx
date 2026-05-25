@@ -18,12 +18,49 @@ export default function Modal({
   className = "",
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Remember the element that triggered the modal so we can restore focus on close
+  const triggerRef = useRef<Element | null>(null);
 
   useEffect(() => {
     if (!open) return;
 
+    // Store the currently focused element
+    triggerRef.current = document.activeElement;
+
+    // Move focus into the modal
+    const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    firstFocusable?.focus();
+
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      // Trap focus within the modal
+      if (e.key === "Tab" && dialogRef.current) {
+        const focusable = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((el) => !el.hasAttribute("disabled"));
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
     }
 
     document.addEventListener("keydown", handleKeyDown);
@@ -32,6 +69,10 @@ export default function Modal({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
+      // Restore focus to the trigger element when modal closes
+      if (triggerRef.current instanceof HTMLElement) {
+        triggerRef.current.focus();
+      }
     };
   }, [open, onClose]);
 
@@ -47,14 +88,15 @@ export default function Modal({
     >
       <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={title ? "modal-title" : undefined}
         className={`relative z-10 w-full max-w-lg rounded-xl bg-surface border border-border shadow-xl ${className}`}
       >
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+            <h2 id="modal-title" className="text-lg font-semibold text-foreground">{title}</h2>
             <button
               onClick={onClose}
               className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"

@@ -15,18 +15,18 @@ const footerLinks = [
   {
     title: "Company",
     links: [
-      { href: "#", label: "About" },
-      { href: "#", label: "Blog" },
-      { href: "#", label: "Careers" },
-      { href: "#", label: "Contact" },
+      { href: "/about", label: "About" },
+      { href: "/blog", label: "Blog" },
+      { href: "/careers", label: "Careers" },
+      { href: "/contact", label: "Contact" },
     ],
   },
   {
     title: "Legal",
     links: [
-      { href: "#", label: "Privacy Policy" },
-      { href: "#", label: "Terms of Service" },
-      { href: "#", label: "Cookie Policy" },
+      { href: "/privacy", label: "Privacy Policy" },
+      { href: "/terms", label: "Terms of Service" },
+      { href: "/cookies", label: "Cookie Policy" },
     ],
   },
 ];

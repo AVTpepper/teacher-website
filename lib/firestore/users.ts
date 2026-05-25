@@ -20,6 +20,8 @@ import { db } from "@/lib/firebase";
 export interface UserProfile {
   uid: string;
   displayName: string;
+  /** Lowercase version of displayName used for case-insensitive prefix search. */
+  displayNameLower?: string;
   email: string;
   photoURL: string | null;
   gradeLevel: string;
@@ -37,7 +39,7 @@ export interface UserProfile {
 
 export type UserProfileInput = Omit<
   UserProfile,
-  "createdAt" | "badges" | "followerCount" | "followingCount" | "isVerified"
+  "createdAt" | "badges" | "followerCount" | "followingCount" | "isVerified" | "displayNameLower"
 >;
 
 export const GRADE_LEVELS = [
@@ -72,6 +74,7 @@ export async function createUser(data: UserProfileInput): Promise<void> {
 
   await setDoc(doc(db, "users", data.uid), {
     ...data,
+    displayNameLower: data.displayName.toLowerCase(),
     isVerified: false,
     createdAt: serverTimestamp(),
     badges: [],
@@ -94,7 +97,11 @@ export async function updateUser(
 ): Promise<void> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  await updateDoc(doc(db, "users", uid), data);
+  const payload: Record<string, unknown> = { ...data };
+  if (data.displayName !== undefined) {
+    payload.displayNameLower = data.displayName.toLowerCase();
+  }
+  await updateDoc(doc(db, "users", uid), payload);
 }
 
 export async function followUser(
@@ -164,6 +171,8 @@ export async function isFollowing(
 export interface SearchEducatorsFilters {
   gradeLevel?: string;
   subject?: string;
+  /** Prefix match on displayNameLower for case-insensitive name search. */
+  nameQuery?: string;
 }
 
 export interface SearchEducatorsResult {
@@ -179,6 +188,33 @@ export async function searchEducators(
 ): Promise<SearchEducatorsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
+  // --- Name search path ---
+  // Uses a prefix-range query on displayNameLower (no composite index needed).
+  // gradeLevel / subject are applied client-side.
+  if (filters.nameQuery?.trim()) {
+    const lower = filters.nameQuery.trim().toLowerCase();
+    const upper = lower + "\uf8ff";
+    const q = query(
+      collection(db, "users"),
+      where("displayNameLower", ">=", lower),
+      where("displayNameLower", "<=", upper),
+      orderBy("displayNameLower"),
+      limit(PAGE_SIZE * 4) // fetch extra to account for client-side filtering
+    );
+    const snapshot = await getDocs(q);
+    let educators = snapshot.docs.map((d) => d.data() as UserProfile);
+
+    if (filters.gradeLevel) {
+      educators = educators.filter((e) => e.gradeLevel === filters.gradeLevel);
+    }
+    if (filters.subject) {
+      educators = educators.filter((e) => e.subjects?.includes(filters.subject!));
+    }
+
+    return { educators: educators.slice(0, PAGE_SIZE), lastDoc: null };
+  }
+
+  // --- Filter path (no name query) ---
   const constraints = [];
 
   if (filters.gradeLevel) {
@@ -206,4 +242,30 @@ export async function searchEducators(
       : null;
 
   return { educators, lastDoc };
+}
+
+// --- Mention / @username search ---
+
+export async function searchUsersByDisplayName(
+  prefix: string,
+  max = 5
+): Promise<{ uid: string; displayName: string; photoURL: string | null }[]> {
+  if (!db || !prefix.trim()) return [];
+
+  // Query against displayNameLower for case-insensitive prefix matching.
+  const lower = prefix.toLowerCase();
+  const end = lower + "\uf8ff";
+
+  const q = query(
+    collection(db, "users"),
+    orderBy("displayNameLower"),
+    where("displayNameLower", ">=", lower),
+    where("displayNameLower", "<=", end),
+    limit(max)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data() as UserProfile;
+    return { uid: data.uid, displayName: data.displayName, photoURL: data.photoURL };
+  });
 }

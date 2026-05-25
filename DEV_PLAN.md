@@ -695,13 +695,103 @@ Take each at **desktop (1280px+)** and **mobile (375px)**:
 
 ## Future Features (Backlog)
 
-- **Reply to post comments**: Allow nested replies on home feed post comments (currently flat).
-- **User tagging in posts/comments**: `@username` mentions that send notifications to tagged users.
-- **Sort forum replies by upvotes**: Highest-upvoted top-level replies float to the top.
-- **Dedicated New Thread page**: Replace the forums "New Discussion" modal with a full page at `/forums/new`.
+- [x] **Reply to post comments**: Allow nested replies on home feed post comments (currently flat). Added `parentId` to `PostComment`/`PostCommentInput`, stored in Firestore. `PostCard` now maps `parentId` correctly and uses `maxDepth={1}` so the Reply button appears on top-level comments.
+- [x] **User tagging in posts/comments**: `@username` mentions that send notifications to tagged users. Added `searchUsersByDisplayName` (Firestore prefix query) to `users.ts`. Created `MentionInput` component — detects `@query` at cursor, shows a floating user dropdown (arrow-key navigable), inserts `@DisplayName` on select, tracks selected UIDs. Used in `CreatePost` (textarea) and `CommentThread` (both top-level and reply inputs). `onAddComment` signature extended with optional `mentionedUids[]`. Mention notifications fire-and-forget via new `notifyMention()` helper (`"mention"` type added to `NotificationType`).
+- [x] **Sort forum replies by upvotes**: Added `replySort` state (`"newest" | "top"`) to the forum thread page. A "Newest / Top" pill toggle appears above the replies when there are 2+ comments. When "Top" is selected, top-level replies are re-sorted by `upvotes - downvotes` descending before being passed to `CommentThread`; nested replies stay grouped under their parents as-is.
+- **Dedicated New Thread page**: ~~Replace the forums "New Discussion" modal with a full page at `/forums/new`.~~ **Done in Phase 8.8.**
 - **Notification system**: In-app notification bell for likes, comments, mentions, and replies.
-- **Auto-generated resource PDF**: When a resource is uploaded without a file attachment, generate a formatted PDF from the form data (title, description, grade level, subject, type, tags) using `@react-pdf/renderer` (client-side, no server needed). The generated PDF becomes the downloadable file, so the download button always works. Resources uploaded with a real file continue to use that file as-is. The PDF would be generated at upload time, uploaded to Firebase Storage, and stored as `fileURL` just like a manually uploaded file.
+- [x] **Auto-generated resource PDF**: Installed `@react-pdf/renderer`. Created `components/resources/ResourcePDFDocument.tsx` — a styled LETTER-size PDF with title, grade/subject/type/author meta row, description, and tag chips. In the upload page (`/resources/upload`): if the user submits without attaching a file and Storage is active, the PDF is generated client-side via `pdf(...).toBlob()`, uploaded to Firebase Storage, and its URL stored as `fileURL` — so the download button always works. Resources uploaded with a real file continue to use that file unchanged. Added `@react-pdf/renderer` to `serverExternalPackages` in `next.config.ts` to prevent SSR bundle errors.
+- [x] **Rich text / hyperlinks in content**: Implemented a `LinkAttacher` component (`components/ui/LinkAttacher.tsx`) — a 🔗 "Attach link" button that opens an inline URL + label form. URLs are validated (`http`/`https` only, auto-prefixes `https://`) and displayed as removable chips. Added `links: AttachedLink[]` field to `Post`, `Resource`, and `ForumThread` data models. Wired `LinkAttacher` into `CreatePost`, `/resources/upload`, and `/forums/new`. Link chips render on `PostCard`, `/resources/[id]`, and `/forums/[id]`.
+- [x] **Share improvements**: Fixed and unified share functionality across all content types. PostCard now shares `/?post={id}` — the home feed loads with that post pinned at the top in a highlighted card (auto-scrolls to it), and the post is filtered out of the regular feed to avoid duplication. Added Share buttons (using `navigator.share` with clipboard fallback) to `/resources/[id]`, `/lesson-builder/[id]`, and `/forums/[id]` — each shares the current page URL so recipients land directly on the content. Share buttons now show "✓ Copied!" visual feedback for 2 seconds when the clipboard fallback is used. Added guest auth walls: resource detail pages show a "Sign in to download and save" banner replacing the action buttons for unauthenticated visitors; lesson detail pages hide steps/materials/attachments and show a "Sign in to view the full lesson plan" gate — both keep the Share button visible so guests can still share content to grow the platform.
+- **Download improvements**: Improve the lesson download feature to produce a properly formatted document (PDF). Use `@react-pdf/renderer` or a similar library so downloaded lessons look clean and professional.
+- **User roles system**: Site Admin + School Admin roles. School Admin requires approval by a Site Admin (with notification flow). Relevant for controlling who can post jobs. Currently left open — anyone can post.
+- **Responsive styling fixes**: Full audit and fix of layout issues on mobile viewports. Priority areas: Navbar, profile header, card grids, filter bars.
+- **Profile header scroll lock**: On the educator profile page, the header/avatar section should only scroll horizontally with the page — not jump or shift vertically during navigation transitions.
+- [x] **Notification system enhancements**: Wired all notification triggers. (1) **Follow** — `notifyNewFollower` fires when a user follows an educator. (2) **Post comment** — `notifyComment` fires when someone comments on your post. (3) **Forum thread comment** — `notifyComment` fires when someone comments on your discussion thread. (4) **Forum thread upvote** — `notifyUpvote` fires on first upvote of a thread. (5) **Lesson comment** — `notifyComment` fires when someone comments on your lesson. (6) **Resource saved** — `notifyResourceLiked` fires when someone saves your resource. (7) **@Mention** — `notifyMention` already wired in posts/comments. All notifications are fire-and-forget (`.catch(() => {})`), skip self-notifications, and link to the relevant content page. Unread count badge already rendered on the bell icon. Fixed missing `mention` entry in `TYPE_ICON` in `NotificationDropdown`.
+- **Google OAuth fix**: Ensure Google Sign-In popup works in production. Requires localhost and production domain in Firebase Console → Authentication → Authorized Domains. Check OAuth consent screen configuration in Google Cloud Console.
+
+---
+
+## Phase 8: User Testing Fixes
+
+> **Goal**: Address feedback from initial user testing.
+
+- [x] **8.1 Forgot password**: Add "Forgot password?" link on login page that sends a password reset email via Firebase Auth `sendPasswordResetEmail`. Shows email input, success confirmation, and error states.
+
+- [x] **8.2 Home feed type filters**: Add pill-button filters (All / 💡 Ideas / 📚 Resources / 💬 Discussions) above the feed. Filters pass a `type` param to `getPosts()`. Added composite Firestore index for `posts.type + createdAt`.
+
+- [x] **8.3 Lesson duration field**: Added `duration` text field to the lesson builder form (e.g. "45 minutes", "2 class periods"). Stored in Firestore. Displayed in lesson preview with ⏱ icon.
+
+- [x] **8.4 Privacy gating — profile page**: Unauthenticated visitors see the public profile info (name, bio, stats) but the content tabs (Posts, Resources, Lessons, Discussions) show a "Sign in to view" wall instead of real data.
+
+- [x] **8.5 Privacy gating — home feed**: Unauthenticated visitors see the first 3 posts, then a "Sign in to see more" wall with links to sign up or log in.
+
+- [x] **8.6 Job post creation fix**: Fixed redirect after posting a job — now uses `jobSlug(title, id)` to navigate to the correct detail URL.
+
+- [x] **8.7 Click post to expand comments**: Clicking the post content text now toggles the comments section open/closed (same as the Comment button). The comment count in the stats bar is also clickable.
+
+- [x] **8.8 Forum new discussion page**: Replaced the "New Discussion" modal with navigation to `/forums/new` — a dedicated full-page form with category selector, title, content, grade level, subject, and tags. The modal and its state were removed from the forums listing page.
+
+- [x] **8.9 Resource discussion modal removed**: Removed the inline Discussion `<Card>` and `<CommentThread>` from the resource detail page. Stripped all associated state (`comments`, `commentsLoading`), `loadComments` callback, `commentData` mapping, and unused imports (`useCallback`, `CommentThread`, `CommentData`, `ResourceComment`, `getResourceComments`, `addResourceComment`).
+
+- [x] **8.10 Responsive styling audit**: Systematic review across all pages at 375px, 768px, and 1280px. Key fixes: (1) Resources page filter bar — replaced 4-item `sm:flex-row` (cramped at 640px) with `grid grid-cols-2 lg:grid-cols-4`; Clear Filters moved below the grid. (2) PostCard action bar — added `flex-wrap` so Like/Comment/Share buttons wrap on very small screens rather than overflowing.
+
+- [x] **8.11 Profile page header scroll behavior**: Added `tabsSectionRef` to the Content Tabs section. When a tab is switched via `handleTabChange`, `requestAnimationFrame` scrolls the tab container into view (`scrollIntoView block:nearest`) so the profile header stays at a predictable vertical position and doesn't jump. Increased tab content card min-height to `min-h-[320px]` to prevent layout collapse when content loads.
+
+- [x] **8.12 Google OAuth debugging**: Code-side improvements: (1) Added `email` + `profile` scopes to `GoogleAuthProvider` so `displayName` and `photoURL` are always populated. (2) Added `prompt: select_account` custom parameter to always show the Google account picker. (3) Added `auth/popup-blocked`, `auth/operation-not-allowed`, `auth/network-request-failed` to the error message maps on both login and signup pages. (4) Added `auth/cancelled-popup-request` to the ignored-error list alongside `auth/popup-closed-by-user`. **Authorized Domains confirmed OK**: `localhost`, `educonnect-60b69.firebaseapp.com`, and `educonnect-60b69.web.app` are all present — domain config is not the issue. **Remaining action**: Go to Firebase Console → Authentication → Sign-in Providers and enable the **Google** provider. If it's already enabled, check Google Cloud Console → APIs & Services → OAuth consent screen to ensure the app is configured and not in a blocked state.
 
 
-additional notes:
-- forum creations should open a new window rather than the modal its opening.
+---
+
+## Phase 9: User Testing Feedback (Round 2)
+
+> **Goal**: Address discoverability gaps and content-type expansion surfaced during second round of user testing.
+
+- [x] **9.1 Follow button on educator discovery cards**: Added Follow/Following button to each `EducatorCard` in `/educators`. On page load, the current user's `following` sub-collection is fetched once (single Firestore read) to seed a `followingSet`. Each card reads its follow state from this set, so no per-card reads. Follow toggle is optimistic — `followingSet` and follower count update immediately, reverting on Firestore error. `notifyNewFollower` fires on new follows. Cards belonging to the current user show a "You" badge and no Follow button. Content area (avatar, name, subjects) is a `<Link>` to the profile; Follow button is outside the link so it doesn't navigate.
+  - **Test**: Visit `/educators` while logged in. Each card (that isn't yours) should show a "Follow" button below the subjects. Click Follow on a card — the button should immediately switch to "Following" and the follower count should increment by 1. Refresh the page — the card should still show "Following" (state persisted from Firestore). Click "Following" to unfollow — button reverts to "Follow" and count decrements. Clicking the card's name/avatar area should navigate to the profile; clicking Follow should not navigate.
+
+- [x] **9.2 @mention bug — fixed**: Two root causes found and fixed. (1) **Case sensitivity**: `searchUsersByDisplayName` was doing a prefix query on `displayName` with first-letter capitalization — users with differently-cased names (e.g. "john") would never be found. Fixed by adding a `displayNameLower` field to the `UserProfile` document (set automatically by `createUser` and `updateUser`), and updating the search query to match against `displayNameLower` using `.toLowerCase()` on the input prefix. (2) **Silent error swallowing**: the `catch` block in `MentionInput` was calling `setShowDropdown(false)` with no logging, so Firestore index errors were invisible. Added `console.error` so failures are visible in DevTools. (3) **Discoverability**: `MentionInput` now uses `forwardRef` + `useImperativeHandle` to expose an `insertText(text)` method. `CreatePost` holds a ref and renders an `@ Mention` button in the action bar that calls `insertText("@")` — placing `@` at the current cursor position and focusing the textarea. Placeholder text also updated to hint: "…(type @ to mention someone)".
+  - **Test**: Open the Create Post form on the home feed. In the content box, type `@` followed by the first letter of another user's display name (e.g. `@J` if there's a user called "John"). A dropdown list of matching users should appear below the cursor. Use arrow keys or click to select a user — `@John` should be inserted into the text. Submit the post. Log in as John in a second browser window and check the notification bell — a "@mention" notification should appear.
+
+- [x] **9.3 Notification system — verified**: All notification call sites confirmed present in code (no new code needed). Call site inventory: (1) `notifyNewFollower` — `EducatorProfile.tsx` (profile follow button) and `educators/page.tsx` (discovery card follow button added in 9.1). (2) `notifyComment` — `PostCard.tsx` (post comments), `forums/[id]/page.tsx` (forum thread comments), `lesson-builder/[id]/page.tsx` (lesson comments). (3) `notifyUpvote` — `forums/[id]/page.tsx` (thread upvote). (4) `notifyResourceLiked` — `resources/[id]/page.tsx` (resource save/bookmark). (5) `notifyMention` — `PostCard.tsx` and `CreatePost.tsx` (@mention in posts). All are fire-and-forget with `.catch(() => {})` and skip self-notifications.
+  1. Open two browser windows — sign in as User A in one, User B in the other.
+  2. **New follower**: User B visits `/educators/{UserA-uid}` and clicks Follow → User A should see a "👤 User B is now following you" notification.
+  3. **Post comment**: User A creates a post. User B adds a comment → User A sees a "💬" notification.
+  4. **Forum upvote**: User A posts a forum thread. User B upvotes it → User A sees a "⬆️" notification.
+  5. **Resource saved**: User A uploads a resource. User B saves it → User A sees a "❤️" notification.
+  6. **@mention**: User B writes a post and types `@UserA` in the body → User A sees a "@" notification.
+  - **Test**: After each action above, click the bell icon in User A's navbar without refreshing the page. The unread badge count should increment in real time (no page reload needed). Clicking a notification should mark it as read (bold/highlight disappears) and navigate to the linked content. "Mark all as read" should clear the entire unread badge.
+
+- [x] **9.4 New post types + forum categories**: Added three new `PostType` values (`general`, `question`, `other`) and two new forum categories.
+  - **Posts** (`lib/firestore/posts.ts`): `PostType` union extended to `"idea" | "resource" | "discussion" | "general" | "question" | "other"`. No new Firestore index needed — the existing `posts.type + createdAt` composite index covers all type values.
+  - **PostCard** (`components/posts/PostCard.tsx`): `TYPE_LABELS` updated with 🌐 General (`default`), ❓ Question (`info`), 💭 Other (`default`) badge entries.
+  - **CreatePost** (`components/posts/CreatePost.tsx`): Type selector now shows all 6 options: 💡 Idea, 📚 Resource, 💬 Discussion, 🌐 General, ❓ Question, 💭 Other.
+  - **Home feed filter bar** (`app/(main)/page.tsx`): `TYPE_FILTERS` extended to 7 pills: All / 💡 Ideas / 📚 Resources / 💬 Discussions / 🌐 General / ❓ Questions / 💭 Other.
+  - **Forums** (`lib/firestore/forums.ts`): Added two new categories at the end of `FORUM_CATEGORIES`: 💬 **General Discussion** (catch-all open conversations) and ❓ **Q&A** (ask a question, get answers). Forums now have 8 categories total.
+  - **Test**: Open the Create Post form and check the type selector — it should list all 6 options (Idea, Resource, Discussion, General, Question, Other). Create one post of each new type. On the home feed, the filter bar should show 7 pills. Click "❓ Question" — only Question posts should appear. Click "🌐 General" — only General posts. Click "All" — all posts return. Each post card should show the correct emoji badge for its type.
+
+
+- [x] **9.5 Rename "Remix" to "Modify"**: The lesson detail page action button labelled "Remix" has been renamed to "Modify" — more appropriate language for an education platform. Updated in both the desktop action bar and the mobile sticky bottom bar. The "Remixed" badge on lessons that were derived from another lesson is also renamed to "Modified". Internal function name (`handleRemix`), URL param (`?remix=`), and Firestore field (`remixedFromId`) are unchanged — these are implementation details not visible to users.
+  - **Test**: Visit any lesson detail page (`/lesson-builder/{id}`) that you don't own. The action buttons should show "Download", "Modify", and "Share" (not "Remix"). Click "Modify" — should open the lesson builder pre-filled with the original lesson as a new draft. Save the draft — the resulting lesson detail page should show a "Modified" badge in the header.
+
+- [x] **9.6 Forum voting — upvotes only, no self-voting**: Removed the downvote button from forum thread pages. Education platforms benefit from positive reinforcement — downvotes discourage sharing. The vote bar now shows a single upvote button with count. Clicking again removes the upvote (toggle). Self-voting is blocked: the upvote button is disabled with a tooltip ("You can't upvote your own discussion") when the current user is the thread author. The Firestore `upvoteThread` and `downvoteThread` helpers remain (to avoid breaking existing vote data), but downvote is no longer called from the UI.
+  - **Test**: Open a forum thread you created — the upvote button should be greyed out and unclickable (hover shows tooltip). Open a thread created by someone else — clicking the upvote arrow should increment the count and highlight the button. Click again — count decrements and button returns to default.
+
+- [x] **9.7 Profile discussions tab — fixed**: The Discussions tab on educator profiles was silently empty for all users. Root cause: `getThreadsByAuthor` uses a Firestore **collection group query** (`collectionGroup(db, "threads")`) across all forum category subcollections. This type of query requires an explicit **collection group index** for the queried field — Firestore does not auto-create collection group scope indexes. The index was missing from `firestore.indexes.json`, causing the query to fail silently (the catch block swallowed the error and set an empty array). Fixed by adding a `fieldOverride` for `threads/authorId` with `COLLECTION_GROUP` query scope to `firestore.indexes.json`. Deploy the index with `firebase deploy --only firestore:indexes`.
+  - **Test**: Visit `/educators/{your-uid}` and click the "Discussions" tab — your forum threads should now load and display. Visit someone else's profile who has posted threads — their Discussions tab should also populate correctly. 
+
+- [x] **9.8 Profile posts clickable**: Post cards on the educator profile Posts tab were not clickable. Fixed by converting each post card from a plain `<div>` to a `<Link href="/?post={id}">` so clicking navigates to the home feed with that post highlighted.
+  - **Test**: Visit your profile page → Posts tab. Click any post card — should navigate to `/?post={id}` on the home feed with that post shown.
+
+- [x] **9.9 Forum thread URLs 404 from profile page**: The Discussions tab in `EducatorProfile.tsx` was generating forum thread URLs as `/forums/{categoryId}/{slug}` (e.g. `/forums/teacher-support/my-thread--abc123`). The actual route is `/forums/[id]` (no category segment), so these links 404'd. Fixed by removing the `thread.categoryId/` prefix from the href — now matches the `/forums/${threadSlug(...)}` format used everywhere else.
+  - **Test**: Visit your profile page → Discussions tab. Click a thread — should navigate correctly to `/forums/{slug}` without a 404.
+
+- [x] **9.10 Follow button not working**: Following a user silently failed. Root cause: `followUser` uses a batch write that includes `batch.update(users/{targetUserId}, { followerCount: increment(1) })`. The Firestore `users` security rule only allowed `update` with `isOwner(userId)` — meaning a user can only update their own document. The target user's `followerCount` increment was blocked, causing the entire batch to fail. Fixed by updating the security rule to additionally allow updates that touch only the `followerCount` field from any authenticated user. Deployed with `firebase deploy --only firestore:rules`.
+  - **Test**: Open another user's profile page. Click "Follow" — the button should switch to "Following" and the follower count should increment. Refresh — state should persist. Click "Following" to unfollow — count decrements and button reverts.
+
+
+notes
+- so if you click on a post to view it, it should view as any other post in the feed, but it should be displayed at the top. Give me your suggestions about this.
+- when tagging another user, the tag should be visibly different than the rest of the text in the post, like give it the color blue or something, or the red to keep in style with the website. Give me your suggestions here too.
+
+- add the ability to search for educators /users

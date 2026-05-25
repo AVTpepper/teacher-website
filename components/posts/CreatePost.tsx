@@ -1,16 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { createPost, type PostType } from "@/lib/firestore/posts";
+import { createPost, type PostType, type MentionedUserRef } from "@/lib/firestore/posts";
+import { notifyMention } from "@/lib/notifications";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import Tag from "@/components/ui/Tag";
+import MentionInput, { type MentionedUser, type MentionInputHandle } from "@/components/ui/MentionInput";
+import LinkAttacher, { type AttachedLink } from "@/components/ui/LinkAttacher";
 
 const POST_TYPES: { value: PostType; label: string }[] = [
   { value: "idea", label: "💡 Idea" },
   { value: "resource", label: "📚 Resource" },
   { value: "discussion", label: "💬 Discussion" },
+  { value: "general", label: "🌐 General" },
+  { value: "question", label: "❓ Question" },
+  { value: "other", label: "💭 Other" },
 ];
 
 const TAG_OPTIONS = [
@@ -40,8 +46,11 @@ interface CreatePostProps {
 
 export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const { user } = useAuth();
+  const mentionInputRef = useRef<MentionInputHandle>(null);
   const [content, setContent] = useState("");
-  const [type, setType] = useState<PostType>("idea");
+  const [mentions, setMentions] = useState<MentionedUser[]>([]);
+  const [links, setLinks] = useState<AttachedLink[]>([]);
+  const [type, setType] = useState<PostType>("general");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [gradeLevel, setGradeLevel] = useState("");
   const [expanded, setExpanded] = useState(false);
@@ -66,7 +75,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     setError("");
     setSubmitting(true);
     try {
-      await createPost({
+      const postId = await createPost({
         authorId: user!.uid,
         authorName: user!.displayName || "Anonymous",
         authorPhotoURL: user!.photoURL,
@@ -74,9 +83,24 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
         type,
         tags: selectedTags,
         gradeLevel,
+        links,
+        mentionedUsers: mentions.map((m): MentionedUserRef => ({ uid: m.uid, displayName: m.displayName })),
       });
+      // Send mention notifications (fire-and-forget)
+      mentions.forEach((m) => {
+        notifyMention({
+          recipientId: m.uid,
+          actorId: user!.uid,
+          actorName: user!.displayName || "Anonymous",
+          actorPhotoURL: user!.photoURL,
+          linkURL: `/?post=${postId}`,
+        }).catch(() => {});
+      });
+      void postId;
       setContent("");
-      setType("idea");
+      setMentions([]);
+      setLinks([]);
+      setType("general");
       setSelectedTags([]);
       setGradeLevel("");
       setExpanded(false);
@@ -97,11 +121,14 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
           size="md"
         />
         <div className="flex-1 min-w-0">
-          <textarea
+          <MentionInput
+            ref={mentionInputRef}
+            multiline
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={setContent}
+            onMentionsChange={setMentions}
             onFocus={() => setExpanded(true)}
-            placeholder="Share an idea, resource, or start a discussion..."
+            placeholder="Share an idea, resource, or start a discussion... (type @ to mention someone)"
             rows={expanded ? 4 : 2}
             className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-ring hover:border-border-strong"
           />
@@ -110,8 +137,22 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
 
       {expanded && (
         <div className="mt-3 space-y-3">
+          {/* Toolbar: @Mention + attach link — immediately below textarea */}
+          <div className="flex flex-wrap items-start gap-4 border-b border-border pb-3">
+            <button
+              type="button"
+              onClick={() => mentionInputRef.current?.insertText("@")}
+              className="flex items-center gap-1 text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer"
+              title="Mention someone"
+            >
+              <span className="text-base leading-none">@</span>
+              <span>Mention</span>
+            </button>
+            <LinkAttacher links={links} onChange={setLinks} />
+          </div>
+
           {/* Post type selector */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {POST_TYPES.map((pt) => (
               <button
                 key={pt.value}
@@ -171,7 +212,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
           {/* Error + submit */}
           {error && <p className="text-xs text-error-500">{error}</p>}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex items-center justify-end gap-2">
             <Button
               variant="ghost"
               size="sm"
@@ -180,7 +221,8 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                 setContent("");
                 setSelectedTags([]);
                 setGradeLevel("");
-                setType("idea");
+                setLinks([]);
+                setType("general");
                 setError("");
               }}
             >

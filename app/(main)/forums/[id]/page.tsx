@@ -7,7 +7,6 @@ import {
   findThreadById,
   parseThreadSlug,
   upvoteThread,
-  downvoteThread,
   getUserVote,
   getThreadComments,
   addThreadComment,
@@ -23,6 +22,7 @@ import Button from "@/components/ui/Button";
 import Tag from "@/components/ui/Tag";
 import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
+import { notifyUpvote, notifyComment } from "@/lib/notifications";
 
 // ─── Main page component ───
 
@@ -43,12 +43,13 @@ export default function ForumThreadPage({
   // Thread voting
   const [vote, setVote] = useState<"up" | "down" | null>(null);
   const [upvotes, setUpvotes] = useState(0);
-  const [downvotes, setDownvotes] = useState(0);
   const [voteLoading, setVoteLoading] = useState(false);
 
   // Comments
   const [comments, setComments] = useState<ThreadComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [replySort, setReplySort] = useState<"newest" | "top">("newest");
+  const [copied, setCopied] = useState(false);
 
   const loadComments = useCallback(
     async (catId: string) => {
@@ -76,7 +77,6 @@ export default function ForumThreadPage({
         setThread(result.thread);
         setCategoryId(result.categoryId);
         setUpvotes(result.thread.upvotes);
-        setDownvotes(result.thread.downvotes);
         loadComments(result.categoryId);
       } catch {
         setNotFound(true);
@@ -98,19 +98,27 @@ export default function ForumThreadPage({
 
   async function handleUpvote() {
     if (!user || !categoryId || voteLoading) return;
+    if (thread?.authorId === user.uid) return; // no self-voting
     setVoteLoading(true);
     try {
       await upvoteThread(categoryId, threadId, user.uid);
       if (vote === "up") {
         setVote(null);
         setUpvotes((c) => c - 1);
-      } else if (vote === "down") {
-        setVote("up");
-        setUpvotes((c) => c + 1);
-        setDownvotes((c) => c - 1);
       } else {
         setVote("up");
         setUpvotes((c) => c + 1);
+        // Notify thread author (fire-and-forget, only on first upvote)
+        if (thread && thread.authorId !== user.uid) {
+          notifyUpvote({
+            recipientId: thread.authorId,
+            actorId: user.uid,
+            actorName: user.displayName || "Someone",
+            actorPhotoURL: user.photoURL,
+            threadTitle: thread.title,
+            linkURL: window.location.href,
+          }).catch(() => {});
+        }
       }
     } catch {
       // ignore
@@ -119,26 +127,15 @@ export default function ForumThreadPage({
     }
   }
 
-  async function handleDownvote() {
-    if (!user || !categoryId || voteLoading) return;
-    setVoteLoading(true);
-    try {
-      await downvoteThread(categoryId, threadId, user.uid);
-      if (vote === "down") {
-        setVote(null);
-        setDownvotes((c) => c - 1);
-      } else if (vote === "up") {
-        setVote("down");
-        setUpvotes((c) => c - 1);
-        setDownvotes((c) => c + 1);
-      } else {
-        setVote("down");
-        setDownvotes((c) => c + 1);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setVoteLoading(false);
+  function handleShare() {
+    if (!thread) return;
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({ title: thread.title, url });
+    } else {
+      navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   }
 
@@ -182,7 +179,30 @@ export default function ForumThreadPage({
   }
 
   const categoryData = FORUM_CATEGORIES.find((c) => c.id === categoryId);
-  const score = upvotes - downvotes;
+  const isOwnThread = user?.uid === thread.authorId;
+
+  // Build CommentData — sort top-level by score when replySort === "top"
+  const commentData: CommentData[] = comments.map((c) => ({
+    id: c.id,
+    parentId: c.parentId,
+    authorId: c.authorId,
+    authorName: c.authorName,
+    authorPhotoURL: c.authorPhotoURL,
+    content: c.content,
+    createdAt: c.createdAt as { seconds: number } | null,
+    upvotes: c.upvotes,
+    downvotes: c.downvotes,
+  }));
+
+  const sortedCommentData =
+    replySort === "top"
+      ? [
+          ...commentData
+            .filter((c) => !c.parentId)
+            .sort((a, b) => (b.upvotes ?? 0) - (b.downvotes ?? 0) - ((a.upvotes ?? 0) - (a.downvotes ?? 0))),
+          ...commentData.filter((c) => !!c.parentId),
+        ]
+      : commentData;
 
   return (
     <div className="space-y-6">
@@ -246,81 +266,98 @@ export default function ForumThreadPage({
               ))}
             </div>
           )}
+
+          {/* Attached links */}
+          {thread.links?.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {thread.links.map((link, i) => (
+                <a
+                  key={i}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-info-50 text-info-700 border border-info-200 hover:bg-info-100 transition-colors max-w-[260px] truncate"
+                  title={link.url}
+                >
+                  <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  <span className="truncate">{link.label}</span>
+                </a>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Vote bar */}
         <div className="px-6 py-3 border-t border-border flex items-center gap-4">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleUpvote}
-              disabled={!user}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer disabled:cursor-not-allowed ${
+              disabled={!user || isOwnThread}
+              title={isOwnThread ? "You can't upvote your own discussion" : !user ? "Sign in to upvote" : undefined}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
                 vote === "up"
                   ? "text-primary-900 bg-primary-100"
                   : "text-muted hover:text-foreground hover:bg-surface-hover"
               }`}
               aria-label="Upvote"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
               </svg>
-            </button>
-            <span
-              className={`text-sm font-semibold min-w-[2ch] text-center ${
-                score > 0
-                  ? "text-primary-900"
-                  : score < 0
-                    ? "text-error-500"
-                    : "text-muted"
-              }`}
-            >
-              {score}
-            </span>
-            <button
-              type="button"
-              onClick={handleDownvote}
-              disabled={!user}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer disabled:cursor-not-allowed ${
-                vote === "down"
-                  ? "text-error-500 bg-error-50"
-                  : "text-muted hover:text-foreground hover:bg-surface-hover"
-              }`}
-              aria-label="Downvote"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
+              <span>{upvotes}</span>
             </button>
           </div>
 
           <span className="text-sm text-muted">
             {thread.commentCount} {thread.commentCount === 1 ? "reply" : "replies"}
           </span>
+
+          <button
+            type="button"
+            onClick={handleShare}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm text-muted hover:text-foreground hover:bg-surface-hover transition-colors cursor-pointer"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+            </svg>
+            {copied ? "✓ Copied!" : "Share"}
+          </button>
         </div>
       </div>
 
       {/* Comments section */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">
-          Replies ({comments.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-foreground">
+            Replies ({comments.length})
+          </h2>
+          {comments.length > 1 && (
+            <div className="flex items-center gap-1 text-sm">
+              <span className="text-muted mr-1">Sort:</span>
+              {(["newest", "top"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setReplySort(s)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                    replySort === s
+                      ? "bg-primary-900 text-white"
+                      : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
+                  }`}
+                >
+                  {s === "newest" ? "Newest" : "Top"}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="rounded-xl border border-border bg-surface p-4">
           <CommentThread
-            comments={comments.map(
-              (c): CommentData => ({
-                id: c.id,
-                parentId: c.parentId,
-                authorId: c.authorId,
-                authorName: c.authorName,
-                authorPhotoURL: c.authorPhotoURL,
-                content: c.content,
-                createdAt: c.createdAt as { seconds: number } | null,
-                upvotes: c.upvotes,
-                downvotes: c.downvotes,
-              })
-            )}
+            comments={sortedCommentData}
             loading={loadingComments}
             maxDepth={2}
             mode="upvote"
@@ -333,6 +370,17 @@ export default function ForumThreadPage({
                 authorPhotoURL: user!.photoURL,
                 content,
               });
+              // Notify thread author when someone comments (fire-and-forget)
+              if (thread && thread.authorId !== user!.uid && !parentId) {
+                notifyComment({
+                  recipientId: thread.authorId,
+                  actorId: user!.uid,
+                  actorName: user!.displayName || "Someone",
+                  actorPhotoURL: user!.photoURL,
+                  contentLabel: `your discussion "${thread.title}"`,
+                  linkURL: window.location.href,
+                }).catch(() => {});
+              }
               return newId;
             }}
             onUpvote={async (commentId) => {

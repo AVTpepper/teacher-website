@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -33,6 +33,7 @@ import {
 import { Avatar, Badge, Button, Card, Tabs, Tag } from "@/components/ui";
 import { BadgeList } from "@/components/badges/BadgeIcon";
 import { BADGE_LIST } from "@/lib/badges";
+import { notifyNewFollower } from "@/lib/notifications";
 
 const PROFILE_TABS = [
   { label: "Posts", value: "posts" },
@@ -67,6 +68,14 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   const [threadsLoaded, setThreadsLoaded] = useState(false);
 
   const [activeTab, setActiveTab] = useState("posts");
+  const tabsSectionRef = useRef<HTMLDivElement>(null);
+  function handleTabChange(tab: string) {
+    setActiveTab(tab);
+    // After content settles, scroll so the tab bar is visible without losing the header
+    requestAnimationFrame(() => {
+      tabsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }
 
   const isOwnProfile = user?.uid === userId;
 
@@ -191,6 +200,13 @@ export default function EducatorProfile({ userId }: { userId: string }) {
         setProfile((p) =>
           p ? { ...p, followerCount: p.followerCount + 1 } : p
         );
+        // Notify the followed user (fire-and-forget)
+        notifyNewFollower({
+          recipientId: profile.uid,
+          actorId: user.uid,
+          actorName: user.displayName || "Someone",
+          actorPhotoURL: user.photoURL,
+        }).catch(() => {});
       }
     } catch {
       // Silently fail
@@ -230,7 +246,8 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   return (
     <div className="mx-auto max-w-3xl py-8">
       {/* Profile Header */}
-      <Card padding="lg">
+      <Card className="p-6">
+        <div>
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
           {/* Avatar */}
           <Avatar
@@ -409,6 +426,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
             </Button>
           </div>
         )}
+        </div>
       </Card>
 
       {/* Badges Section */}
@@ -432,13 +450,33 @@ export default function EducatorProfile({ userId }: { userId: string }) {
       )}
 
       {/* Content Tabs */}
-      <div className="mt-6">
+      <div className="mt-6" ref={tabsSectionRef}>
         <Tabs
           tabs={PROFILE_TABS}
           defaultValue="posts"
-          onChange={setActiveTab}
+          onChange={handleTabChange}
         />
-        <Card className="mt-4 min-h-50" padding="lg">
+        <Card className="mt-4 min-h-[320px]" padding="lg">
+          {!user ? (
+            <div className="py-12 text-center">
+              <div className="text-4xl mb-3">🔒</div>
+              <h3 className="text-base font-semibold text-foreground">
+                Sign in to view {isOwnProfile ? "your" : `${profile.displayName}'s`} content
+              </h3>
+              <p className="text-sm text-muted mt-1">
+                Create a free account to see posts, resources, and lessons from educators on EduConnect.
+              </p>
+              <div className="mt-4 flex justify-center gap-3">
+                <Button variant="primary" onClick={() => window.location.href = "/auth/signup"}>
+                  Create Account
+                </Button>
+                <Button variant="outline" onClick={() => window.location.href = `/auth/login?redirect=/educators/${userId}`}>
+                  Sign In
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
           {activeTab === "posts" && (
             <PostsTabContent
               posts={posts}
@@ -470,6 +508,8 @@ export default function EducatorProfile({ userId }: { userId: string }) {
               isOwnProfile={isOwnProfile}
               displayName={profile.displayName}
             />
+          )}
+            </>
           )}
         </Card>
       </div>
@@ -518,12 +558,18 @@ function PostsTabContent({
       />
     );
   }
+  const POSTS_PER_PAGE = 5;
+  const [visibleCount, setVisibleCount] = useState(POSTS_PER_PAGE);
+  const visiblePosts = posts.slice(0, visibleCount);
+  const hasMore = visibleCount < posts.length;
+
   return (
     <div className="space-y-3">
-      {posts.map((post) => (
-        <div
+      {visiblePosts.map((post) => (
+        <Link
           key={post.id}
-          className="rounded-lg border border-border px-4 py-3"
+          href={`/?post=${post.id}`}
+          className="block rounded-lg border border-border px-4 py-3 hover:bg-surface-hover transition-colors"
         >
           <div className="mb-1 flex items-center gap-2">
             <Badge variant="primary">{post.type}</Badge>
@@ -551,8 +597,16 @@ function PostsTabContent({
               </span>
             ))}
           </div>
-        </div>
+        </Link>
       ))}
+      {hasMore && (
+        <button
+          className="w-full rounded-lg py-2 text-sm font-medium text-primary-900 hover:bg-surface-hover transition-colors"
+          onClick={() => setVisibleCount((c) => c + POSTS_PER_PAGE)}
+        >
+          Show more ({posts.length - visibleCount} remaining)
+        </button>
+      )}
     </div>
   );
 }
@@ -686,7 +740,7 @@ function DiscussionsTabContent({
       {threads.map((thread) => (
         <Link
           key={thread.id}
-          href={`/forums/${thread.categoryId}/${threadSlug(thread.title, thread.id)}`}
+          href={`/forums/${threadSlug(thread.title, thread.id)}`}
         >
           <div className="rounded-lg border border-border px-4 py-3 transition-colors hover:border-primary-300 hover:bg-primary-50/40">
             <p className="text-sm font-medium text-foreground line-clamp-2">

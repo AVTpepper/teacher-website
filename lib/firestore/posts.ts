@@ -22,7 +22,12 @@ import { byCreatedAtDesc } from "@/lib/utils";
 
 // --- Post types ---
 
-export type PostType = "idea" | "resource" | "discussion";
+export type PostType = "idea" | "resource" | "discussion" | "general" | "question" | "other";
+
+export interface MentionedUserRef {
+  uid: string;
+  displayName: string;
+}
 
 export interface Post {
   id: string;
@@ -33,6 +38,8 @@ export interface Post {
   type: PostType;
   tags: string[];
   gradeLevel: string;
+  links: AttachedLink[];
+  mentionedUsers?: MentionedUserRef[];
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
   likesCount: number;
@@ -47,21 +54,31 @@ export interface PostInput {
   type: PostType;
   tags: string[];
   gradeLevel: string;
+  links?: AttachedLink[];
+  mentionedUsers?: MentionedUserRef[];
 }
 
 // --- Comment types ---
 
+export interface AttachedLink {
+  url: string;
+  label: string;
+}
+
 export interface PostComment {
   id: string;
   postId: string;
+  parentId: string | null;
   authorId: string;
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
   createdAt: Timestamp | null;
+  likesCount: number;
 }
 
 export interface PostCommentInput {
+  parentId?: string | null;
   authorId: string;
   authorName: string;
   authorPhotoURL: string | null;
@@ -80,6 +97,8 @@ export async function createPost(data: PostInput): Promise<string> {
   await setDoc(ref, {
     ...data,
     id: ref.id,
+    links: data.links ?? [],
+    mentionedUsers: data.mentionedUsers ?? [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     likesCount: 0,
@@ -95,7 +114,8 @@ export interface GetPostsResult {
 }
 
 export async function getPosts(
-  cursor?: DocumentSnapshot | null
+  cursor?: DocumentSnapshot | null,
+  type?: PostType | null
 ): Promise<GetPostsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
@@ -103,6 +123,10 @@ export async function getPosts(
     orderBy("createdAt", "desc"),
     limit(PAGE_SIZE),
   ];
+
+  if (type) {
+    constraints.unshift(where("type", "==", type));
+  }
 
   if (cursor) {
     constraints.push(startAfter(cursor));
@@ -200,6 +224,8 @@ export async function commentOnPost(
     ...data,
     id: ref.id,
     postId,
+    parentId: data.parentId ?? null,
+    likesCount: 0,
     createdAt: serverTimestamp(),
   });
 
@@ -222,4 +248,56 @@ export async function getPostComments(
   const snapshot = await getDocs(q);
 
   return snapshot.docs.map((d) => d.data() as PostComment);
+}
+
+export async function likeComment(
+  postId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await setDoc(doc(db, "posts", postId, "comments", commentId, "likes", userId), {
+    likedAt: serverTimestamp(),
+  });
+  await updateDoc(doc(db, "posts", postId, "comments", commentId), {
+    likesCount: increment(1),
+  });
+}
+
+export async function unlikeComment(
+  postId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "posts", postId, "comments", commentId, "likes", userId));
+  await updateDoc(doc(db, "posts", postId, "comments", commentId), {
+    likesCount: increment(-1),
+  });
+}
+
+export async function hasLikedComment(
+  postId: string,
+  commentId: string,
+  userId: string
+): Promise<boolean> {
+  if (!db) throw new Error("Firestore is not initialized");
+  const snap = await getDoc(doc(db, "posts", postId, "comments", commentId, "likes", userId));
+  return snap.exists();
+}
+
+export async function updatePost(
+  postId: string,
+  updates: Pick<PostInput, "content" | "type" | "tags" | "gradeLevel" | "links">
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(doc(db, "posts", postId), {
+    ...updates,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deletePost(postId: string): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "posts", postId));
 }

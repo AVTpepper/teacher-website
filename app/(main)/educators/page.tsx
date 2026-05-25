@@ -2,32 +2,46 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { type DocumentSnapshot } from "firebase/firestore";
+import { collection, getDocs, type DocumentSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import {
   searchEducators,
+  followUser,
+  unfollowUser,
   GRADE_LEVELS,
   SUBJECTS,
   type UserProfile,
   type SearchEducatorsFilters,
 } from "@/lib/firestore/users";
-import { Avatar, Badge, Button, Card, Select } from "@/components/ui";
+import { Avatar, Badge, Button, Card, Input, Select } from "@/components/ui";
+import { notifyNewFollower } from "@/lib/notifications";
+import { db } from "@/lib/firebase";
 
 export default function EducatorsPage() {
   const { user } = useAuth();
 
+  const [nameInput, setNameInput] = useState("");
+  const [nameQuery, setNameQuery] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
+
+  // Debounce name input → nameQuery (400 ms)
+  useEffect(() => {
+    const timer = setTimeout(() => setNameQuery(nameInput), 400);
+    return () => clearTimeout(timer);
+  }, [nameInput]);
 
   const [educators, setEducators] = useState<UserProfile[]>([]);
   const [cursor, setCursor] = useState<DocumentSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
 
   const filters: SearchEducatorsFilters = {
     gradeLevel: gradeLevel || undefined,
     subject: subject || undefined,
+    nameQuery: nameQuery.trim() || undefined,
   };
 
   const fetchEducators = useCallback(
@@ -59,7 +73,7 @@ export default function EducatorsPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gradeLevel, subject, cursor]
+    [gradeLevel, subject, nameQuery, cursor]
   );
 
   // Initial load + re-fetch on filter change
@@ -67,7 +81,62 @@ export default function EducatorsPage() {
     setCursor(null);
     fetchEducators(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gradeLevel, subject]);
+  }, [gradeLevel, subject, nameQuery]);
+
+  // Load which educators the current user is already following
+  useEffect(() => {
+    if (!user || !db) return;
+    getDocs(collection(db, "users", user.uid, "following"))
+      .then((snap) => setFollowingSet(new Set(snap.docs.map((d) => d.id))))
+      .catch(() => {});
+  }, [user]);
+
+  async function handleFollowToggle(educator: UserProfile) {
+    if (!user) return;
+    const isCurrentlyFollowing = followingSet.has(educator.uid);
+    // Optimistic updates
+    setFollowingSet((prev) => {
+      const next = new Set(prev);
+      if (isCurrentlyFollowing) next.delete(educator.uid);
+      else next.add(educator.uid);
+      return next;
+    });
+    setEducators((prev) =>
+      prev.map((e) =>
+        e.uid === educator.uid
+          ? { ...e, followerCount: e.followerCount + (isCurrentlyFollowing ? -1 : 1) }
+          : e
+      )
+    );
+    try {
+      if (isCurrentlyFollowing) {
+        await unfollowUser(user.uid, educator.uid);
+      } else {
+        await followUser(user.uid, educator.uid);
+        notifyNewFollower({
+          recipientId: educator.uid,
+          actorId: user.uid,
+          actorName: user.displayName ?? "Someone",
+          actorPhotoURL: user.photoURL ?? null,
+        }).catch(() => {});
+      }
+    } catch {
+      // Revert on error
+      setFollowingSet((prev) => {
+        const next = new Set(prev);
+        if (isCurrentlyFollowing) next.add(educator.uid);
+        else next.delete(educator.uid);
+        return next;
+      });
+      setEducators((prev) =>
+        prev.map((e) =>
+          e.uid === educator.uid
+            ? { ...e, followerCount: e.followerCount + (isCurrentlyFollowing ? 1 : -1) }
+            : e
+        )
+      );
+    }
+  }
 
   return (
     <div className="py-8">
@@ -83,37 +152,52 @@ export default function EducatorsPage() {
 
       {/* Filters */}
       <Card className="mb-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <Select
-              label="Grade Level"
-              value={gradeLevel}
-              onChange={(e) => setGradeLevel(e.target.value)}
-              placeholder="All Grade Levels"
-              options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
+        <div className="flex flex-col gap-4">
+          {/* Name search row */}
+          <div>
+            <Input
+              label="Search by name"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="Type an educator's name…"
+              type="search"
             />
           </div>
-          <div className="flex-1">
-            <Select
-              label="Subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="All Subjects"
-              options={SUBJECTS.map((s) => ({ value: s, label: s }))}
-            />
+          {/* Grade + Subject row */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <Select
+                label="Grade Level"
+                value={gradeLevel}
+                onChange={(e) => setGradeLevel(e.target.value)}
+                placeholder="All Grade Levels"
+                options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
+              />
+            </div>
+            <div className="flex-1">
+              <Select
+                label="Subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="All Subjects"
+                options={SUBJECTS.map((s) => ({ value: s, label: s }))}
+              />
+            </div>
+            {(gradeLevel || subject || nameInput) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setGradeLevel("");
+                  setSubject("");
+                  setNameInput("");
+                  setNameQuery("");
+                }}
+              >
+                Clear Filters
+              </Button>
+            )}
           </div>
-          {(gradeLevel || subject) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setGradeLevel("");
-                setSubject("");
-              }}
-            >
-              Clear Filters
-            </Button>
-          )}
         </div>
       </Card>
 
@@ -141,19 +225,22 @@ export default function EducatorsPage() {
             No educators found
           </h3>
           <p className="mt-1 text-xs text-muted">
-            {gradeLevel || subject
-              ? "Try adjusting your filters."
+            {gradeLevel || subject || nameQuery
+              ? "Try adjusting your search or filters."
               : "Be the first to create a profile!"}
           </p>
         </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
             {educators.map((educator) => (
               <EducatorCard
                 key={educator.uid}
                 educator={educator}
                 isOwnProfile={user?.uid === educator.uid}
+                currentUid={user?.uid ?? null}
+                isFollowed={followingSet.has(educator.uid)}
+                onFollowToggle={handleFollowToggle}
               />
             ))}
           </div>
@@ -178,13 +265,31 @@ export default function EducatorsPage() {
 function EducatorCard({
   educator,
   isOwnProfile,
+  currentUid,
+  isFollowed,
+  onFollowToggle,
 }: {
   educator: UserProfile;
   isOwnProfile: boolean;
+  currentUid: string | null;
+  isFollowed: boolean;
+  onFollowToggle: (educator: UserProfile) => Promise<void>;
 }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleFollow() {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await onFollowToggle(educator);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <Link href={`/educators/${educator.uid}`}>
-      <Card hoverable className="flex flex-col items-center text-center">
+    <Card hoverable className="flex flex-col items-center text-center">
+      <Link href={`/educators/${educator.uid}`} className="flex flex-col items-center w-full">
         <Avatar
           src={educator.photoURL}
           alt={educator.displayName}
@@ -255,12 +360,24 @@ function EducatorCard({
             )}
           </div>
         )}
+      </Link>
 
-        <p className="mt-2 text-xs text-muted">
-          {educator.followerCount}{" "}
-          {educator.followerCount === 1 ? "follower" : "followers"}
-        </p>
-      </Card>
-    </Link>
+      <p className="mt-2 text-xs text-muted">
+        {educator.followerCount}{" "}
+        {educator.followerCount === 1 ? "follower" : "followers"}
+      </p>
+
+      {currentUid && !isOwnProfile && (
+        <Button
+          size="sm"
+          variant={isFollowed ? "outline" : "primary"}
+          className="mt-3 w-full"
+          onClick={handleFollow}
+          isLoading={loading}
+        >
+          {isFollowed ? "Following" : "Follow"}
+        </Button>
+      )}
+    </Card>
   );
 }

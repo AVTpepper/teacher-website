@@ -19,6 +19,7 @@ export default function Card({
   hoverable = false,
   className = "",
   children,
+  onClick,
   ...props
 }: CardProps) {
   return (
@@ -28,6 +29,14 @@ export default function Card({
           ? "transition-shadow hover:shadow-card-hover cursor-pointer"
           : ""
       } ${paddingClasses[padding]} ${className}`}
+      onClick={onClick}
+      role={hoverable && onClick ? "button" : undefined}
+      tabIndex={hoverable && onClick ? 0 : undefined}
+      onKeyDown={
+        hoverable && onClick
+          ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(e as unknown as React.MouseEvent<HTMLDivElement>); } }
+          : undefined
+      }
       {...props}
     >
       {children}

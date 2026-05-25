@@ -11,6 +11,8 @@ import {
   onSnapshot,
   where,
   serverTimestamp,
+  startAfter,
+  type DocumentSnapshot,
   type Timestamp,
   type Unsubscribe,
 } from "firebase/firestore";
@@ -25,7 +27,8 @@ export type NotificationType =
   | "comment"
   | "upvote"
   | "badge-earned"
-  | "resource-liked";
+  | "resource-liked"
+  | "mention";
 
 export interface Notification {
   id: string;
@@ -80,19 +83,25 @@ export async function createNotification(
 
 export async function getNotifications(
   recipientId: string,
-  pageSize = 20
-): Promise<Notification[]> {
-  if (!db) return [];
-  const q = query(
-    notifCollection(recipientId),
+  pageSize = 20,
+  cursor: DocumentSnapshot | null = null
+): Promise<{ notifications: Notification[]; lastDoc: DocumentSnapshot | null }> {
+  if (!db) return { notifications: [], lastDoc: null };
+
+  const constraints = [
     orderBy("createdAt", "desc"),
-    limit(pageSize)
-  );
+    limit(pageSize),
+    ...(cursor ? [startAfter(cursor)] : []),
+  ];
+
+  const q = query(notifCollection(recipientId), ...constraints);
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({
+  const notifications: Notification[] = snap.docs.map((d) => ({
     id: d.id,
     ...(d.data() as Omit<Notification, "id">),
   }));
+  const lastDoc = snap.docs.length === pageSize ? snap.docs[snap.docs.length - 1] : null;
+  return { notifications, lastDoc };
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +251,24 @@ export function notifyResourceLiked(params: {
     actorName: params.actorName,
     actorPhotoURL: params.actorPhotoURL,
     message: `${params.actorName} saved your resource "${params.resourceTitle}".`,
+    linkURL: params.linkURL,
+  });
+}
+
+export function notifyMention(params: {
+  recipientId: string;
+  actorId: string;
+  actorName: string;
+  actorPhotoURL: string | null;
+  linkURL: string;
+}): Promise<void> {
+  return createNotification({
+    recipientId: params.recipientId,
+    type: "mention",
+    actorId: params.actorId,
+    actorName: params.actorName,
+    actorPhotoURL: params.actorPhotoURL,
+    message: `${params.actorName} mentioned you.`,
     linkURL: params.linkURL,
   });
 }

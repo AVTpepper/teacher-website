@@ -2,42 +2,28 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   getCategories,
   getThreads,
-  createThread,
   threadSlug,
   FORUM_CATEGORIES,
   type ForumCategory,
   type ForumThread,
   type GetThreadsResult,
 } from "@/lib/firestore/forums";
-import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import type { DocumentSnapshot } from "firebase/firestore";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import Modal from "@/components/ui/Modal";
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
 import { timeAgo } from "@/lib/utils";
 
-const TAG_OPTIONS = [
-  "Classroom Management",
-  "Lesson Planning",
-  "Student Engagement",
-  "Technology",
-  "Assessment",
-  "Differentiation",
-  "SEL",
-  "STEM",
-  "Literacy",
-  "Professional Development",
-];
-
 export default function ForumsPage() {
   const { user } = useAuth();
+  const router = useRouter();
 
   // Category listing state
   const [categories, setCategories] = useState<ForumCategory[]>([]);
@@ -48,17 +34,8 @@ export default function ForumsPage() {
   const [threads, setThreads] = useState<ForumThread[]>([]);
   const [threadsCursor, setThreadsCursor] = useState<DocumentSnapshot | null>(null);
   const [loadingThreads, setLoadingThreads] = useState(false);
+  const [loadingMoreThreads, setLoadingMoreThreads] = useState(false);
   const [hasMoreThreads, setHasMoreThreads] = useState(false);
-
-  // New thread modal
-  const [showNewThread, setShowNewThread] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newContent, setNewContent] = useState("");
-  const [newGrade, setNewGrade] = useState("");
-  const [newSubject, setNewSubject] = useState("");
-  const [newTags, setNewTags] = useState<string[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     getCategories()
@@ -95,11 +72,12 @@ export default function ForumsPage() {
     setSelectedCategory(null);
     setThreads([]);
     setThreadsCursor(null);
+    setHasMoreThreads(false);
   }
 
   async function loadMoreThreads() {
     if (!selectedCategory || !threadsCursor) return;
-    setLoadingThreads(true);
+    setLoadingMoreThreads(true);
     try {
       const result = await getThreads(selectedCategory, threadsCursor);
       setThreads((prev) => [...prev, ...result.threads]);
@@ -108,63 +86,13 @@ export default function ForumsPage() {
     } catch {
       // ignore
     } finally {
-      setLoadingThreads(false);
+      setLoadingMoreThreads(false);
     }
   }
 
   function openNewThread(categoryId?: string) {
-    if (categoryId) setSelectedCategory(categoryId);
-    setShowNewThread(true);
-    setFormError("");
-  }
-
-  function resetForm() {
-    setNewTitle("");
-    setNewContent("");
-    setNewGrade("");
-    setNewSubject("");
-    setNewTags([]);
-    setFormError("");
-    setShowNewThread(false);
-  }
-
-  async function handleCreateThread() {
-    if (!user || !selectedCategory) return;
-    const trimmedTitle = newTitle.trim();
-    const trimmedContent = newContent.trim();
-
-    if (!trimmedTitle) {
-      setFormError("Title is required.");
-      return;
-    }
-    if (!trimmedContent) {
-      setFormError("Content is required.");
-      return;
-    }
-
-    setSubmitting(true);
-    setFormError("");
-    try {
-      await createThread({
-        categoryId: selectedCategory,
-        title: trimmedTitle,
-        content: trimmedContent,
-        authorId: user.uid,
-        authorName: user.displayName || "Anonymous",
-        authorPhotoURL: user.photoURL,
-        tags: newTags,
-        gradeLevel: newGrade,
-        subject: newSubject,
-      });
-      resetForm();
-      // Reload threads and categories
-      loadThreads(selectedCategory);
-      getCategories().then(setCategories).catch(() => {});
-    } catch {
-      setFormError("Failed to create thread. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
+    const cat = categoryId || selectedCategory || FORUM_CATEGORIES[0].id;
+    router.push(`/forums/new?category=${cat}`);
   }
 
   const selectedCategoryData = FORUM_CATEGORIES.find(
@@ -433,7 +361,7 @@ export default function ForumsPage() {
                   <Button
                     variant="outline"
                     onClick={loadMoreThreads}
-                    isLoading={loadingThreads}
+                    isLoading={loadingMoreThreads}
                   >
                     Load More
                   </Button>
@@ -443,144 +371,6 @@ export default function ForumsPage() {
           )}
         </div>
       )}
-
-      {/* New Discussion Modal */}
-      <Modal
-        open={showNewThread}
-        onClose={resetForm}
-        title="New Discussion"
-        className="max-w-2xl"
-      >
-        <div className="p-6 space-y-4">
-          {/* Category selector */}
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-1.5">
-              Category
-            </label>
-            <select
-              value={selectedCategory || ""}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus-ring cursor-pointer hover:border-border-strong"
-            >
-              {FORUM_CATEGORIES.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.icon} {cat.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Title */}
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-1.5">
-              Title
-            </label>
-            <input
-              type="text"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="What do you want to discuss?"
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
-            />
-          </div>
-
-          {/* Content */}
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-1.5">
-              Content
-            </label>
-            <textarea
-              value={newContent}
-              onChange={(e) => setNewContent(e.target.value)}
-              placeholder="Share your thoughts, questions, or ideas..."
-              rows={5}
-              className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong min-h-24"
-            />
-          </div>
-
-          {/* Grade Level + Subject row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">
-                Grade Level{" "}
-                <span className="text-muted font-normal">(optional)</span>
-              </label>
-              <select
-                value={newGrade}
-                onChange={(e) => setNewGrade(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus-ring cursor-pointer hover:border-border-strong"
-              >
-                <option value="">Any grade</option>
-                {GRADE_LEVELS.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">
-                Subject{" "}
-                <span className="text-muted font-normal">(optional)</span>
-              </label>
-              <select
-                value={newSubject}
-                onChange={(e) => setNewSubject(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus-ring cursor-pointer hover:border-border-strong"
-              >
-                <option value="">Any subject</option>
-                {SUBJECTS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-1.5">
-              Tags <span className="text-muted font-normal">(optional)</span>
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {TAG_OPTIONS.map((tag) => (
-                <Tag
-                  key={tag}
-                  label={tag}
-                  selected={newTags.includes(tag)}
-                  onToggle={() =>
-                    setNewTags((prev) =>
-                      prev.includes(tag)
-                        ? prev.filter((t) => t !== tag)
-                        : [...prev, tag]
-                    )
-                  }
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Error */}
-          {formError && (
-            <p className="text-sm text-error-500">{formError}</p>
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={resetForm}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreateThread}
-              isLoading={submitting}
-              disabled={!newTitle.trim() || !newContent.trim()}
-            >
-              Post Discussion
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

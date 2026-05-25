@@ -86,6 +86,11 @@ export async function getJob(id: string): Promise<Job | null> {
   return { id: snap.id, ...(snap.data() as Omit<Job, "id">) };
 }
 
+export async function deactivateJob(id: string): Promise<void> {
+  if (!db) return;
+  await updateDoc(doc(db, "jobs", id), { isActive: false });
+}
+
 export interface JobFilters {
   gradeLevel?: string;
   subject?: string;

@@ -25,6 +25,7 @@ const TYPE_ICON: Record<NotificationType, string> = {
   upvote: "⬆️",
   "badge-earned": "🏅",
   "resource-liked": "❤️",
+  mention: "@",
 };
 
 // ---------------------------------------------------------------------------
@@ -38,9 +39,17 @@ export default function NotificationDropdown() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [markingAll, setMarkingAll] = useState(false);
+  // Tracks when the dropdown was last opened — used to reset the badge count
+  const [lastSeenAt, setLastSeenAt] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // Badge count: only unread notifications that arrived after the dropdown was last opened
+  const unreadCount = notifications.filter(
+    (n) => !n.read && (n.createdAt?.seconds ?? 0) * 1000 > lastSeenAt
+  ).length;
+  // Keep a ref so the open-effect can read it without adding it to deps
+  const unreadCountRef = useRef(unreadCount);
+  unreadCountRef.current = unreadCount;
 
   // Real-time listener - only runs when user is logged in
   useEffect(() => {
@@ -48,9 +57,16 @@ export default function NotificationDropdown() {
       setNotifications([]);
       return;
     }
-    const unsub = subscribeToNotifications(user.uid, 20, setNotifications);
+    const unsub = subscribeToNotifications(user.uid, 5, setNotifications);
     return unsub;
   }, [user]);
+
+  // Reset the badge count when the dropdown is opened (record current time)
+  useEffect(() => {
+    if (!open) return;
+    setLastSeenAt(Date.now());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Close on outside click
   useEffect(() => {
@@ -74,14 +90,15 @@ export default function NotificationDropdown() {
     return () => document.removeEventListener("keydown", handleKey);
   }, [open]);
 
-  async function handleNotificationClick(n: Notification) {
-    setOpen(false);
+  function handleNotificationClick(n: Notification) {
+    // Mark this individual notification as read
     if (!n.read && user) {
-      await markAsRead(user.uid, n.id).catch(console.error);
+      markAsRead(user.uid, n.id).catch(console.error);
       setNotifications((prev) =>
-        prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
+        prev.map((item) => item.id === n.id ? { ...item, read: true } : item)
       );
     }
+    setOpen(false);
     router.push(n.linkURL);
   }
 
@@ -107,7 +124,7 @@ export default function NotificationDropdown() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative rounded-lg p-2 text-muted hover:bg-surface-hover hover:text-foreground transition-colors cursor-pointer"
+        className="relative rounded-lg p-2 transition-colors cursor-pointer hover:bg-surface-hover text-foreground"
         aria-label="Notifications"
         aria-expanded={open}
         aria-haspopup="true"
@@ -127,8 +144,8 @@ export default function NotificationDropdown() {
         </svg>
         {/* Unread badge */}
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-white text-[10px] font-bold leading-none">
-            {unreadCount > 9 ? "9+" : unreadCount}
+          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error-500 text-white text-[10px] font-bold leading-none">
+            {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
@@ -138,18 +155,11 @@ export default function NotificationDropdown() {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-xl border border-border bg-surface shadow-xl z-50 overflow-hidden"
+          className="fixed left-4 right-4 top-14 rounded-xl border border-border bg-surface shadow-xl z-50 overflow-hidden sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <h2 className="text-sm font-semibold text-foreground">
-              Notifications
-              {unreadCount > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center h-5 min-w-5 rounded-full bg-error text-white text-[10px] font-bold px-1">
-                  {unreadCount}
-                </span>
-              )}
-            </h2>
+            <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
             {unreadCount > 0 && (
               <button
                 type="button"
@@ -163,7 +173,7 @@ export default function NotificationDropdown() {
           </div>
 
           {/* List */}
-          <div className="max-h-105 overflow-y-auto">
+          <div className="overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="py-12 text-center">
                 <p className="text-3xl mb-2">🔔</p>
@@ -217,15 +227,15 @@ export default function NotificationDropdown() {
             )}
           </div>
 
-          {/* Footer */}
+          {/* Footer — always show when there are notifications */}
           {notifications.length > 0 && (
             <div className="border-t border-border px-4 py-2.5 text-center">
               <Link
-                href="/profile"
+                href="/notifications"
                 onClick={() => setOpen(false)}
                 className="text-xs text-primary hover:underline"
               >
-                View profile & activity
+                View all notifications
               </Link>
             </div>
           )}
