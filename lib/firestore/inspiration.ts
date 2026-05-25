@@ -48,7 +48,7 @@ export interface InspirationItem {
   sourceURL: string;
   thumbnailURL: string | null;
   creator: string; // name of creator / publication / source
-  submittedBy: string | null; // uid — null for seeded/admin content
+  submittedBy: string | null; // uid - null for seeded/admin content
   createdAt: Timestamp | null;
   isApproved: boolean;
 }

@@ -46,7 +46,7 @@ export default function JobDetailPage({
             const profile = await getUser(j.postedBy);
             setPoster(profile);
           } catch {
-            // poster profile unavailable — non-critical
+            // poster profile unavailable - non-critical
           }
         }
       })

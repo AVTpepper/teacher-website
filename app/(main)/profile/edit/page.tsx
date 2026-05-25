@@ -74,7 +74,7 @@ export default function EditProfilePage() {
           setPhotoURL(user!.photoURL || null);
         }
       } catch {
-        // Firestore may not be configured yet — just pre-fill from auth
+        // Firestore may not be configured yet - just pre-fill from auth
         setDisplayName(user!.displayName || "");
         setPhotoURL(user!.photoURL || null);
       } finally {
@@ -125,8 +125,8 @@ export default function EditProfilePage() {
       // Upload photo if a new one was selected
       if (photoFile) {
         if (!storage) {
-          // Storage not activated — skip upload, keep existing photo
-          console.warn("Firebase Storage not activated — skipping photo upload");
+          // Storage not activated - skip upload, keep existing photo
+          console.warn("Firebase Storage not activated - skipping photo upload");
         } else {
           const storageRef = ref(
             storage,
@@ -227,7 +227,7 @@ export default function EditProfilePage() {
             >
               {currentPhoto ? "Change Photo" : "Upload Photo"}
             </Button>
-            <p className="mt-1 text-xs text-muted">JPG, PNG, GIF — max 5 MB</p>
+            <p className="mt-1 text-xs text-muted">JPG, PNG, GIF - max 5 MB</p>
           </div>
           <input
             ref={fileInputRef}

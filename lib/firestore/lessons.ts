@@ -116,7 +116,7 @@ export async function getPublicLessons(
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  // Only equality where() filters — no composite index required.
+  // Only equality where() filters - no composite index required.
   // orderBy is done client-side to avoid needing a composite index.
   const constraints: QueryConstraint[] = [
     where("isPublic", "==", true),
@@ -148,7 +148,7 @@ export async function getLessonsByAuthor(
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  // Single equality where() — no composite index required.
+  // Single equality where() - no composite index required.
   // Filtering by isPublic and sorting are done client-side.
   const q = query(
     collection(db, "lessons"),

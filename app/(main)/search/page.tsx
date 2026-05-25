@@ -186,7 +186,7 @@ function SectionHeading({ label, count }: { label: string; count: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Inner search page (needs useSearchParams — must be inside Suspense)
+// Inner search page (needs useSearchParams - must be inside Suspense)
 // ---------------------------------------------------------------------------
 
 function SearchInner() {
@@ -408,7 +408,7 @@ function SearchInner() {
 }
 
 // ---------------------------------------------------------------------------
-// Page export — wraps inner in Suspense (required for useSearchParams)
+// Page export - wraps inner in Suspense (required for useSearchParams)
 // ---------------------------------------------------------------------------
 
 export default function SearchPage() {

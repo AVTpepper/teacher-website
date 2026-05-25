@@ -115,7 +115,7 @@ export default function UploadResourcePage() {
         fileURL = await getDownloadURL(storageRef);
         fileName = file.name;
       } else if (file && !storage) {
-        console.warn("Firebase Storage not activated — skipping file upload");
+        console.warn("Firebase Storage not activated - skipping file upload");
       }
 
       const id = await createResource({

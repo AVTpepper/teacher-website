@@ -56,7 +56,7 @@ function notifCollection(recipientId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// createNotification — write a new notification for a user
+// createNotification - write a new notification for a user
 // ---------------------------------------------------------------------------
 
 export async function createNotification(
@@ -75,7 +75,7 @@ export async function createNotification(
 }
 
 // ---------------------------------------------------------------------------
-// getNotifications — fetch the most recent N notifications for a user
+// getNotifications - fetch the most recent N notifications for a user
 // ---------------------------------------------------------------------------
 
 export async function getNotifications(
@@ -96,7 +96,7 @@ export async function getNotifications(
 }
 
 // ---------------------------------------------------------------------------
-// subscribeToNotifications — real-time listener (returns unsubscribe fn)
+// subscribeToNotifications - real-time listener (returns unsubscribe fn)
 // ---------------------------------------------------------------------------
 
 export function subscribeToNotifications(
@@ -120,7 +120,7 @@ export function subscribeToNotifications(
 }
 
 // ---------------------------------------------------------------------------
-// markAsRead — mark a single notification as read
+// markAsRead - mark a single notification as read
 // ---------------------------------------------------------------------------
 
 export async function markAsRead(
@@ -135,7 +135,7 @@ export async function markAsRead(
 }
 
 // ---------------------------------------------------------------------------
-// markAllAsRead — batch-mark all unread notifications as read
+// markAllAsRead - batch-mark all unread notifications as read
 // ---------------------------------------------------------------------------
 
 export async function markAllAsRead(recipientId: string): Promise<void> {

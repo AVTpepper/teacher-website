@@ -195,7 +195,7 @@ export async function getResourcesByAuthor(
 ): Promise<GetResourcesResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  // Single equality where() — uses Firestore auto single-field index, no composite needed.
+  // Single equality where() - uses Firestore auto single-field index, no composite needed.
   // Sort client-side to avoid needing a composite index.
   const q = query(
     collection(db, "resources"),
@@ -218,7 +218,7 @@ export async function trackDownload(
 ): Promise<void> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  // Record individual download (idempotent per user — overwrites)
+  // Record individual download (idempotent per user - overwrites)
   await setDoc(doc(db, "resources", resourceId, "downloads", userId), {
     downloadedAt: serverTimestamp(),
   });

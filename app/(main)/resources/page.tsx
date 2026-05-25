@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -190,7 +190,7 @@ export default function ResourcesPage() {
             Resource Library
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Browse, share, and download teaching resources — lesson plans,
+            Browse, share, and download teaching resources - lesson plans,
             worksheets, strategies, and more.
           </p>
         </div>
@@ -220,7 +220,7 @@ export default function ResourcesPage() {
       <Card className="mb-8">
         <div className="flex flex-col gap-4">
           <Input
-            placeholder="Search resources by title, description, or tags…"
+            placeholder="Search resources by title, description, or tags�"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             icon={
@@ -521,7 +521,7 @@ function ResourceCard({ resource }: { resource: Resource }) {
           {resource.gradeLevel && (
             <span className="truncate">{resource.gradeLevel}</span>
           )}
-          {resource.gradeLevel && resource.subject && <span>·</span>}
+          {resource.gradeLevel && resource.subject && <span>�</span>}
           {resource.subject && (
             <span className="truncate">{resource.subject}</span>
           )}

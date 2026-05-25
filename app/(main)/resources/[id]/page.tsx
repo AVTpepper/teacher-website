@@ -85,7 +85,7 @@ export default function ResourceDetailPage({
         setLocalDownloadCount(res.downloadCount);
         setLocalSavedCount(res.savedByCount);
 
-        // Load author, comments, related in parallel — failures are non-fatal
+        // Load author, comments, related in parallel - failures are non-fatal
         const [authorData] = await Promise.all([
           getUser(res.authorId).catch(() => null),
           loadComments().catch(() => {}),

@@ -265,7 +265,7 @@ export async function getThreadsByAuthor(
   if (!db) throw new Error("Firestore is not initialized");
 
   // collectionGroup queries all 'threads' subcollections across every category.
-  // Single equality where() uses the auto single-field index — no composite needed.
+  // Single equality where() uses the auto single-field index - no composite needed.
   // Sort client-side to avoid orderBy composite index requirement.
   const q = query(
     collectionGroup(db, "threads"),

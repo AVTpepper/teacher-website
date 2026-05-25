@@ -18,12 +18,12 @@ const COLOR_CLASSES: Record<BadgeDefinition["color"], string> = {
 };
 
 // ---------------------------------------------------------------------------
-// BadgeIcon — renders a single badge pill or compact icon
+// BadgeIcon - renders a single badge pill or compact icon
 //
 // Props:
-//   badgeId  — the badge ID string (e.g. "resource-creator")
-//   compact  — if true, renders icon-only (no label) — good for comment lines
-//   className — extra classes
+//   badgeId  - the badge ID string (e.g. "resource-creator")
+//   compact  - if true, renders icon-only (no label) - good for comment lines
+//   className - extra classes
 // ---------------------------------------------------------------------------
 
 interface BadgeIconProps {
@@ -45,7 +45,7 @@ export default function BadgeIcon({
   if (compact) {
     return (
       <span
-        title={`${badge.label} — ${badge.description}`}
+        title={`${badge.label} - ${badge.description}`}
         aria-label={badge.label}
         className={`inline-flex items-center justify-center w-5 h-5 rounded-full border text-xs cursor-default ${colors} ${className}`}
       >
@@ -67,7 +67,7 @@ export default function BadgeIcon({
 }
 
 // ---------------------------------------------------------------------------
-// BadgeList — renders a row of badge icons for a profile
+// BadgeList - renders a row of badge icons for a profile
 // ---------------------------------------------------------------------------
 
 interface BadgeListProps {

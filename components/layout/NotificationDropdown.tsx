@@ -42,7 +42,7 @@ export default function NotificationDropdown() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // Real-time listener — only runs when user is logged in
+  // Real-time listener - only runs when user is logged in
   useEffect(() => {
     if (!user) {
       setNotifications([]);

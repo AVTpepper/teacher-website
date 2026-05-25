@@ -125,7 +125,7 @@ export async function getPostsByAuthor(
 ): Promise<GetPostsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  // Single equality where() — uses Firestore auto single-field index, no composite needed.
+  // Single equality where() - uses Firestore auto single-field index, no composite needed.
   // Sort client-side to avoid needing a composite index.
   const q = query(
     collection(db, "posts"),

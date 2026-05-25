@@ -49,7 +49,7 @@ export default function Navbar() {
             EduConnect
           </Link>
 
-          {/* Search — hidden on mobile, shown md+ */}
+          {/* Search - hidden on mobile, shown md+ */}
           <div className="hidden md:block flex-1 max-w-md mx-4">
             <SearchBar
               placeholder="Search educators, resources, discussions..."
@@ -169,10 +169,10 @@ export default function Navbar() {
       </div>
     </header>
 
-    {/* Mobile menu — rendered outside header to avoid stacking context issues */}
+    {/* Mobile menu - rendered outside header to avoid stacking context issues */}
     {mobileMenuOpen && (
       <div className="fixed inset-0 top-14 z-40 lg:hidden">
-        {/* Backdrop overlay — below header */}
+        {/* Backdrop overlay - below header */}
         <div
           className="absolute inset-0 bg-black/40"
           onClick={() => setMobileMenuOpen(false)}
