@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import type { LessonStep } from "@/lib/firestore/lessons";
-import { GRADE_LEVELS } from "@/lib/firestore/users";
+import { SPECIFIC_GRADE_LEVELS } from "@/lib/constants";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 
@@ -16,12 +16,16 @@ export type LessonFormState = {
   objectives: string[];
   materials: string[];
   steps: LessonStep[];
+  checkForUnderstanding: string[];
+  assessments: string[];
 };
 
 export type ApplySuggestionPayload =
   | { field: "objectives"; items: string[] }
   | { field: "materials"; items: string[] }
   | { field: "steps"; items: LessonStep[] }
+  | { field: "checkForUnderstanding"; items: string[] }
+  | { field: "assessments"; items: string[] }
   | {
       field: "all";
       lesson: {
@@ -29,10 +33,12 @@ export type ApplySuggestionPayload =
         objectives: string[];
         materials: string[];
         steps: LessonStep[];
+        checkForUnderstanding: string[];
+        assessments: string[];
       };
     };
 
-type SuggestSection = "objectives" | "materials" | "steps";
+type SuggestSection = "objectives" | "materials" | "steps" | "checkForUnderstanding" | "assessments";
 
 type AIAssistantPanelProps = {
   isOpen: boolean;
@@ -41,10 +47,11 @@ type AIAssistantPanelProps = {
   lessonFormState: LessonFormState;
   onApplySuggestion: (payload: ApplySuggestionPayload) => void;
   onGetToken: () => Promise<string>;
+  onHighlightBasicInfo: () => void;
   // US-04: Per-section suggestions
   activeSuggestSection: SuggestSection | null;
   isSuggesting: boolean;
-  suggestionItems: string[] | null;
+  suggestionItems: string[] | Array<{ title: string; description: string; duration?: string }> | null;
   suggestionError: string;
   onDismissSuggestion: () => void;
   // US-07: Usage tracking
@@ -71,6 +78,8 @@ function sectionLabel(section: SuggestSection | null): string {
   if (section === "objectives") return "Objectives";
   if (section === "materials") return "Materials";
   if (section === "steps") return "Steps";
+  if (section === "checkForUnderstanding") return "Check for Understanding";
+  if (section === "assessments") return "Assessments";
   return "";
 }
 
@@ -81,6 +90,7 @@ export default function AIAssistantPanel({
   lessonFormState,
   onApplySuggestion,
   onGetToken,
+  onHighlightBasicInfo,
   activeSuggestSection,
   isSuggesting,
   suggestionItems,
@@ -103,7 +113,9 @@ export default function AIAssistantPanel({
     title: string;
     objectives: string[];
     materials: string[];
-    steps: string[];
+    steps: Array<{ title: string; description: string; duration?: string }>;
+    checkForUnderstanding: string[];
+    assessments: string[];
   } | null>(null);
 
   async function handleGenerate(e: React.FormEvent) {
@@ -154,7 +166,7 @@ export default function AIAssistantPanel({
       if (typeof remField === "number") onRemainingUpdate(remField);
       else if (remField === null) onRemainingUpdate(null);
 
-      const lesson = (data as { lesson: { title: string; objectives: string[]; materials: string[]; steps: string[] } }).lesson;
+      const lesson = (data as { lesson: { title: string; objectives: string[]; materials: string[]; steps: Array<{ title: string; description: string; duration?: string }>; checkForUnderstanding: string[]; assessments: string[] } }).lesson;
 
       if (isFormEmpty(lessonFormState)) {
         applyLesson(lesson);
@@ -192,25 +204,24 @@ export default function AIAssistantPanel({
     title: string;
     objectives: string[];
     materials: string[];
-    steps: string[];
+    steps: Array<{ title: string; description: string; duration?: string }>;
+    checkForUnderstanding: string[];
+    assessments: string[];
   }) {
-    // API returns steps as strings; map each to a LessonStep shape
-    const mappedSteps: LessonStep[] = lesson.steps.map((s) => ({
-      title: s,
-      description: "",
-    }));
     onApplySuggestion({
       field: "all",
       lesson: {
         title: lesson.title,
         objectives: lesson.objectives,
         materials: lesson.materials,
-        steps: mappedSteps,
+        steps: lesson.steps,
+        checkForUnderstanding: lesson.checkForUnderstanding,
+        assessments: lesson.assessments,
       },
     });
   }
 
-  // Close on Escape key — focus is returned by the parent via useEffect on isOpen
+  // Close on Escape key - focus is returned by the parent via useEffect on isOpen
   useEffect(() => {
     if (!isOpen) return;
 
@@ -233,10 +244,10 @@ export default function AIAssistantPanel({
 
   return (
     <>
-      {/* Mobile backdrop — fades in/out behind the panel, below the navbar */}
+      {/* Mobile backdrop - fades in/out behind the panel, below the navbar */}
       <div
         className={[
-          "fixed inset-x-0 bottom-0 top-16 z-20 bg-black/40 md:hidden transition-opacity duration-300",
+          "fixed inset-x-0 bottom-0 top-14 z-20 bg-black/40 md:hidden transition-opacity duration-300",
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none",
         ].join(" ")}
         aria-hidden="true"
@@ -256,12 +267,12 @@ export default function AIAssistantPanel({
           // Base
           "flex flex-col bg-surface border-border outline-none",
           "transition-all duration-300 ease-in-out",
-          // Mobile: overlay below the navbar (top-16 = 64px clears the nav bar)
-          "fixed inset-x-0 bottom-0 top-16 z-30",
+          // Mobile: overlay below the navbar (top-14 = 56px matches navbar h-14)
+          "fixed inset-x-0 bottom-0 top-14 z-30",
           isOpen ? "translate-x-0" : "translate-x-full",
           // Desktop: in-flow sidebar with animated width
           "md:relative md:inset-auto md:z-auto md:translate-x-0",
-          "md:rounded-lg md:border md:shadow-sm md:self-start md:sticky md:top-20",
+          "md:rounded-lg md:border md:shadow-sm md:self-start md:sticky md:top-22",
           isOpen ? "md:w-80 md:opacity-100" : "md:w-0 md:opacity-0 md:overflow-hidden",
         ].join(" ")}
       >
@@ -299,7 +310,7 @@ export default function AIAssistantPanel({
         {/* Panel body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {!isAvailable ? (
-            /* Unavailable notice — shown when OPENAI_API_KEY is absent */
+            /* Unavailable notice - shown when OPENAI_API_KEY is absent */
             <div
               role="status"
               className="rounded-lg border border-warning-500/30 bg-warning-50 px-4 py-4 text-sm text-warning-700"
@@ -320,8 +331,8 @@ export default function AIAssistantPanel({
                     Generate Full Lesson
                   </h3>
 
-                  {/* Context pills — read-only form values */}
-                  <div className="flex flex-wrap gap-1.5 mb-3">
+                  {/* Context pills - read-only form values */}
+                  <div className="flex flex-wrap gap-1.5 mb-1">
                     {lessonFormState.gradeLevel ? (
                       <span className="inline-flex items-center rounded-full bg-secondary-100 px-2.5 py-0.5 text-xs text-secondary-700">
                         {lessonFormState.gradeLevel}
@@ -341,6 +352,22 @@ export default function AIAssistantPanel({
                       </span>
                     )}
                   </div>
+                  <p className="text-xs text-muted mb-3">
+                    To change grade or subject, update the{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // On mobile the panel is a full-screen overlay - close it first
+                        // so the user can see the form fields being highlighted
+                        if (window.innerWidth < 768) onToggle();
+                        onHighlightBasicInfo();
+                      }}
+                      className="font-medium text-primary-700 underline underline-offset-2 hover:text-primary-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded cursor-pointer"
+                    >
+                      Basic Info
+                    </button>
+                    {" "}section.
+                  </p>
 
                   {/* Topic input */}
                   <label
@@ -372,13 +399,13 @@ export default function AIAssistantPanel({
                 {/* US-08: Plus tier controls / Free upgrade notice */}
                 {userTier === "plus" ? (
                   <div className="space-y-3">
-                    {/* Grade Level Override */}
+                    {/* Specific Grade Level (Plus only) */}
                     <div>
                       <label
                         htmlFor="ai-grade-override"
                         className="block text-xs font-medium text-foreground mb-1"
                       >
-                        Grade Level Override
+                        Specific Grade
                       </label>
                       <select
                         id="ai-grade-override"
@@ -388,7 +415,7 @@ export default function AIAssistantPanel({
                         className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50"
                       >
                         <option value="">Use form grade level</option>
-                        {GRADE_LEVELS.map((g) => (
+                        {SPECIFIC_GRADE_LEVELS.map((g) => (
                           <option key={g} value={g}>
                             {g}
                           </option>
@@ -540,10 +567,22 @@ export default function AIAssistantPanel({
                   {!isSuggesting && suggestionItems && suggestionItems.length > 0 && (
                     <>
                       <ul className="space-y-1.5" aria-label={`Suggested ${sectionLabel(activeSuggestSection)}`}>
-                        {suggestionItems.map((item, i) => (
+                        {(suggestionItems as Array<string | { title: string; description: string; duration?: string }>).map((item, i) => (
                           <li key={i} className="flex items-start gap-2 text-sm text-foreground">
                             <span className="mt-0.5 shrink-0 text-muted" aria-hidden="true">•</span>
-                            <span>{item}</span>
+                            {typeof item === "string" ? (
+                              <span>{item}</span>
+                            ) : (
+                              <span>
+                                <span className="font-medium">{item.title}</span>
+                                {item.duration && (
+                                  <span className="text-xs text-muted ml-1">({item.duration})</span>
+                                )}
+                                {item.description && (
+                                  <span className="text-muted"> - {item.description}</span>
+                                )}
+                              </span>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -557,15 +596,21 @@ export default function AIAssistantPanel({
                             if (activeSuggestSection === "steps") {
                               onApplySuggestion({
                                 field: "steps",
-                                items: suggestionItems.map((s) => ({
-                                  title: s,
-                                  description: "",
+                                items: (suggestionItems as Array<{ title: string; description: string; duration?: string }>).map((s) => ({
+                                  title: typeof s === "string" ? s : s.title,
+                                  description: typeof s === "string" ? "" : s.description,
+                                  duration: typeof s === "string" ? undefined : s.duration,
                                 })),
+                              });
+                            } else if (activeSuggestSection === "checkForUnderstanding" || activeSuggestSection === "assessments") {
+                              onApplySuggestion({
+                                field: activeSuggestSection,
+                                items: suggestionItems as string[],
                               });
                             } else {
                               onApplySuggestion({
                                 field: activeSuggestSection,
-                                items: suggestionItems,
+                                items: suggestionItems as string[],
                               });
                             }
                             onDismissSuggestion();

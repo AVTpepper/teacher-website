@@ -39,7 +39,7 @@ function HomePageInner() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Capture the linked post ID once at mount — stays stable even after we strip the URL param
+  // Capture the linked post ID once at mount - stays stable even after we strip the URL param
   const [pinnedPostId] = useState<string | null>(() => searchParams.get("post"));
 
   const [posts, setPosts] = useState<Post[]>([]);
@@ -129,7 +129,7 @@ function HomePageInner() {
       {/* Create post (logged in only) */}
       {user && <CreatePost onPostCreated={() => loadPosts(true, typeFilter)} />}
 
-      {/* Shared / linked post — pinned below the create form */}
+      {/* Shared / linked post - pinned below the create form */}
       {pinnedPostId && (
         <div ref={sharedPostRef} className="scroll-mt-28">
           {sharedPostLoading ? (

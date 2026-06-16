@@ -293,7 +293,7 @@ function CommentItem({
             )}
           </div>
 
-          {/* Reply input — only shown inline when there are no existing replies yet */}
+          {/* Reply input - only shown inline when there are no existing replies yet */}
           {showReply && localReplies.length === 0 && (
             <div className="mt-2 flex gap-2">
               <MentionInput

@@ -1,4 +1,4 @@
-import type { NextRequest } from "next/server";
+﻿import type { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { createPublicKey, createVerify } from "crypto";
 
@@ -67,6 +67,7 @@ async function verifyFirebaseToken(token: string): Promise<string | null> {
 // check `request.auth.uid` will accept these calls.
 
 const FREE_DAILY_LIMIT = 10;
+const FREE_MONTHLY_REFINE_LIMIT = 20;
 
 function getUtcDateKey(): string {
   const now = new Date();
@@ -74,6 +75,13 @@ function getUtcDateKey(): string {
   const month = String(now.getUTCMonth() + 1).padStart(2, "0");
   const day = String(now.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getUtcMonthKey(): string {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
 }
 
 async function fsGet(
@@ -122,7 +130,7 @@ async function fsIncrementCount(
       cache: "no-store",
     });
   } catch {
-    // Non-critical — best-effort write
+    // Non-critical - best-effort write
   }
 }
 
@@ -148,9 +156,11 @@ function fsIntField(
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ValidSection = "objectives" | "materials" | "steps";
+type ValidSection = "objectives" | "materials" | "steps" | "checkForUnderstanding" | "assessments";
 
-import { GRADE_LEVELS as VALID_GRADE_LEVELS } from "@/lib/constants";
+import { GRADE_LEVELS as VALID_GRADE_LEVELS, SPECIFIC_GRADE_LEVELS } from "@/lib/constants";
+
+const ALL_VALID_GRADE_LEVELS = [...VALID_GRADE_LEVELS, ...SPECIFIC_GRADE_LEVELS] as readonly string[];
 
 interface GenerateBody {
   mode: "generate";
@@ -167,12 +177,25 @@ interface SuggestBody {
   subject: string;
   section: ValidSection;
   existingContent?: string[];
+  lessonContext?: {
+    objectives?: string[];
+    steps?: Array<{ title: string; description: string }>;
+  };
 }
 
-type RequestBody = GenerateBody | SuggestBody;
+interface RefineBody {
+  mode: "refine";
+  field: string;
+  content: string | string[] | Array<{ title: string; description: string; duration?: string }>;
+  instruction: string;
+  gradeLevel: string;
+  subject: string;
+}
+
+type RequestBody = GenerateBody | SuggestBody | RefineBody;
 
 // ─── OpenAI client (module-level lazy singleton) ──────────────────────────────
-// OPENAI_API_KEY is read exclusively from process.env — never exported to the client.
+// OPENAI_API_KEY is read exclusively from process.env - never exported to the client.
 
 let _openai: OpenAI | null | undefined; // undefined = not yet initialised
 
@@ -186,7 +209,7 @@ function getOpenAIClient(): OpenAI | null {
 // ─── Route Handler ────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest): Promise<Response> {
-  // 1. Auth guard — require a valid Firebase ID token in the Authorization header
+  // 1. Auth guard - require a valid Firebase ID token in the Authorization header
   const authHeader = request.headers.get("authorization");
   const token =
     authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
@@ -211,7 +234,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const userTier: "free" | "plus" =
     fsStringField(userDoc, "tier") === "plus" ? "plus" : "free";
 
-  // 2. OpenAI availability check — return 503, never crash
+  // 2. OpenAI availability check - return 503, never crash
   const openai = getOpenAIClient();
   if (!openai) {
     return Response.json(
@@ -241,14 +264,153 @@ export async function POST(request: NextRequest): Promise<Response> {
   const raw = rawBody as Record<string, unknown>;
 
   // 4. Validate common required fields
-  if (raw.mode !== "generate" && raw.mode !== "suggest") {
+  if (raw.mode !== "generate" && raw.mode !== "suggest" && raw.mode !== "refine") {
     return Response.json(
       {
         error:
-          'Field "mode" is required and must be "generate" or "suggest".',
+          'Field "mode" is required and must be "generate", "suggest", or "refine".',
       },
       { status: 400 },
     );
+  }
+
+  // ── Refine mode (fast path - separate limit, early return) ────────────────
+  if (raw.mode === "refine") {
+    // Validate instruction
+    if (
+      !raw.instruction ||
+      typeof raw.instruction !== "string" ||
+      !raw.instruction.trim()
+    ) {
+      return Response.json(
+        { error: 'Field "instruction" is required and must be a non-empty string.' },
+        { status: 400 },
+      );
+    }
+    if ((raw.instruction as string).length > 300) {
+      return Response.json(
+        { error: 'Field "instruction" must be 300 characters or fewer.' },
+        { status: 400 },
+      );
+    }
+    if (!raw.field || typeof raw.field !== "string" || !raw.field.trim()) {
+      return Response.json(
+        { error: 'Field "field" is required and must be a non-empty string.' },
+        { status: 400 },
+      );
+    }
+    if (raw.content === undefined || raw.content === null) {
+      return Response.json(
+        { error: 'Field "content" is required.' },
+        { status: 400 },
+      );
+    }
+    if (!raw.gradeLevel || typeof raw.gradeLevel !== "string") {
+      return Response.json(
+        { error: 'Field "gradeLevel" is required.' },
+        { status: 400 },
+      );
+    }
+    if (!raw.subject || typeof raw.subject !== "string") {
+      return Response.json(
+        { error: 'Field "subject" is required.' },
+        { status: 400 },
+      );
+    }
+
+    // Monthly refine limit (free tier only)
+    const monthKey = getUtcMonthKey();
+    let currentRefineCount = 0;
+    if (userTier === "free") {
+      const refineDoc = await fsGet(`users/${uid}/aiRefineUsage/${monthKey}`, token);
+      currentRefineCount = fsIntField(refineDoc, "count");
+      if (currentRefineCount >= FREE_MONTHLY_REFINE_LIMIT) {
+        return Response.json(
+          {
+            error: "You've reached your monthly refine limit (20). Upgrade to Plus for unlimited refines.",
+            remainingRefines: 0,
+          },
+          { status: 429 },
+        );
+      }
+    }
+
+    // Build refine prompt
+    const instruction = (raw.instruction as string).trim();
+    const field = raw.field as string;
+    const contentJson = JSON.stringify(raw.content);
+    const gradeLevel = raw.gradeLevel as string;
+    const subject = raw.subject as string;
+
+    const isStepsField = field === "steps";
+    const stepStructureHint = isStepsField
+      ? ' Return a JSON array of objects with shape {"title":"...","description":"...","duration":"..."}. '
+      : " Return a JSON array of strings. ";
+
+    const refineSystemPrompt = `You are an expert educator. You will be given the current content of a lesson plan section and an instruction describing how to change it. Apply the instruction and return only the revised content as a JSON object: {"refined": <array>}.${stepStructureHint}No markdown, no code fences, no explanation.`;
+    const refineUserMessage = `Grade Level: ${gradeLevel}\nSubject: ${subject}\nSection: ${field}\nCurrent content: ${contentJson}\nInstruction: ${instruction}`;
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: refineSystemPrompt },
+          { role: "user", content: refineUserMessage },
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" },
+      });
+
+      const rawContent = completion.choices[0]?.message?.content;
+      if (!rawContent) {
+        return Response.json(
+          { error: "The AI returned an empty response. Please try again." },
+          { status: 502 },
+        );
+      }
+
+      let parsed: unknown;
+      try { parsed = JSON.parse(rawContent); } catch {
+        return Response.json(
+          { error: "The AI returned an unreadable response. Please try again." },
+          { status: 502 },
+        );
+      }
+
+      const data = parsed as Record<string, unknown>;
+      if (!Array.isArray(data.refined)) {
+        return Response.json(
+          { error: "The AI returned an unexpected format. Please try again." },
+          { status: 502 },
+        );
+      }
+
+      // Increment monthly refine counter (free tier, best-effort)
+      if (userTier === "free") {
+        fsIncrementCount(`users/${uid}/aiRefineUsage/${monthKey}`, token).catch(() => {});
+      }
+
+      const remainingRefines: number | null =
+        userTier === "free"
+          ? Math.max(0, FREE_MONTHLY_REFINE_LIMIT - (currentRefineCount + 1))
+          : null;
+
+      return Response.json({ refined: data.refined, remainingRefines });
+    } catch (err: unknown) {
+      if (err && typeof err === "object") {
+        const status = "status" in err ? (err as { status: number }).status : undefined;
+        if (status === 429) {
+          return Response.json(
+            { error: "AI service is currently busy. Please wait and try again." },
+            { status: 429 },
+          );
+        }
+      }
+      return Response.json(
+        { error: "Something went wrong. Please try again." },
+        { status: 500 },
+      );
+    }
   }
 
   if (
@@ -312,9 +474,9 @@ export async function POST(request: NextRequest): Promise<Response> {
           { status: 400 },
         );
       }
-      if (!(VALID_GRADE_LEVELS as readonly string[]).includes(raw.gradeLevelOverride)) {
+      if (!ALL_VALID_GRADE_LEVELS.includes(raw.gradeLevelOverride)) {
         return Response.json(
-          { error: `Field "gradeLevelOverride" must be one of: ${VALID_GRADE_LEVELS.join(", ")}.` },
+          { error: `Field "gradeLevelOverride" must be a valid grade level.` },
           { status: 400 },
         );
       }
@@ -338,6 +500,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       "objectives",
       "materials",
       "steps",
+      "checkForUnderstanding",
+      "assessments",
     ];
     if (
       !raw.section ||
@@ -347,7 +511,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       return Response.json(
         {
           error:
-            'Field "section" is required for mode "suggest" and must be "objectives", "materials", or "steps".',
+            'Field "section" is required for mode "suggest" and must be "objectives", "materials", "steps", "checkForUnderstanding", or "assessments".',
         },
         { status: 400 },
       );
@@ -381,7 +545,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   const body = raw as unknown as RequestBody;
 
-  // 5a. Enforce free-tier daily limit (server-side — cannot be bypassed by the client)
+  // 5a. Enforce free-tier daily limit (server-side - cannot be bypassed by the client)
   const dateKey = getUtcDateKey();
   let currentCount = 0;
   if (userTier === "free") {
@@ -407,11 +571,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     systemPrompt = `You are an expert educator. Given a topic, grade level, and subject, return a complete lesson plan as a single JSON object with exactly this structure:
 {
   "title": "<string>",
+  "duration": "<total lesson duration, e.g. 45 minutes or 2 class periods>",
   "objectives": ["<string>"],
   "materials": ["<string>"],
-  "steps": ["<string>"]
+  "steps": [{"title": "<step title>", "description": "<1-2 sentence description of what happens in this step>", "duration": "<e.g. 5 minutes>"}],
+  "checkForUnderstanding": ["<question or activity to check student comprehension>"],
+  "assessments": ["<assessment method or task>"]
 }
-Return only the raw JSON object — no markdown, no code fences, no explanation.`;
+Return only the raw JSON object - no markdown, no code fences, no explanation.`;
 
     // Use gradeLevelOverride (plus-tier only) if provided, otherwise fall back to gradeLevel
     const effectiveGradeLevel =
@@ -428,20 +595,41 @@ Subject: ${body.subject}`;
       userMessage += `\nAdditional context: ${body.description.trim()}`;
     }
   } else {
-    systemPrompt = `You are an expert educator. Given a lesson section name and its current content, return improved or alternative items for that section as a JSON object with exactly this structure:
+    const sb = body as SuggestBody;
+    const existing =
+      sb.existingContent && sb.existingContent.length > 0
+        ? JSON.stringify(sb.existingContent)
+        : "(none provided)";
+
+    if (sb.section === "steps") {
+      systemPrompt = `You are an expert educator. Given existing lesson steps, return improved or alternative steps as a JSON object with exactly this structure:
+{
+  "suggestions": [{"title": "<step title>", "description": "<1-2 sentence description of what happens in this step>", "duration": "<e.g. 5 minutes>"}]
+}
+Return only the raw JSON object - no markdown, no code fences, no explanation.`;
+    } else if (sb.section === "checkForUnderstanding") {
+      systemPrompt = `You are an expert educator. Return check-for-understanding questions or activities as a JSON object with exactly this structure:
+{
+  "suggestions": ["<question or activity>"]
+}
+Return only the raw JSON object - no markdown, no code fences, no explanation.`;
+    } else if (sb.section === "assessments") {
+      systemPrompt = `You are an expert educator. Return suggested assessment methods or tasks as a JSON object with exactly this structure:
+{
+  "suggestions": ["<assessment description>"]
+}
+Return only the raw JSON object - no markdown, no code fences, no explanation.`;
+    } else {
+      systemPrompt = `You are an expert educator. Given a lesson section name and its current content, return improved or alternative items for that section as a JSON object with exactly this structure:
 {
   "suggestions": ["<string>", "<string>"]
 }
-Return only the raw JSON object — no markdown, no code fences, no explanation.`;
+Return only the raw JSON object - no markdown, no code fences, no explanation.`;
+    }
 
-    const existing =
-      body.existingContent && body.existingContent.length > 0
-        ? JSON.stringify(body.existingContent)
-        : "(none provided)";
-
-    userMessage = `Improve the "${body.section}" section for:
-Grade Level: ${body.gradeLevel}
-Subject: ${body.subject}
+    userMessage = `Improve the "${sb.section}" section for:
+Grade Level: ${sb.gradeLevel}
+Subject: ${sb.subject}
 Current content: ${existing}`;
   }
 
@@ -482,7 +670,16 @@ Current content: ${existing}`;
         typeof lesson.title !== "string" ||
         !Array.isArray(lesson.objectives) ||
         !Array.isArray(lesson.materials) ||
-        !Array.isArray(lesson.steps)
+        !Array.isArray(lesson.steps) ||
+        !(lesson.steps as unknown[]).every(
+          (s) =>
+            s !== null &&
+            typeof s === "object" &&
+            typeof (s as Record<string, unknown>).title === "string" &&
+            typeof (s as Record<string, unknown>).description === "string",
+        ) ||
+        !Array.isArray(lesson.checkForUnderstanding) ||
+        !Array.isArray(lesson.assessments)
       ) {
         return Response.json(
           {
@@ -501,7 +698,9 @@ Current content: ${existing}`;
           title: lesson.title,
           objectives: lesson.objectives as string[],
           materials: lesson.materials as string[],
-          steps: lesson.steps as string[],
+          steps: lesson.steps as Array<{ title: string; description: string; duration?: string }>,
+          checkForUnderstanding: lesson.checkForUnderstanding as string[],
+          assessments: lesson.assessments as string[],
         },
         remainingRequests:
           userTier === "free"
@@ -532,7 +731,7 @@ Current content: ${existing}`;
       });
     }
   } catch (err: unknown) {
-    // Map all OpenAI SDK errors to safe, human-readable messages — no raw objects in responses
+    // Map all OpenAI SDK errors to safe, human-readable messages - no raw objects in responses
     if (err && typeof err === "object") {
       const status =
         "status" in err ? (err as { status: number }).status : undefined;
@@ -571,7 +770,7 @@ Current content: ${existing}`;
   }
 }
 
-// ─── GET /api/ai/lesson — usage check ────────────────────────────────────────
+// ─── GET /api/ai/lesson - usage check ────────────────────────────────────────
 // Returns today's usage for the authenticated user: { tier, used, limit, remainingRequests }
 
 export async function GET(request: NextRequest): Promise<Response> {
@@ -594,18 +793,23 @@ export async function GET(request: NextRequest): Promise<Response> {
     );
   }
 
+  const monthKey = getUtcMonthKey();
   const dateKey = getUtcDateKey();
-  const [userDoc, usageDoc] = await Promise.all([
+  const [userDoc, usageDoc, refineDoc] = await Promise.all([
     fsGet(`users/${uid}`, token),
     fsGet(`users/${uid}/aiUsage/${dateKey}`, token),
+    fsGet(`users/${uid}/aiRefineUsage/${monthKey}`, token),
   ]);
 
   const tier: "free" | "plus" =
     fsStringField(userDoc, "tier") === "plus" ? "plus" : "free";
   const used = fsIntField(usageDoc, "count");
+  const usedRefines = fsIntField(refineDoc, "count");
   const limit: number | null = tier === "plus" ? null : FREE_DAILY_LIMIT;
   const remainingRequests: number | null =
     tier === "plus" ? null : Math.max(0, FREE_DAILY_LIMIT - used);
+  const remainingRefines: number | null =
+    tier === "plus" ? null : Math.max(0, FREE_MONTHLY_REFINE_LIMIT - usedRefines);
 
-  return Response.json({ tier, used, limit, remainingRequests });
+  return Response.json({ tier, used, limit, remainingRequests, remainingRefines });
 }

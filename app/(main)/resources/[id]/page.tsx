@@ -65,7 +65,7 @@ export default function ResourceDetailPage({
         setLocalDownloadCount(res.downloadCount);
         setLocalSavedCount(res.savedByCount);
 
-        // Load author + related in parallel — failures are non-fatal
+        // Load author + related in parallel - failures are non-fatal
         const [authorData] = await Promise.all([
           getUser(res.authorId).catch(() => null),
           getRelatedResources(res).then(setRelated).catch(() => {}),
@@ -492,7 +492,7 @@ export default function ResourceDetailPage({
         </div>
       </div>
 
-      {/* Mobile sticky action bar — logged-in only */}
+      {/* Mobile sticky action bar - logged-in only */}
       {user && (
         <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-surface/95 backdrop-blur-sm border-t border-border px-4 py-3 flex items-center gap-2">
           <Button onClick={handleDownload} className="flex-1 justify-center">

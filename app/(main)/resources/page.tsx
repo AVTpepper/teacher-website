@@ -220,7 +220,7 @@ export default function ResourcesPage() {
       <Card className="mb-8">
         <div className="flex flex-col gap-4">
           <Input
-            placeholder="Search resources by title, description, or tags…"
+            placeholder="Search resources by title, description, or tagsâ€¦"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             icon={
@@ -515,7 +515,7 @@ function ResourceCard({ resource }: { resource: Resource }) {
           {resource.gradeLevel && (
             <span className="truncate">{resource.gradeLevel}</span>
           )}
-          {resource.gradeLevel && resource.subject && <span>·</span>}
+          {resource.gradeLevel && resource.subject && <span>Â·</span>}
           {resource.subject && (
             <span className="truncate">{resource.subject}</span>
           )}

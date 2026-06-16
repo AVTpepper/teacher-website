@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -113,7 +113,7 @@ export default function UploadResourcePage() {
       let fileName = "";
 
       if (file && storage) {
-        // User attached a real file — upload it as-is
+        // User attached a real file - upload it as-is
         const storageRef = ref(
           storage,
           `resources/${user.uid}/${Date.now()}_${file.name}`
@@ -122,7 +122,7 @@ export default function UploadResourcePage() {
         fileURL = await getDownloadURL(storageRef);
         fileName = file.name;
       } else if (!file && storage) {
-        // No file attached — generate a formatted PDF from the form data
+        // No file attached - generate a formatted PDF from the form data
         const typeLabelObj = RESOURCE_TYPES.find((t) => t.value === resType);
         const typeLabel = typeLabelObj?.label ?? resType;
         const pdfBlob = await pdf(

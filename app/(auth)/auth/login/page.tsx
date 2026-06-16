@@ -72,7 +72,7 @@ function LoginForm() {
           ? (err as { code: string }).code
           : "";
       if (code === "auth/user-not-found" || code === "auth/invalid-email") {
-        // Don't reveal whether email exists — show generic success
+        // Don't reveal whether email exists - show generic success
         setForgotSent(true);
       } else {
         setForgotError("Failed to send reset email. Please try again.");

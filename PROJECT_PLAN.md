@@ -18,9 +18,10 @@
 
 ## Milestones
 
-| #   | Name                    | Goal                                                              | User Stories                         |
-|-----|-------------------------|-------------------------------------------------------------------|--------------------------------------|
-| M1  | AI Lesson Plan Assistant | Add an AI assistant to the Lesson Builder that generates full lesson plans and suggests improvements to individual sections | US-01, US-02, US-03, US-04, US-05, US-06, US-07, US-08 |
+| #   | Name                         | Goal                                                                                                    | User Stories                                     |
+|-----|------------------------------|---------------------------------------------------------------------------------------------------------|--------------------------------------------------|
+| M1  | AI Lesson Plan Assistant     | Add an AI assistant to the Lesson Builder that generates full lesson plans and suggests improvements to individual sections | US-01, US-02, US-03, US-04, US-05, US-06, US-07, US-08 |
+| M2  | Lesson Builder Wizard Redesign | Replace the single-page editor with a guided wizard flow, AI-powered creation path, inline review editing, and per-field AI refine | US-09, US-10, US-11, US-12, US-13, US-14 |
 
 ---
 
@@ -216,3 +217,168 @@
 - [x] AC-4: The description textarea enforces the 500-character limit client-side (character counter visible) and the API returns 400 if a longer value is submitted directly
 - [x] AC-5: Submitting an unrecognised `gradeLevelOverride` value directly to the API returns 400
 - [x] AC-6: Removing the grade override (resetting to the form's current grade level) and generating a lesson uses the original form grade level, not the overridden one
+
+---
+
+## Milestone 2: Lesson Builder Wizard Redesign
+
+**Goal**: Replace the existing single-page lesson builder with a guided, multi-step wizard experience. Users choose between a manual path (section-by-section with a sticky stepper) and an AI-assisted path (generate then review). The review page supports inline editing and per-field AI refinement. Progress auto-saves to Firestore as a draft.
+
+**Architecture**
+- `app/(main)/lesson-builder/new/page.tsx` becomes the entry screen and wizard coordinator
+- New directory: `components/lessons/wizard/` containing the stepper, step components, review page, inline editor, and refine popover
+- New API mode `refine` added to `app/api/ai/lesson/route.ts`
+- New Firestore path `users/{uid}/aiRefineUsage/{YYYY-MM}` for monthly refine tracking
+- `AIAssistantPanel.tsx` and the existing step-by-step editor are retired (replaced by this wizard)
+
+---
+
+### US-09: Entry Screen
+
+**As an** educator landing on `/lesson-builder/new`, **I want** to choose between creating a lesson manually or with the AI assistant, **so that** the tool matches my intent from the start.
+
+**Tasks**
+- [x] Replace current new-lesson page content with a centred entry card showing the heading "Lesson Builder" and subtitle "How would you like to create your lesson?"
+- [x] Two primary action buttons: **"Create My Own"** and **"Create with AI Assistant"** (AI button disabled with tooltip when `NEXT_PUBLIC_AI_AVAILABLE` is false)
+- [x] "Create My Own" sets a `path: "manual"` flag in wizard state and advances to the wizard shell (US-10)
+- [x] "Create with AI Assistant" sets `path: "ai"` and advances to the AI generation screen (US-12)
+- [x] If the user has an unfinished draft from a previous session, display a dismissible "Resume your draft?" banner above the two buttons with "Resume" and "Start fresh" actions; resume loads the draft state
+- [x] Entry screen is accessible: buttons are focusable, labelled, and have visible focus indicators; heading hierarchy starts at `<h1>`
+- [x] Existing `/lesson-builder/new?edit=` and `?remix=` query-param flows bypass the entry screen and load directly into the wizard shell with the lesson pre-populated
+
+**Acceptance Criteria**
+- [x] AC-1: The page renders two clearly labelled buttons ("Create My Own" and "Create with AI Assistant") with no other form fields visible
+- [x] AC-2: Clicking "Create My Own" navigates to (or reveals) the wizard shell at step 1
+- [x] AC-3: Clicking "Create with AI Assistant" navigates to (or reveals) the AI generation screen
+- [x] AC-4: When AI is unavailable (`NEXT_PUBLIC_AI_AVAILABLE` is false), the "Create with AI Assistant" button is visually disabled and shows a tooltip explaining why
+- [x] AC-5: A draft resume banner appears when an incomplete draft exists for the current user, and clicking "Resume" restores all previously entered field values
+- [x] AC-6: Using `?edit=<id>` or `?remix=<id>` bypasses the entry screen and loads the lesson directly into the wizard
+
+---
+
+### US-10: Wizard Shell with Sticky Stepper (Manual Path)
+
+**As an** educator on the manual creation path, **I want** to see all lesson sections on one scrollable page with a sticky progress stepper, **so that** I always know where I am and can jump back to completed sections.
+
+**Tasks**
+- [x] Create `components/lessons/wizard/WizardShell.tsx` — a layout component that renders a sticky left stepper (desktop) or a compact top progress bar (mobile ≤768 px) alongside a scrollable content area
+- [x] The stepper shows 7 steps: Basic Info, Learning Objectives, Materials Needed, Step-by-Step Plan, Check for Understanding, Suggested Assessments, Review & Publish
+- [x] Each step has three visual states: **locked** (grey, future), **active** (blue, current), **completed** (green with checkmark)
+- [x] Clicking a completed step in the stepper scrolls the page to that section and sets it as the active step
+- [x] Future (locked) steps are not clickable; clicking them shows no action
+- [x] Each section card is always rendered on the page (not conditionally hidden); active section has a highlighted border; locked sections are dimmed
+- [x] A **Next** button at the bottom of each section card advances to the next step (validates required fields first — see US-11); a **Back** button (except on step 1) returns to the previous step
+- [x] Scrolling the page (Intersection Observer) updates the active step in the stepper to reflect the section currently in the viewport
+- [x] Create individual step components: `BasicInfoStep.tsx`, `ObjectivesStep.tsx`, `MaterialsStep.tsx`, `LessonStepsStep.tsx`, `CFUStep.tsx`, `AssessmentsStep.tsx` — each accepts the lesson state slice and an `onChange` callback
+- [x] All form inputs within each step are identical to the existing lesson builder fields (same `Input`, `Textarea`, `Select` components)
+
+**Acceptance Criteria**
+- [x] AC-1: On desktop (≥768 px), a sticky left sidebar stepper is visible showing all 7 steps with correct states (locked/active/completed)
+- [x] AC-2: On mobile (<768 px), the stepper is replaced by a compact horizontal progress bar showing the current step number and title
+- [x] AC-3: Clicking a completed step in the stepper scrolls smoothly to that section and highlights it as active
+- [x] AC-4: The active section's card has a distinct visual highlight (e.g. primary-colour border); locked sections are visually dimmed but still readable
+- [x] AC-5: The Next button at the bottom of each section advances the stepper when clicked (after validation)
+- [x] AC-6: The Back button returns to the previous step with no data loss
+- [x] AC-7: Scrolling past a section card updates the stepper's active indicator to match the section in the viewport
+
+---
+
+### US-11: Step Validation and Firestore Draft Auto-Save
+
+**As an** educator working through the wizard, **I want** my progress saved automatically after each step and required fields validated before I can advance, **so that** I never lose work and am guided to fill in essential information.
+
+**Tasks**
+- [x] Define required fields per step: Basic Info (title required to advance; grade + subject required to publish but not to advance), Objectives (at least one non-empty item), Materials (optional — can advance empty), Steps (at least one step with a title), CFU (optional), Assessments (optional)
+- [x] When Next is clicked, validate the active step's required fields; if validation fails, show inline error messages on the failing fields and do not advance
+- [x] On successful validation, mark the step as completed and save the full lesson state to Firestore as a draft: call `createLesson` if no `draftId` exists yet, otherwise `updateLesson`; store `isPublic: false`
+- [x] Persist the `draftId` in component state (and React ref) so subsequent saves update the same document
+- [x] Display a transient "Saved" indicator (toast or small badge near the stepper) for 2 seconds after each successful Firestore save
+- [x] If the Firestore save fails, show a non-blocking error notice ("Draft could not be saved — your changes are still here"); do not prevent advancing
+- [x] On mount, if a `draftId` query param is present (from the resume flow in US-09), load that draft and restore all field values and the completed-steps set
+
+**Acceptance Criteria**
+- [x] AC-1: Clicking Next on the Basic Info step without a title shows an inline "Title is required" error and does not advance
+- [x] AC-2: Filling in the title and clicking Next marks Basic Info as completed, saves a Firestore draft, and advances to step 2
+- [x] AC-3: The Firestore draft document is updated (not re-created) on each subsequent step completion
+- [x] AC-4: A "Saved" indicator appears briefly after each successful save and then disappears
+- [x] AC-5: If Firestore is unavailable, the wizard continues to function and displays a non-blocking warning; no data is lost
+- [x] AC-6: Loading the page with `?draft=<id>` restores all field values and marks previously-completed steps as completed in the stepper
+
+---
+
+### US-12: AI Creation Path — Generate then Review
+
+**As an** educator on the AI creation path, **I want** to fill in basic context, let the AI generate a complete lesson, and land directly on the review page, **so that** I can go from idea to draft in seconds.
+
+**Tasks**
+- [x] Create `components/lessons/wizard/AIGenerateScreen.tsx` — a focused form showing: topic input (required, max 300 chars), grade level select, subject select, and (plus-tier only) specific-grade override and additional context textarea
+- [x] A single **"Generate Lesson"** button submits the form; button is disabled while generating or when topic is empty
+- [x] On submit, POST to `/api/ai/lesson` with `{ mode: 'generate', ... }` (same endpoint as before); show a full-screen loading state with a spinner and the message "Generating your lesson plan…"
+- [x] On success, populate all lesson state fields from the API response (title, objectives, materials, steps, checkForUnderstanding, assessments) and mark all 6 content steps as completed in the wizard state
+- [x] Automatically advance to the Review & Publish step (step 7); save a Firestore draft in the same operation
+- [x] On error, display a human-readable error message (same error-mapping as M1) and re-enable the Generate button
+- [x] The screen shows the current daily AI usage (free tier) and disables the Generate button if the limit is reached (same guard as M1)
+- [x] Retain plus-tier grade override and additional context fields (identical to M1 behaviour)
+
+**Acceptance Criteria**
+- [x] AC-1: The AI generation screen shows a topic input, grade level, and subject — and for plus users also a grade override select and context textarea
+- [x] AC-2: Clicking "Generate Lesson" with a valid topic calls the API and shows a loading state for the full duration of the request
+- [x] AC-3: On success, all lesson fields are populated from the API response and the wizard jumps to the Review & Publish step
+- [x] AC-4: A Firestore draft is created automatically after successful generation without the user having to click Save
+- [x] AC-5: On API error, a human-readable message is shown and the Generate button becomes re-enabled
+- [x] AC-6: Free tier users see their remaining daily requests and cannot generate when the limit is reached
+
+---
+
+### US-13: Review & Publish Page with Inline Editing
+
+**As an** educator on the review step, **I want** to see all lesson sections in a clean read-only view, then click Edit on any section to modify it inline, **so that** I can review and fine-tune before publishing.
+
+**Tasks**
+- [ ] Create `components/lessons/wizard/ReviewPage.tsx` — renders all lesson sections in read mode (title, grade, subject, duration, objectives, materials, steps with duration, check for understanding, assessments, attachments)
+- [ ] Each section has an **"Edit"** button (pencil icon + label); clicking it switches that section to inline edit mode
+- [ ] Inline edit mode renders the same form fields used in the corresponding wizard step component, pre-populated with current values
+- [ ] Inline edit mode shows **"Save"** and **"Cancel"** buttons; Save commits the changes to wizard state and returns to read mode; Cancel discards changes and returns to read mode
+- [ ] Only one section can be in edit mode at a time; opening a second section's editor while one is open prompts "You have unsaved changes — save or cancel first" and does not open the second editor
+- [ ] A **"Back to Edit"** button at the top returns to the last active wizard step (not step 1) for more extensive editing via the stepper
+- [ ] **"Save Draft"** and **"Publish"** buttons at the bottom; Publish validates that grade level, subject, and at least one objective and one step are present
+- [ ] Publish validation errors appear as an inline error list above the action buttons; focus is moved to the first error
+- [ ] The review page is accessible: sections use `<section>` elements with `aria-label`; edit mode fields are focussed on open; Save/Cancel are keyboard-navigable
+
+**Acceptance Criteria**
+- [ ] AC-1: All lesson sections are visible in read mode on the review page; no form fields are shown until Edit is clicked
+- [ ] AC-2: Clicking "Edit" on a section switches it to inline edit mode with the current values pre-filled
+- [ ] AC-3: Clicking "Save" commits the edited values and returns the section to read mode with the updated content visible
+- [ ] AC-4: Clicking "Cancel" discards the changes and the section shows the original values
+- [ ] AC-5: Attempting to open a second section's editor while one is open shows a warning and does not open the second editor
+- [ ] AC-6: Clicking "Publish" with a missing required field shows an inline validation error list and does not submit
+- [ ] AC-7: A successfully published lesson navigates to `/lesson-builder/<id>` as before
+
+---
+
+### US-14: Per-Field AI Refine with Monthly Limit
+
+**As an** educator on the review page, **I want** to click "Refine" next to any section, describe how I want it changed, and have the AI rewrite just that section, **so that** I can polish specific parts without rewriting them manually.
+
+**Tasks**
+- [x] Add a **"Refine"** button (sparkle icon) to each editable section on the review page, visible when the section is in **read mode** (not while editing inline)
+- [x] Clicking Refine opens an inline popover directly below/above the section containing: a labelled textarea ("How should this be changed?", max 300 chars), a **"Refine"** submit button, and an **"×"** close button
+- [x] On submit, POST to `/api/ai/lesson` with `{ mode: 'refine', field: '<section>', content: <current value>, instruction: <user text>, gradeLevel, subject }` and show a spinner in the popover
+- [x] On success, replace only that section's content in wizard state (do not touch other sections); close the popover; show a transient "Refined ✓" badge on the section header for 2 seconds
+- [x] On error, show a human-readable error inside the popover and re-enable the Refine button
+- [x] Add `mode: 'refine'` handling to `app/api/ai/lesson/route.ts`: accepts `{ field, content, instruction, gradeLevel, subject }`; returns `{ refined: string[] | LessonStep[] }` depending on field type; sanitise instruction (max 300 chars, must be non-empty)
+- [x] **Monthly refine limit — server-side**: read/write `users/{uid}/aiRefineUsage/{YYYY-MM}` with a `count` field; free tier limit = 20/month; plus = unlimited; compute key as `YYYY-MM` in UTC; use atomic Firestore increment
+- [x] Return HTTP 429 with `{ error: "You've reached your monthly refine limit (20). Upgrade to Plus for unlimited refines.", remainingRefines: 0 }` when free tier exceeds 20
+- [x] **Monthly refine limit — client-side**: on mount (and after each successful refine), fetch remaining refines from a `GET /api/ai/lesson` response field `remainingRefines`; display "X / 20 refines remaining this month" in the review page header for free tier; disable Refine buttons when 0 remain
+- [x] Firestore security rules: add `aiRefineUsage/{monthKey}` subcollection under `users/{userId}` with owner-only read/write
+- [x] The instruction textarea is sanitised server-side (strip leading/trailing whitespace; reject if empty after trim); do not pass raw user text directly to the OpenAI system prompt — inject it only into the user message
+
+**Acceptance Criteria**
+- [x] AC-1: A "Refine" button is visible next to each section in read mode on the review page; it is not shown while that section is in inline edit mode
+- [x] AC-2: Clicking Refine opens a popover with a textarea; submitting a non-empty instruction calls the API and shows a spinner
+- [x] AC-3: On success, only the targeted section's content is updated; all other sections are unchanged; a "Refined ✓" badge appears briefly
+- [x] AC-4: On error, a human-readable message appears inside the popover; the Refine button is re-enabled
+- [x] AC-5: A free tier user who has made 20 refine requests this calendar month receives a 429 on the 21st attempt; all Refine buttons are disabled and an upgrade prompt is shown
+- [x] AC-6: A plus tier user can make more than 20 refines per month without receiving a 429
+- [x] AC-7: The API returns 400 if `instruction` is empty or exceeds 300 characters
+- [x] AC-8: The monthly refine counter resets on the 1st of the next UTC month

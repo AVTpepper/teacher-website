@@ -1,4 +1,4 @@
-import {
+﻿import {
   doc,
   getDoc,
   setDoc,
@@ -82,7 +82,7 @@ export const FORUM_CATEGORIES: Omit<ForumCategory, "threadCount" | "lastActivity
   {
     id: "general-discussion",
     name: "General Discussion",
-    description: "Anything that doesn't fit elsewhere — open conversations for the educator community.",
+    description: "Anything that doesn't fit elsewhere - open conversations for the educator community.",
     icon: "💬",
   },
   {

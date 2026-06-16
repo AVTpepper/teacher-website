@@ -9,7 +9,7 @@ export interface MentionedUser {
   displayName: string;
 }
 
-/** Imperative handle — call insertText("@") from parent to trigger a mention. */
+/** Imperative handle - call insertText("@") from parent to trigger a mention. */
 export interface MentionInputHandle {
   insertText: (text: string) => void;
 }

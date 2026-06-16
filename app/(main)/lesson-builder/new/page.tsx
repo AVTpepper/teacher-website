@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import {
@@ -22,11 +22,32 @@ import {
   createLesson,
   getLesson,
   updateLesson,
+  getLessonsByAuthor,
+  type Lesson,
   type LessonStep,
   type LessonAttachment,
 } from "@/lib/firestore/lessons";
-import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
+import { Badge, Button, Card, Input, Select, Spinner, Textarea } from "@/components/ui";
 import AIAssistantPanel, { type LessonFormState, type ApplySuggestionPayload } from "@/components/lessons/AIAssistantPanel";
+import WizardShell from "@/components/lessons/wizard/WizardShell";
+import AIGenerateScreen from "@/components/lessons/wizard/AIGenerateScreen";
+import type { WizardLessonState } from "@/components/lessons/wizard/LessonWizardState";
+
+// Convert a persisted Lesson into the wizard's flat state shape
+function lessonToWizardState(lesson: Lesson): WizardLessonState {
+  return {
+    title: lesson.title,
+    gradeLevel: lesson.gradeLevel,
+    subject: lesson.subject,
+    duration: lesson.duration,
+    objectives: lesson.objectives.length > 0 ? lesson.objectives : [""],
+    materials: lesson.materials.length > 0 ? lesson.materials : [""],
+    steps: lesson.steps.length > 0 ? lesson.steps : [{ title: "", description: "" }],
+    checkForUnderstanding:
+      lesson.checkForUnderstanding.length > 0 ? lesson.checkForUnderstanding : [""],
+    assessments: lesson.assessments.length > 0 ? lesson.assessments : [""],
+  };
+}
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 const UPLOAD_TIMEOUT_MS = 30_000;
@@ -49,10 +70,330 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 export default function LessonBuilderNewPage() {
   return (
     <Suspense>
-      <LessonBuilderNewInner />
+      <LessonBuilderNewEntry />
     </Suspense>
   );
 }
+
+// ------------------------------------------------------------
+// US-09: Entry screen
+// ------------------------------------------------------------
+
+function LessonBuilderNewEntry() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const editingLessonId = searchParams.get("edit");
+  const remixLessonId = searchParams.get("remix");
+  const draftParam = searchParams.get("draft");
+  const completeParam = searchParams.get("complete") === "true";
+  const pathParam = searchParams.get("path") as "manual" | "ai" | null;
+  const isEditOrRemix = Boolean(editingLessonId ?? remixLessonId);
+  // ?draft=id&complete=true: load draft and jump straight to Review step with AI Refine
+  const isCompleteFlow = Boolean(draftParam && completeParam);
+
+  const isAvailable = process.env.NEXT_PUBLIC_AI_AVAILABLE === "true";
+
+  const [wizardPath, setWizardPath] = useState<"manual" | "ai" | null>(
+    // ?draft= goes straight to manual wizard; ?path= sets the path directly
+    (draftParam && !completeParam) ? "manual" : (pathParam ?? null)
+  );
+  const [resumeDraftId, setResumeDraftId] = useState<string | null>(draftParam ?? null);
+  const [draft, setDraft] = useState<Pick<Lesson, "id" | "title"> | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  // US-12: AI creation path state
+  const [aiGeneratedState, setAiGeneratedState] = useState<WizardLessonState | null>(null);
+  const [aiDraftId, setAiDraftId] = useState<string | null>(null);
+  const [userTier, setUserTier] = useState<"free" | "plus">("free");
+
+  // Edit / Remix path: load lesson into wizard state
+  const [editLoadedState, setEditLoadedState] = useState<WizardLessonState | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editLoadError, setEditLoadError] = useState<string | null>(null);
+
+  // Complete-flow state: load a draft and open Review step
+  const [completeLoadedState, setCompleteLoadedState] = useState<WizardLessonState | null>(null);
+  const [completeLoading, setCompleteLoading] = useState(isCompleteFlow);
+  const [completeLoadError, setCompleteLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isCompleteFlow || !draftParam) return;
+    setCompleteLoading(true);
+    getLesson(draftParam)
+      .then((lesson) => {
+        if (!lesson) { setCompleteLoadError("Draft not found."); return; }
+        setCompleteLoadedState(lessonToWizardState(lesson));
+      })
+      .catch(() => setCompleteLoadError("Failed to load draft. Please try again."))
+      .finally(() => setCompleteLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!isEditOrRemix || !user) return;
+    const lessonId = editingLessonId ?? remixLessonId;
+    if (!lessonId) return;
+    setEditLoading(true);
+    getLesson(lessonId)
+      .then((lesson) => {
+        if (!lesson) { setEditLoadError("Lesson not found."); return; }
+        setEditLoadedState(lessonToWizardState(lesson));
+      })
+      .catch(() => setEditLoadError("Failed to load lesson. Please try again."))
+      .finally(() => setEditLoading(false));
+  }, [isEditOrRemix, user, editingLessonId, remixLessonId]);
+
+  // Detect existing draft for the current user (skip when bypassing for edit/remix)
+  useEffect(() => {
+    if (isEditOrRemix || !user) return;
+    let cancelled = false;
+
+    async function fetchDraft() {
+      try {
+        const result = await getLessonsByAuthor(user!.uid, true);
+        if (cancelled) return;
+        const drafts = result.lessons.filter((l) => !l.isPublic);
+        if (drafts.length > 0) {
+          setDraft({ id: drafts[0].id, title: drafts[0].title });
+        }
+      } catch {
+        // Non-critical - silent failure; banner simply won't appear
+      }
+    }
+
+    fetchDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isEditOrRemix]);
+
+  // US-12: Fetch user tier on mount so it can be passed to AIGenerateScreen
+  useEffect(() => {
+    if (!user || !isAvailable) return;
+    let cancelled = false;
+    async function fetchTier() {
+      try {
+        const token = await user!.getIdToken();
+        const res = await fetch("/api/ai/lesson", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { tier?: string };
+        if (!cancelled && data.tier === "plus") setUserTier("plus");
+      } catch {
+        // Non-critical - defaults to "free"
+      }
+    }
+    fetchTier();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isAvailable]);
+
+  // Complete flow: ?draft=id&complete=true - opens draft at Review step with AI Refine available
+  if (isCompleteFlow) {
+    if (completeLoading || (!completeLoadedState && !completeLoadError)) {
+      return (
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <Spinner />
+        </div>
+      );
+    }
+    if (completeLoadError) {
+      return (
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
+          <p className="text-base text-destructive">{completeLoadError}</p>
+          <Button variant="outline" size="sm" onClick={() => router.push("/lesson-builder/drafts")}>Back to drafts</Button>
+        </div>
+      );
+    }
+    return (
+      <WizardShell
+        user={user}
+        initialDraftId={draftParam}
+        initialState={completeLoadedState ?? undefined}
+        initialCompletedSteps={new Set([1, 2, 3, 4, 5, 6, 7])}
+        startAtStep={7}
+        isAvailable={isAvailable}
+        onExit={() => router.push("/lesson-builder/drafts")}
+      />
+    );
+  }
+
+  // Edit / Remix path - wizard (replaces LessonBuilderNewInner)
+  if (isEditOrRemix) {
+    if (editLoading || (!editLoadedState && !editLoadError)) {
+      return (
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <Spinner />
+        </div>
+      );
+    }
+    if (editLoadError) {
+      return (
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
+          <p className="text-base text-destructive">{editLoadError}</p>
+          <Button variant="outline" size="sm" onClick={() => router.back()}>Go back</Button>
+        </div>
+      );
+    }
+    return (
+      <WizardShell
+        user={user}
+        // For edit: reuse the existing doc; for remix: create a new draft on first save
+        initialDraftId={editingLessonId ?? null}
+        initialState={editLoadedState ?? undefined}
+        initialCompletedSteps={new Set([1, 2, 3, 4, 5, 6, 7])}
+        isAvailable={isAvailable}
+        onExit={() => {
+          if (editingLessonId) {
+            router.push(`/lesson-builder/${editingLessonId}`);
+          } else {
+            router.push("/lesson-builder");
+          }
+        }}
+      />
+    );
+  }
+
+  // AC-2: manual wizard shell (US-10)
+  if (wizardPath === "manual") {
+    return (
+      <WizardShell
+        user={user}
+        initialDraftId={resumeDraftId}
+        isAvailable={process.env.NEXT_PUBLIC_AI_AVAILABLE === "true"}
+        onExit={() => { setWizardPath(null); setResumeDraftId(null); }}
+      />
+    );
+  }
+
+  // AC-3: AI path (US-12)
+  if (wizardPath === "ai") {
+    if (aiGeneratedState) {
+      // Generation complete - show wizard shell starting at Review step with all steps pre-completed
+      return (
+        <WizardShell
+          user={user}
+          initialDraftId={aiDraftId}
+          initialState={aiGeneratedState}
+          initialCompletedSteps={new Set([1, 2, 3, 4, 5, 6, 7])}
+          startAtStep={7}
+          isAvailable={process.env.NEXT_PUBLIC_AI_AVAILABLE === "true"}
+          onExit={() => {
+            setWizardPath(null);
+            setAiGeneratedState(null);
+            setAiDraftId(null);
+          }}
+        />
+      );
+    }
+    return (
+      <AIGenerateScreen
+        user={user}
+        userTier={userTier}
+        onGenerated={(state, draftId) => {
+          setAiGeneratedState(state);
+          setAiDraftId(draftId);
+        }}
+        onBack={() => setWizardPath(null)}
+      />
+    );
+  }
+
+  // Entry screen
+  return (
+    <main className="flex min-h-[60vh] flex-col items-center justify-center gap-8 py-16 px-4">
+      {/* AC-5: Draft resume banner */}
+      {!bannerDismissed && draft && (
+        <div
+          role="alert"
+          className="w-full max-w-2xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="text-sm font-medium text-amber-800">
+            You have an unfinished lesson draft
+            {draft.title ? `: "${draft.title}"` : ""}
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              onClick={() => {
+                setResumeDraftId(draft.id);
+                setWizardPath("manual");
+              }}
+            >
+              Resume
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBannerDismissed(true)}
+            >
+              Start fresh
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className="text-center">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          Lesson Builder
+        </h1>
+        <p className="mt-2 text-base text-muted">
+          How would you like to create your lesson?
+        </p>
+      </div>
+
+      {/* AC-1: Two path cards */}
+      <div className="grid w-full max-w-2xl gap-4 sm:grid-cols-2">
+        {/* Create My Own */}
+        <button
+          type="button"
+          onClick={() => setWizardPath("manual")}
+          className="group flex flex-col items-center gap-3 rounded-xl border-2 border-border bg-surface p-8 text-center transition-colors hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 cursor-pointer"
+        >
+          {/* Pencil icon */}
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-primary-700 group-hover:bg-primary-200 transition-colors" aria-hidden="true">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+            </svg>
+          </span>
+          <span className="text-base font-semibold text-foreground">Create My Own</span>
+          <span className="text-sm text-muted">Fill in each section at your own pace</span>
+        </button>
+
+        {/* Create with AI Assistant - AC-4: disabled with tooltip when AI unavailable */}
+        <button
+          type="button"
+          onClick={isAvailable ? () => setWizardPath("ai") : undefined}
+          disabled={!isAvailable}
+          aria-disabled={!isAvailable}
+          title={!isAvailable ? "AI features are not available in this environment" : undefined}
+          className={[
+            "group flex flex-col items-center gap-3 rounded-xl border-2 border-border bg-surface p-8 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
+            isAvailable
+              ? "hover:border-primary-500 hover:bg-primary-50 cursor-pointer"
+              : "opacity-50 cursor-not-allowed",
+          ].join(" ")}
+        >
+          {/* Sparkle icon */}
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-primary-700 group-hover:bg-primary-200 transition-colors" aria-hidden="true">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+            </svg>
+          </span>
+          <span className="text-base font-semibold text-foreground">Create with AI Assistant</span>
+          <span className="text-sm text-muted">Let AI generate a starting plan for you</span>
+        </button>
+      </div>
+    </main>
+  );
+}
+
+// ------------------------------------------------------------
+// Existing editor (edit / remix bypass - retained for US-13)
+// ------------------------------------------------------------
 
 function LessonBuilderNewInner() {
   const { user } = useAuth();
@@ -76,6 +417,8 @@ function LessonBuilderNewInner() {
   const [steps, setSteps] = useState<LessonStep[]>([
     { title: "", description: "" },
   ]);
+  const [checkForUnderstanding, setCheckForUnderstanding] = useState<string[]>([""]);
+  const [assessments, setAssessments] = useState<string[]>([""]);
   const [attachments, setAttachments] = useState<LessonAttachment[]>([]);
 
   // UI state
@@ -86,8 +429,10 @@ function LessonBuilderNewInner() {
   const [sourceLoading, setSourceLoading] = useState(false);
 
   const formTopRef = useRef<HTMLDivElement>(null);
-  const objectiveRefs = useRef<Array<HTMLInputElement | null>>([]);
-  const materialRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const objectiveRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
+  const materialRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
+  const checkForUnderstandingRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
+  const assessmentRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
 
   // AI Assistant panel
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
@@ -101,10 +446,18 @@ function LessonBuilderNewInner() {
   const [userTier, setUserTier] = useState<"free" | "plus">("free");
 
   // US-04: Per-section suggestions
-  const [activeSuggestSection, setActiveSuggestSection] = useState<"objectives" | "materials" | "steps" | null>(null);
+  const [activeSuggestSection, setActiveSuggestSection] = useState<"objectives" | "materials" | "steps" | "checkForUnderstanding" | "assessments" | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
-  const [suggestionItems, setSuggestionItems] = useState<string[] | null>(null);
+  const [suggestionItems, setSuggestionItems] = useState<string[] | Array<{ title: string; description: string; duration?: string }> | null>(null);
   const [suggestionError, setSuggestionError] = useState("");
+
+  // AI Assistant - Basic Info highlight
+  const [highlightBasicInfo, setHighlightBasicInfo] = useState(false);
+  function handleHighlightBasicInfo() {
+    document.getElementById("grade-level")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightBasicInfo(true);
+    setTimeout(() => setHighlightBasicInfo(false), 2000);
+  }
 
   // Return focus to the toggle button whenever the panel closes
   useEffect(() => {
@@ -131,7 +484,7 @@ function LessonBuilderNewInner() {
           if (data.tier === "plus") setUserTier("plus");
         }
       } catch {
-        // Non-critical — silent failure; usage will update after first request
+        // Non-critical - silent failure; usage will update after first request
       }
     }
     fetchUsage();
@@ -146,6 +499,8 @@ function LessonBuilderNewInner() {
     objectives,
     materials,
     steps,
+    checkForUnderstanding,
+    assessments,
   };
 
   function handleApplySuggestion(payload: ApplySuggestionPayload) {
@@ -162,12 +517,22 @@ function LessonBuilderNewInner() {
           ? payload.lesson.steps
           : [{ title: "", description: "" }]
       );
+      setCheckForUnderstanding(
+        payload.lesson.checkForUnderstanding.length > 0 ? payload.lesson.checkForUnderstanding : [""]
+      );
+      setAssessments(
+        payload.lesson.assessments.length > 0 ? payload.lesson.assessments : [""]
+      );
     } else if (payload.field === "objectives") {
       setObjectives(payload.items.length > 0 ? payload.items : [""]);
     } else if (payload.field === "materials") {
       setMaterials(payload.items.length > 0 ? payload.items : [""]);
     } else if (payload.field === "steps") {
       setSteps(payload.items.length > 0 ? payload.items : [{ title: "", description: "" }]);
+    } else if (payload.field === "checkForUnderstanding") {
+      setCheckForUnderstanding(payload.items.length > 0 ? payload.items : [""]);
+    } else if (payload.field === "assessments") {
+      setAssessments(payload.items.length > 0 ? payload.items : [""]);
     }
   }
 
@@ -177,7 +542,7 @@ function LessonBuilderNewInner() {
     return token;
   }
 
-  async function handleSuggestRequest(section: "objectives" | "materials" | "steps") {
+  async function handleSuggestRequest(section: "objectives" | "materials" | "steps" | "checkForUnderstanding" | "assessments") {
     // Replace any existing preview immediately
     setActiveSuggestSection(section);
     setIsSuggesting(true);
@@ -189,6 +554,10 @@ function LessonBuilderNewInner() {
         ? objectives.filter((o) => o.trim())
         : section === "materials"
         ? materials.filter((m) => m.trim())
+        : section === "checkForUnderstanding"
+        ? checkForUnderstanding.filter((c) => c.trim())
+        : section === "assessments"
+        ? assessments.filter((a) => a.trim())
         : steps
             .map((s) =>
               s.title.trim() && s.description.trim()
@@ -228,7 +597,11 @@ function LessonBuilderNewInner() {
         throw new Error("api_error");
       }
 
-      setSuggestionItems((data as { suggestions: string[] }).suggestions);
+      setSuggestionItems(
+        section === "steps"
+          ? (data as { suggestions: Array<{ title: string; description: string; duration?: string }> }).suggestions
+          : (data as { suggestions: string[] }).suggestions
+      );
 
       // US-07: Update remaining requests from response
       const remField = (data as Record<string, unknown>).remainingRequests;
@@ -275,6 +648,14 @@ function LessonBuilderNewInner() {
   }, [materials.length]);
 
   useEffect(() => {
+    checkForUnderstandingRefs.current = checkForUnderstandingRefs.current.slice(0, checkForUnderstanding.length);
+  }, [checkForUnderstanding.length]);
+
+  useEffect(() => {
+    assessmentRefs.current = assessmentRefs.current.slice(0, assessments.length);
+  }, [assessments.length]);
+
+  useEffect(() => {
     async function loadSourceLesson() {
       if (!sourceLessonId) return;
       if (isEditMode && !user) return;
@@ -308,6 +689,12 @@ function LessonBuilderNewInner() {
           sourceLesson.steps.length > 0
             ? sourceLesson.steps
             : [{ title: "", description: "" }]
+        );
+        setCheckForUnderstanding(
+          sourceLesson.checkForUnderstanding?.length > 0 ? sourceLesson.checkForUnderstanding : [""]
+        );
+        setAssessments(
+          sourceLesson.assessments?.length > 0 ? sourceLesson.assessments : [""]
         );
         setAttachments(sourceLesson.attachments ?? []);
       } catch {
@@ -354,11 +741,11 @@ function LessonBuilderNewInner() {
   }
 
   function handleListInputEnter(
-    event: KeyboardEvent<HTMLInputElement>,
+    event: KeyboardEvent<HTMLTextAreaElement>,
     list: string[],
     setList: Dispatch<SetStateAction<string[]>>,
     index: number,
-    refs: MutableRefObject<Array<HTMLInputElement | null>>
+    refs: MutableRefObject<Array<HTMLTextAreaElement | null>>
   ) {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -477,8 +864,11 @@ function LessonBuilderNewInner() {
         steps: cleanSteps.map((s) => ({
           title: s.title.trim(),
           description: s.description.trim(),
+          ...(s.duration?.trim() ? { duration: s.duration.trim() } : {}),
         })),
         attachments,
+        checkForUnderstanding: checkForUnderstanding.map((c) => c.trim()).filter(Boolean),
+        assessments: assessments.map((a) => a.trim()).filter(Boolean),
         isPublic: publish,
       };
 
@@ -516,6 +906,8 @@ function LessonBuilderNewInner() {
     const cleanSteps = steps.filter(
       (s) => s.title.trim() || s.description.trim()
     );
+    const cleanCheckForUnderstanding = checkForUnderstanding.map((c) => c.trim()).filter(Boolean);
+    const cleanAssessments = assessments.map((a) => a.trim()).filter(Boolean);
 
     return (
       <div className="py-8 max-w-3xl mx-auto">
@@ -582,10 +974,15 @@ function LessonBuilderNewInner() {
               <div className="space-y-4">
                 {cleanSteps.map((step, i) => (
                   <div key={i} className="border-l-2 border-primary-300 pl-4">
-                    <p className="text-sm font-semibold text-foreground">
-                      Step {i + 1}
-                      {step.title.trim() ? `: ${step.title.trim()}` : ""}
-                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-sm font-semibold text-foreground">
+                        Step {i + 1}
+                        {step.title.trim() ? `: ${step.title.trim()}` : ""}
+                      </p>
+                      {step.duration?.trim() && (
+                        <span className="text-xs text-muted">({step.duration.trim()})</span>
+                      )}
+                    </div>
                     {step.description.trim() && (
                       <p className="mt-1 text-sm text-muted whitespace-pre-wrap">
                         {step.description.trim()}
@@ -594,6 +991,32 @@ function LessonBuilderNewInner() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {cleanCheckForUnderstanding.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-2">
+                ❓ Check for Understanding
+              </h3>
+              <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
+                {cleanCheckForUnderstanding.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {cleanAssessments.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-2">
+                📝 Suggested Assessments
+              </h3>
+              <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
+                {cleanAssessments.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
             </div>
           )}
 
@@ -657,6 +1080,19 @@ function LessonBuilderNewInner() {
 
   return (
     <div className="py-8 flex items-start gap-6">
+      {/* Floating AI button - mobile only, replaces the sidebar drawer button */}
+      {!aiPanelOpen && isAvailable && (
+        <button
+          type="button"
+          onClick={() => setAiPanelOpen(true)}
+          aria-label="Open AI Assistant"
+          className="lg:hidden fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary-900 text-white shadow-lg hover:bg-primary-800 transition-colors"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+          </svg>
+        </button>
+      )}
       {/* Form column */}
       <div className={["flex-1 min-w-0 transition-all duration-300", aiPanelOpen ? "" : "max-w-3xl mx-auto"].join(" ")}>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -754,6 +1190,7 @@ function LessonBuilderNewInner() {
               onChange={(e) => setGradeLevel(e.target.value)}
               placeholder="Select grade level"
               options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
+              className={highlightBasicInfo ? "ring-2 ring-primary-500 ring-offset-1 transition-all" : ""}
             />
             <Select
               label="Subject"
@@ -761,6 +1198,7 @@ function LessonBuilderNewInner() {
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Select subject"
               options={SUBJECTS.map((s) => ({ value: s, label: s }))}
+              className={highlightBasicInfo ? "ring-2 ring-primary-500 ring-offset-1 transition-all" : ""}
             />
           </div>
 
@@ -817,7 +1255,7 @@ function LessonBuilderNewInner() {
                 <span className="mt-2.5 text-xs text-muted font-medium w-5 shrink-0">
                   {i + 1}.
                 </span>
-                <Input
+                <Textarea
                   ref={(el) => {
                     objectiveRefs.current[i] = el;
                   }}
@@ -829,7 +1267,9 @@ function LessonBuilderNewInner() {
                   onKeyDown={(e) =>
                     handleListInputEnter(e, objectives, setObjectives, i, objectiveRefs)
                   }
-                  className="flex-1"
+                  rows={1}
+                  style={{ minHeight: "2.25rem", resize: "none", fieldSizing: "content" } as React.CSSProperties}
+                  className="flex-1 min-h-0"
                 />
                 {objectives.length > 1 && (
                   <button
@@ -893,7 +1333,7 @@ function LessonBuilderNewInner() {
                 <span className="mt-2.5 text-xs text-muted font-medium w-5 shrink-0">
                   •
                 </span>
-                <Input
+                <Textarea
                   ref={(el) => {
                     materialRefs.current[i] = el;
                   }}
@@ -905,7 +1345,9 @@ function LessonBuilderNewInner() {
                   onKeyDown={(e) =>
                     handleListInputEnter(e, materials, setMaterials, i, materialRefs)
                   }
-                  className="flex-1"
+                  rows={1}
+                  style={{ minHeight: "2.25rem", resize: "none", fieldSizing: "content" } as React.CSSProperties}
+                  className="flex-1 min-h-0"
                 />
                 {materials.length > 1 && (
                   <button
@@ -1011,6 +1453,16 @@ function LessonBuilderNewInner() {
                     })
                   }
                 />
+                <Input
+                  placeholder="Duration (e.g. 10 minutes)"
+                  value={step.duration ?? ""}
+                  onChange={(e) =>
+                    updateListItem(steps, setSteps, i, {
+                      ...step,
+                      duration: e.target.value,
+                    })
+                  }
+                />
                 <Textarea
                   placeholder="Describe what happens in this step…"
                   value={step.description}
@@ -1020,7 +1472,8 @@ function LessonBuilderNewInner() {
                       description: e.target.value,
                     })
                   }
-                  rows={3}
+                  rows={2}
+                  style={{ fieldSizing: "content" } as React.CSSProperties}
                 />
 
                 <div className="flex justify-end">
@@ -1039,6 +1492,168 @@ function LessonBuilderNewInner() {
                     + Add Step Below
                   </Button>
                 </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Check for Understanding */}
+        <Card padding="lg" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">
+              ❓ Check for Understanding
+            </h2>
+            <div className="flex items-center gap-2">
+              {aiPanelOpen && isAvailable && (
+                <button
+                  type="button"
+                  onClick={() => handleSuggestRequest("checkForUnderstanding")}
+                  disabled={(isSuggesting && activeSuggestSection === "checkForUnderstanding") || remainingRequests === 0}
+                  aria-label="Get AI suggestions for Check for Understanding"
+                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 disabled:opacity-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {isSuggesting && activeSuggestSection === "checkForUnderstanding" ? (
+                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+                    </svg>
+                  )}
+                  Suggest
+                </button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setCheckForUnderstanding((prev) => [...prev, ""])}
+              >
+                + Add
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted -mt-2">
+            Questions or activities to gauge student comprehension during the lesson.
+          </p>
+
+          <div className="space-y-3">
+            {checkForUnderstanding.map((item, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <span className="mt-2.5 text-xs text-muted font-medium w-5 shrink-0">
+                  {i + 1}.
+                </span>
+                <Textarea
+                  ref={(el) => {
+                    checkForUnderstandingRefs.current[i] = el;
+                  }}
+                  placeholder={`Question or activity ${i + 1}`}
+                  value={item}
+                  onChange={(e) =>
+                    updateListItem(checkForUnderstanding, setCheckForUnderstanding, i, e.target.value)
+                  }
+                  onKeyDown={(e) =>
+                    handleListInputEnter(e, checkForUnderstanding, setCheckForUnderstanding, i, checkForUnderstandingRefs)
+                  }
+                  rows={1}
+                  style={{ minHeight: "2.25rem", resize: "none", fieldSizing: "content" } as React.CSSProperties}
+                  className="flex-1 min-h-0"
+                />
+                {checkForUnderstanding.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeListItem(checkForUnderstanding, setCheckForUnderstanding, i)}
+                    className="mt-2 p-1 text-muted hover:text-error-500 transition-colors cursor-pointer"
+                    aria-label="Remove item"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Suggested Assessments */}
+        <Card padding="lg" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">
+              📝 Suggested Assessments
+            </h2>
+            <div className="flex items-center gap-2">
+              {aiPanelOpen && isAvailable && (
+                <button
+                  type="button"
+                  onClick={() => handleSuggestRequest("assessments")}
+                  disabled={(isSuggesting && activeSuggestSection === "assessments") || remainingRequests === 0}
+                  aria-label="Get AI suggestions for Assessments"
+                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 disabled:opacity-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {isSuggesting && activeSuggestSection === "assessments" ? (
+                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+                    </svg>
+                  )}
+                  Suggest
+                </button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setAssessments((prev) => [...prev, ""])}
+              >
+                + Add
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted -mt-2">
+            Formal or informal ways to evaluate student learning at the end of the lesson.
+          </p>
+
+          <div className="space-y-3">
+            {assessments.map((item, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <span className="mt-2.5 text-xs text-muted font-medium w-5 shrink-0">
+                  {i + 1}.
+                </span>
+                <Textarea
+                  ref={(el) => {
+                    assessmentRefs.current[i] = el;
+                  }}
+                  placeholder={`Assessment ${i + 1} (e.g. Exit ticket, quiz, project)`}
+                  value={item}
+                  onChange={(e) =>
+                    updateListItem(assessments, setAssessments, i, e.target.value)
+                  }
+                  onKeyDown={(e) =>
+                    handleListInputEnter(e, assessments, setAssessments, i, assessmentRefs)
+                  }
+                  rows={1}
+                  style={{ minHeight: "2.25rem", resize: "none", fieldSizing: "content" } as React.CSSProperties}
+                  className="flex-1 min-h-0"
+                />
+                {assessments.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeListItem(assessments, setAssessments, i)}
+                    className="mt-2 p-1 text-muted hover:text-error-500 transition-colors cursor-pointer"
+                    aria-label="Remove assessment"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -1120,7 +1735,7 @@ function LessonBuilderNewInner() {
       </form>
       </div>{/* end form column */}
 
-      {/* AI Assistant Panel — sidebar on desktop, full-screen drawer on mobile */}
+      {/* AI Assistant Panel - sidebar on desktop, full-screen drawer on mobile */}
       <AIAssistantPanel
         isOpen={aiPanelOpen}
         onToggle={() => setAiPanelOpen((prev) => !prev)}
@@ -1128,6 +1743,7 @@ function LessonBuilderNewInner() {
         lessonFormState={lessonFormState}
         onApplySuggestion={handleApplySuggestion}
         onGetToken={getToken}
+        onHighlightBasicInfo={handleHighlightBasicInfo}
         activeSuggestSection={activeSuggestSection}
         isSuggesting={isSuggesting}
         suggestionItems={suggestionItems}

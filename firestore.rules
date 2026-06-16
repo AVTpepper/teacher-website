@@ -47,6 +47,13 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow write: if isOwner(userId);
       }
+
+      // aiRefineUsage sub-collection — users/{userId}/aiRefineUsage/{monthKey}
+      // Stores monthly AI refine counts; only the owner may read or write
+      match /aiRefineUsage/{monthKey} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
     }
 
     // -----------------------------------------------------------------------

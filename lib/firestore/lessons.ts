@@ -3,6 +3,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   increment,
   collection,
@@ -22,6 +23,7 @@ import { byCreatedAtDesc, byUpdatedAtDesc } from "@/lib/utils";
 export interface LessonStep {
   title: string;
   description: string;
+  duration?: string;
 }
 
 export interface LessonAttachment {
@@ -42,6 +44,8 @@ export interface Lesson {
   materials: string[];
   steps: LessonStep[];
   attachments: LessonAttachment[];
+  checkForUnderstanding: string[];
+  assessments: string[];
   isPublic: boolean;
   remixedFromId: string | null;
   createdAt: Timestamp | null;
@@ -61,6 +65,8 @@ export interface LessonInput {
   materials: string[];
   steps: LessonStep[];
   attachments: LessonAttachment[];
+  checkForUnderstanding: string[];
+  assessments: string[];
   isPublic: boolean;
   remixedFromId?: string | null;
 }
@@ -104,6 +110,11 @@ export async function updateLesson(
     ...data,
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function deleteLesson(lessonId: string): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "lessons", lessonId));
 }
 
 export interface GetLessonsResult {

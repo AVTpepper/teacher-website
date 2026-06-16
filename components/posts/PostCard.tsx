@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -289,7 +289,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
         </div>
       )}
 
-      {/* Content — click to expand comments */}
+      {/* Content - click to expand comments */}
       {!editing && (
         <p
           className="mt-3 text-sm text-foreground whitespace-pre-wrap cursor-pointer"

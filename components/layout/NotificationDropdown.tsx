@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -39,7 +39,7 @@ export default function NotificationDropdown() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [markingAll, setMarkingAll] = useState(false);
-  // Tracks when the dropdown was last opened — used to reset the badge count
+  // Tracks when the dropdown was last opened - used to reset the badge count
   const [lastSeenAt, setLastSeenAt] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -227,7 +227,7 @@ export default function NotificationDropdown() {
             )}
           </div>
 
-          {/* Footer — always show when there are notifications */}
+          {/* Footer - always show when there are notifications */}
           {notifications.length > 0 && (
             <div className="border-t border-border px-4 py-2.5 text-center">
               <Link

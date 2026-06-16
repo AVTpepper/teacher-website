@@ -181,7 +181,7 @@ export default function ForumThreadPage({
   const categoryData = FORUM_CATEGORIES.find((c) => c.id === categoryId);
   const isOwnThread = user?.uid === thread.authorId;
 
-  // Build CommentData — sort top-level by score when replySort === "top"
+  // Build CommentData - sort top-level by score when replySort === "top"
   const commentData: CommentData[] = comments.map((c) => ({
     id: c.id,
     parentId: c.parentId,

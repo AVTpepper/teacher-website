@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -33,7 +33,7 @@ interface SuggestionItem {
 }
 
 // ---------------------------------------------------------------------------
-// Firestore helpers (prefix range — same strategy as search page)
+// Firestore helpers (prefix range - same strategy as search page)
 // ---------------------------------------------------------------------------
 
 async function prefixCol<T>(
@@ -149,7 +149,7 @@ async function fetchSuggestions(term: string): Promise<SuggestionItem[]> {
 // ---------------------------------------------------------------------------
 
 interface NavSearchBarProps {
-  /** Called when user presses Enter or clicks "See all results" — navigate to /search */
+  /** Called when user presses Enter or clicks "See all results" - navigate to /search */
   onNavigate?: () => void;
   placeholder?: string;
 }
