@@ -26,6 +26,7 @@ import {
   type LessonAttachment,
 } from "@/lib/firestore/lessons";
 import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
+import AIAssistantPanel, { type LessonFormState, type ApplySuggestionPayload } from "@/components/lessons/AIAssistantPanel";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 const UPLOAD_TIMEOUT_MS = 30_000;
@@ -87,6 +88,141 @@ function LessonBuilderNewInner() {
   const formTopRef = useRef<HTMLDivElement>(null);
   const objectiveRefs = useRef<Array<HTMLInputElement | null>>([]);
   const materialRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  // AI Assistant panel
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const aiToggleButtonRef = useRef<HTMLButtonElement>(null);
+  const aiPanelWasOpen = useRef(false);
+  const isAvailable = process.env.NEXT_PUBLIC_AI_AVAILABLE === "true";
+
+  // US-04: Per-section suggestions
+  const [activeSuggestSection, setActiveSuggestSection] = useState<"objectives" | "materials" | "steps" | null>(null);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestionItems, setSuggestionItems] = useState<string[] | null>(null);
+  const [suggestionError, setSuggestionError] = useState("");
+
+  // Return focus to the toggle button whenever the panel closes
+  useEffect(() => {
+    if (aiPanelWasOpen.current && !aiPanelOpen) {
+      aiToggleButtonRef.current?.focus();
+    }
+    aiPanelWasOpen.current = aiPanelOpen;
+  }, [aiPanelOpen]);
+
+  const lessonFormState: LessonFormState = {
+    title,
+    gradeLevel,
+    subject,
+    duration,
+    objectives,
+    materials,
+    steps,
+  };
+
+  function handleApplySuggestion(payload: ApplySuggestionPayload) {
+    if (payload.field === "all") {
+      setTitle(payload.lesson.title);
+      setObjectives(
+        payload.lesson.objectives.length > 0 ? payload.lesson.objectives : [""]
+      );
+      setMaterials(
+        payload.lesson.materials.length > 0 ? payload.lesson.materials : [""]
+      );
+      setSteps(
+        payload.lesson.steps.length > 0
+          ? payload.lesson.steps
+          : [{ title: "", description: "" }]
+      );
+    } else if (payload.field === "objectives") {
+      setObjectives(payload.items.length > 0 ? payload.items : [""]);
+    } else if (payload.field === "materials") {
+      setMaterials(payload.items.length > 0 ? payload.items : [""]);
+    } else if (payload.field === "steps") {
+      setSteps(payload.items.length > 0 ? payload.items : [{ title: "", description: "" }]);
+    }
+  }
+
+  async function getToken(): Promise<string> {
+    const token = await user?.getIdToken();
+    if (!token) throw new Error("You must be signed in to use AI features.");
+    return token;
+  }
+
+  async function handleSuggestRequest(section: "objectives" | "materials" | "steps") {
+    // Replace any existing preview immediately
+    setActiveSuggestSection(section);
+    setIsSuggesting(true);
+    setSuggestionItems(null);
+    setSuggestionError("");
+
+    const existingContent =
+      section === "objectives"
+        ? objectives.filter((o) => o.trim())
+        : section === "materials"
+        ? materials.filter((m) => m.trim())
+        : steps
+            .map((s) =>
+              s.title.trim() && s.description.trim()
+                ? `${s.title}: ${s.description}`
+                : s.title.trim() || s.description.trim()
+            )
+            .filter(Boolean);
+
+    let responseStatus: number | undefined;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/ai/lesson", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          mode: "suggest",
+          section,
+          gradeLevel,
+          subject,
+          existingContent,
+        }),
+        signal: controller.signal,
+      });
+
+      responseStatus = res.status;
+      const data = await res.json().catch(() => ({}) as Record<string, unknown>);
+
+      if (!res.ok) {
+        throw new Error("api_error");
+      }
+
+      setSuggestionItems((data as { suggestions: string[] }).suggestions);
+    } catch (err) {
+      let msg: string;
+      if (err instanceof Error && err.name === "AbortError") {
+        msg = "The AI took too long to respond. Please try again.";
+      } else if (err instanceof TypeError) {
+        msg = "Could not reach the AI service. Check your connection and try again.";
+      } else if (responseStatus === 503) {
+        msg = "AI features are not available in this environment.";
+      } else if (responseStatus === 429) {
+        msg = "The AI service is busy. Please wait a moment and try again.";
+      } else {
+        msg = "Something went wrong. Please try again.";
+      }
+      setSuggestionError(msg);
+    } finally {
+      clearTimeout(timeoutId);
+      setIsSuggesting(false);
+    }
+  }
+
+  function handleDismissSuggestion() {
+    setActiveSuggestSection(null);
+    setSuggestionItems(null);
+    setSuggestionError("");
+  }
 
   useEffect(() => {
     objectiveRefs.current = objectiveRefs.current.slice(0, objectives.length);
@@ -319,8 +455,7 @@ function LessonBuilderNewInner() {
         checkAndAwardBadges(user!.uid).catch(() => {});
       }
       router.push(`/lesson-builder/${lessonId}`);
-    } catch (err) {
-      console.error("Create lesson error:", err);
+    } catch {
       setError("Failed to save lesson. Please try again.");
     } finally {
       setSaving(false);
@@ -479,7 +614,9 @@ function LessonBuilderNewInner() {
   // --- Editor mode ---
 
   return (
-    <div className="py-8 max-w-3xl mx-auto">
+    <div className="py-8 flex items-start gap-6">
+      {/* Form column */}
+      <div className={["flex-1 min-w-0 transition-all duration-300", aiPanelOpen ? "" : "max-w-3xl mx-auto"].join(" ")}>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -500,6 +637,31 @@ function LessonBuilderNewInner() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* AI Assistant toggle */}
+          <button
+            ref={aiToggleButtonRef}
+            type="button"
+            onClick={() => setAiPanelOpen((prev) => !prev)}
+            aria-expanded={aiPanelOpen}
+            aria-controls="ai-assistant-panel"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-800 hover:bg-primary-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer"
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"
+              />
+            </svg>
+            AI Assistant
+          </button>
           <Link href="/lesson-builder/drafts">
             <Button variant="outline" size="sm" type="button">
               View Drafts
@@ -574,14 +736,37 @@ function LessonBuilderNewInner() {
             <h2 className="text-lg font-semibold text-foreground">
               🎯 Learning Objectives
             </h2>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setObjectives((prev) => [...prev, ""])}
-            >
-              + Add
-            </Button>
+            <div className="flex items-center gap-2">
+              {aiPanelOpen && isAvailable && (
+                <button
+                  type="button"
+                  onClick={() => handleSuggestRequest("objectives")}
+                  disabled={isSuggesting && activeSuggestSection === "objectives"}
+                  aria-label="Get AI suggestions for Learning Objectives"
+                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 disabled:opacity-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {isSuggesting && activeSuggestSection === "objectives" ? (
+                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+                    </svg>
+                  )}
+                  Suggest
+                </button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setObjectives((prev) => [...prev, ""])}
+              >
+                + Add
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -627,14 +812,37 @@ function LessonBuilderNewInner() {
             <h2 className="text-lg font-semibold text-foreground">
               📦 Materials Needed
             </h2>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setMaterials((prev) => [...prev, ""])}
-            >
-              + Add
-            </Button>
+            <div className="flex items-center gap-2">
+              {aiPanelOpen && isAvailable && (
+                <button
+                  type="button"
+                  onClick={() => handleSuggestRequest("materials")}
+                  disabled={isSuggesting && activeSuggestSection === "materials"}
+                  aria-label="Get AI suggestions for Materials Needed"
+                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 disabled:opacity-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {isSuggesting && activeSuggestSection === "materials" ? (
+                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+                    </svg>
+                  )}
+                  Suggest
+                </button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setMaterials((prev) => [...prev, ""])}
+              >
+                + Add
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -676,9 +884,32 @@ function LessonBuilderNewInner() {
 
         {/* Step-by-step plan */}
         <Card padding="lg" className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">
-            📋 Step-by-Step Plan
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">
+              📋 Step-by-Step Plan
+            </h2>
+            {aiPanelOpen && isAvailable && (
+              <button
+                type="button"
+                onClick={() => handleSuggestRequest("steps")}
+                disabled={isSuggesting && activeSuggestSection === "steps"}
+                aria-label="Get AI suggestions for Lesson Steps"
+                className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 disabled:opacity-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {isSuggesting && activeSuggestSection === "steps" ? (
+                  <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                ) : (
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+                  </svg>
+                )}
+                Suggest
+              </button>
+            )}
+          </div>
 
           <div className="space-y-4">
             {steps.map((step, i) => (
@@ -845,6 +1076,22 @@ function LessonBuilderNewInner() {
           </Button>
         </div>
       </form>
+      </div>{/* end form column */}
+
+      {/* AI Assistant Panel — sidebar on desktop, full-screen drawer on mobile */}
+      <AIAssistantPanel
+        isOpen={aiPanelOpen}
+        onToggle={() => setAiPanelOpen((prev) => !prev)}
+        isAvailable={isAvailable}
+        lessonFormState={lessonFormState}
+        onApplySuggestion={handleApplySuggestion}
+        onGetToken={getToken}
+        activeSuggestSection={activeSuggestSection}
+        isSuggesting={isSuggesting}
+        suggestionItems={suggestionItems}
+        suggestionError={suggestionError}
+        onDismissSuggestion={handleDismissSuggestion}
+      />
     </div>
   );
 }

@@ -44,7 +44,7 @@ Teachers are busy professionals who lack a dedicated space that combines profess
 - Save as draft or publish publicly
 - Remix other educators' published lessons
 - Shareable lesson preview card
-
+- Collapsible AI Assistant panel: opens as a fixed-width sidebar on desktop or full-screen drawer on mobile so AI tools are accessible on demand without cluttering the form  - Per-section AI Suggest buttons on Learning Objectives, Materials Needed, and Lesson Steps: fetch targeted suggestions, preview them in the AI panel, then Apply (replaces only that section) or Dismiss (leaves the section unchanged); buttons hidden when AI is unavailable
 ### Inspiration Hub
 - Curated content in a magazine-style grid
 - Categories: Podcasts, Articles, Videos, Education News, Teacher Stories
@@ -71,6 +71,12 @@ Teachers are busy professionals who lack a dedicated space that combines profess
 ### Universal Search
 - Search across all content types from the navbar
 - Tabbed results by type: Educators, Resources, Discussions, Lessons, Jobs
+
+### AI Lesson Assistant
+- Authenticated educators can generate a complete lesson plan from a topic, grade level, and subject using OpenAI
+- AI can also suggest improvements to individual lesson sections (objectives, materials, steps)
+- All OpenAI API calls are made server-side; the API key is never exposed to the browser
+- Graceful degradation: spinner and loading states for every in-flight request; 30-second client-side timeout; human-readable messages for network failures, rate limits, and missing configuration; buttons re-enable after any error so users can retry without refreshing
 
 ---
 
@@ -345,6 +351,7 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
+OPENAI_API_KEY=       # Server-side only — never expose to the client
 ```
 
 ### Install & Run
@@ -370,6 +377,80 @@ firebase deploy
 ```
 
 Ensure `firebase.json` is configured for Next.js and all production environment variables are set in your hosting provider before deploying.
+
+---
+
+## Configuration
+
+| Variable | Description | Example |
+|---|---|---|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase project API key | `AIza...` |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase Auth domain | `project.firebaseapp.com` |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase project ID | `my-project` |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase Storage bucket | `my-project.appspot.com` |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID | `123456789` |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase app ID | `1:123:web:abc` |
+| `OPENAI_API_KEY` | OpenAI secret key for AI lesson features — **server-side only, never commit** | `sk-...` |
+| `NEXT_PUBLIC_AI_AVAILABLE` | **Derived automatically** — set to `"true"` by `next.config.ts` when `OPENAI_API_KEY` is present, `"false"` when absent. Do not set this variable manually. | — |
+
+---
+
+## AI Features
+
+### Obtaining an API Key
+
+1. Sign in at [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+2. Create a new secret key and copy it immediately — it is only shown once
+3. Add it to your `.env.local` file:
+
+```
+OPENAI_API_KEY=sk-...
+```
+
+### Model
+
+All AI requests use **`gpt-4o-mini`** — a fast, cost-effective model suited to structured lesson-plan generation.
+
+### Security
+
+`OPENAI_API_KEY` is read exclusively from `process.env` inside the `app/api/ai/lesson/` server-side route handler. It is **never** imported in any client component or included in the browser bundle. **Do not commit this key** — `.env.local` is listed in `.gitignore` and must never be added to source control.
+
+### Graceful Degradation
+
+When `OPENAI_API_KEY` is absent or empty:
+- The AI assistant panel is hidden from the lesson builder UI
+- All "Generate" and "Suggest" buttons are removed
+- The `/api/ai/lesson` route returns HTTP 503 if called directly
+- Every other feature of EduConnect continues to work normally
+
+`NEXT_PUBLIC_AI_AVAILABLE` controls this behaviour and is **derived automatically** from `OPENAI_API_KEY` in `next.config.ts` — do not set it manually.
+
+---
+
+## API
+
+### `POST /api/ai/lesson`
+
+Generates a full lesson plan or section suggestions using OpenAI. Requires a valid Firebase ID token in the `Authorization: Bearer <token>` header.
+
+**Request body**
+
+```json
+// Generate a full lesson plan
+{ "mode": "generate", "topic": "Photosynthesis", "gradeLevel": "Grade 7", "subject": "Science" }
+
+// Suggest improvements to a section
+{ "mode": "suggest", "gradeLevel": "Grade 7", "subject": "Science", "section": "objectives", "existingContent": ["Understand photosynthesis"] }
+```
+
+**Responses**
+
+| Status | Meaning |
+|---|---|
+| 200 | Success — returns `{ lesson: { title, objectives, materials, steps } }` or `{ suggestions: [] }` |
+| 400 | Validation error — returns `{ error: "..." }` identifying the missing/invalid field |
+| 401 | Unauthenticated — missing or invalid Firebase ID token |
+| 503 | `OPENAI_API_KEY` not configured in the environment |
 
 ---
 
