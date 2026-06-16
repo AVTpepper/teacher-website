@@ -42,13 +42,8 @@ export type UserProfileInput = Omit<
   "createdAt" | "badges" | "followerCount" | "followingCount" | "isVerified" | "displayNameLower"
 >;
 
-export const GRADE_LEVELS = [
-  "Kindergarten",
-  "Elementary",
-  "Middle School",
-  "High School",
-  "Higher Education",
-] as const;
+export { GRADE_LEVELS } from "@/lib/constants";
+export type { GradeLevel } from "@/lib/constants";
 
 export const SUBJECTS = [
   "Cross-Curricular",

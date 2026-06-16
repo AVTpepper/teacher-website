@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { LessonStep } from "@/lib/firestore/lessons";
+import { GRADE_LEVELS } from "@/lib/firestore/users";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 
@@ -46,6 +47,11 @@ type AIAssistantPanelProps = {
   suggestionItems: string[] | null;
   suggestionError: string;
   onDismissSuggestion: () => void;
+  // US-07: Usage tracking
+  remainingRequests: number | null;
+  onRemainingUpdate: (remaining: number | null) => void;
+  // US-08: Plus tier
+  userTier: "free" | "plus";
 };
 
 // ---------- Component ----------
@@ -80,11 +86,16 @@ export default function AIAssistantPanel({
   suggestionItems,
   suggestionError,
   onDismissSuggestion,
+  remainingRequests,
+  onRemainingUpdate,
+  userTier,
 }: AIAssistantPanelProps) {
   const panelRef = useRef<HTMLElement>(null);
 
   // Generate Full Lesson state
   const [topic, setTopic] = useState("");
+  const [gradeLevelOverride, setGradeLevelOverride] = useState("");
+  const [description, setDescription] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -103,6 +114,7 @@ export default function AIAssistantPanel({
     setGenerateError("");
 
     let responseStatus: number | undefined;
+    let responseData: Record<string, unknown> = {};
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30_000);
 
@@ -119,16 +131,28 @@ export default function AIAssistantPanel({
           topic: topic.trim(),
           gradeLevel: lessonFormState.gradeLevel,
           subject: lessonFormState.subject,
+          ...(userTier === "plus" && gradeLevelOverride
+            ? { gradeLevelOverride }
+            : {}),
+          ...(userTier === "plus" && description.trim()
+            ? { description: description.trim() }
+            : {}),
         }),
         signal: controller.signal,
       });
 
       responseStatus = res.status;
       const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      responseData = data;
 
       if (!res.ok) {
         throw new Error("api_error");
       }
+
+      // Update remaining requests from response
+      const remField = data.remainingRequests;
+      if (typeof remField === "number") onRemainingUpdate(remField);
+      else if (remField === null) onRemainingUpdate(null);
 
       const lesson = (data as { lesson: { title: string; objectives: string[]; materials: string[]; steps: string[] } }).lesson;
 
@@ -147,7 +171,13 @@ export default function AIAssistantPanel({
       } else if (responseStatus === 503) {
         msg = "AI features are not available in this environment.";
       } else if (responseStatus === 429) {
-        msg = "The AI service is busy. Please wait a moment and try again.";
+        const errBody = typeof responseData.error === "string" ? responseData.error : "";
+        msg = errBody.includes("daily AI limit")
+          ? "You've reached your daily limit (10 requests). Upgrade to Plus for unlimited access."
+          : "The AI service is busy. Please wait a moment and try again.";
+        if (typeof responseData.remainingRequests === "number") {
+          onRemainingUpdate(responseData.remainingRequests);
+        }
       } else {
         msg = "Something went wrong. Please try again.";
       }
@@ -203,10 +233,10 @@ export default function AIAssistantPanel({
 
   return (
     <>
-      {/* Mobile backdrop — fades in/out behind the panel */}
+      {/* Mobile backdrop — fades in/out behind the panel, below the navbar */}
       <div
         className={[
-          "fixed inset-0 z-20 bg-black/40 md:hidden transition-opacity duration-300",
+          "fixed inset-x-0 bottom-0 top-16 z-20 bg-black/40 md:hidden transition-opacity duration-300",
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none",
         ].join(" ")}
         aria-hidden="true"
@@ -220,14 +250,14 @@ export default function AIAssistantPanel({
         role="complementary"
         aria-label="AI Assistant"
         aria-hidden={!isOpen}
-        inert={!isOpen ? "" : undefined}
+        inert={!isOpen || undefined}
         tabIndex={-1}
         className={[
           // Base
           "flex flex-col bg-surface border-border outline-none",
           "transition-all duration-300 ease-in-out",
-          // Mobile: full-screen overlay sliding in from the right
-          "fixed inset-0 z-30",
+          // Mobile: overlay below the navbar (top-16 = 64px clears the nav bar)
+          "fixed inset-x-0 bottom-0 top-16 z-30",
           isOpen ? "translate-x-0" : "translate-x-full",
           // Desktop: in-flow sidebar with animated width
           "md:relative md:inset-auto md:z-auto md:translate-x-0",
@@ -339,6 +369,68 @@ export default function AIAssistantPanel({
                   )}
                 </div>
 
+                {/* US-08: Plus tier controls / Free upgrade notice */}
+                {userTier === "plus" ? (
+                  <div className="space-y-3">
+                    {/* Grade Level Override */}
+                    <div>
+                      <label
+                        htmlFor="ai-grade-override"
+                        className="block text-xs font-medium text-foreground mb-1"
+                      >
+                        Grade Level Override
+                      </label>
+                      <select
+                        id="ai-grade-override"
+                        value={gradeLevelOverride}
+                        onChange={(e) => setGradeLevelOverride(e.target.value)}
+                        disabled={isGenerating}
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50"
+                      >
+                        <option value="">Use form grade level</option>
+                        {GRADE_LEVELS.map((g) => (
+                          <option key={g} value={g}>
+                            {g}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Additional Context */}
+                    <div>
+                      <label
+                        htmlFor="ai-description"
+                        className="block text-xs font-medium text-foreground mb-1"
+                      >
+                        Additional Context
+                      </label>
+                      <textarea
+                        id="ai-description"
+                        value={description}
+                        onChange={(e) =>
+                          setDescription(e.target.value.slice(0, 500))
+                        }
+                        disabled={isGenerating}
+                        placeholder="e.g. Focus on visual learners, avoid fractions"
+                        maxLength={500}
+                        rows={3}
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50 resize-none"
+                        aria-describedby="ai-description-counter"
+                      />
+                      <p
+                        id="ai-description-counter"
+                        className="text-xs text-muted mt-0.5 text-right"
+                        aria-live="polite"
+                      >
+                        {description.length} / 500
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
+                    Upgrade to Plus to access grade override and additional context fields.
+                  </p>
+                )}
+
                 {/* Error message */}
                 {generateError && (
                   <div className="flex items-start justify-between gap-2">
@@ -367,12 +459,33 @@ export default function AIAssistantPanel({
                   variant="primary"
                   size="sm"
                   isLoading={isGenerating}
-                  disabled={!topic.trim() || isGenerating}
+                  disabled={!topic.trim() || isGenerating || remainingRequests === 0}
                   className="w-full"
                   aria-live="polite"
                 >
                   {isGenerating ? "Generating…" : "Generate"}
                 </Button>
+
+                {/* US-07: Usage meter for free tier */}
+                {remainingRequests !== null && remainingRequests > 0 && (
+                  <p className="text-center text-xs text-muted" aria-live="polite">
+                    {remainingRequests} / 10 requests remaining today
+                  </p>
+                )}
+
+                {/* US-07: Upgrade prompt when daily limit is reached */}
+                {remainingRequests === 0 && (
+                  <div
+                    role="alert"
+                    className="rounded-lg border border-warning-500/30 bg-warning-50 px-3 py-3 text-xs text-warning-700"
+                  >
+                    <p className="font-semibold mb-1">Daily limit reached</p>
+                    <p className="leading-relaxed">
+                      You&apos;ve used all 10 daily requests. Upgrade to Plus for
+                      unlimited AI access.
+                    </p>
+                  </div>
+                )}
               </form>
 
               {/* US-04: Per-section suggestions preview */}

@@ -40,6 +40,13 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isOwner(userId);
       }
+
+      // aiUsage sub-collection — users/{userId}/aiUsage/{dateKey}
+      // Stores daily AI request counts; only the owner may read or write
+      match /aiUsage/{dateKey} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
     }
 
     // -----------------------------------------------------------------------

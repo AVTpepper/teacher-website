@@ -20,7 +20,7 @@
 
 | #   | Name                    | Goal                                                              | User Stories                         |
 |-----|-------------------------|-------------------------------------------------------------------|--------------------------------------|
-| M1  | AI Lesson Plan Assistant | Add an AI assistant to the Lesson Builder that generates full lesson plans and suggests improvements to individual sections | US-01, US-02, US-03, US-04, US-05, US-06 |
+| M1  | AI Lesson Plan Assistant | Add an AI assistant to the Lesson Builder that generates full lesson plans and suggests improvements to individual sections | US-01, US-02, US-03, US-04, US-05, US-06, US-07, US-08 |
 
 ---
 
@@ -166,3 +166,53 @@
 - [x] AC-2: `README.md` has an "AI Features" section with setup instructions
 - [x] AC-3: `.gitignore` includes `.env.local` (no secrets can be accidentally committed)
 - [x] AC-4: A developer who clones the repo and follows the README AI setup section can get AI features working without additional guidance
+
+---
+
+### US-07: Free Tier Daily AI Usage Limit
+
+**As a** free-tier educator, **I want** the app to track and enforce my daily AI request limit, **so that** I understand my usage and am prompted to upgrade when I reach the cap.
+
+**Tasks**
+- [x] Add a `tier: 'free' | 'plus'` field to the Firestore user document schema; treat absent field as `'free'`
+- [x] In `app/api/ai/lesson/route.ts`, after verifying the JWT, read the user's `tier` from `users/{uid}` in Firestore using the Firebase Admin SDK
+- [x] Read and write daily usage from `users/{uid}/aiUsage/{YYYY-MM-DD}` (document with a `count: number` field); compute the date key in UTC
+- [x] Before calling OpenAI: if `tier === 'free'` and `count >= 10`, return HTTP 429 with `{ error: "You've reached your daily AI limit (10 requests). Upgrade to Plus for unlimited access." }` without incrementing the counter
+- [x] Otherwise, increment `count` by 1 (using Firestore `FieldValue.increment(1)` with `{ merge: true }`) and proceed to the OpenAI call
+- [x] Plus tier users skip the read/write entirely — proceed directly to the OpenAI call
+- [x] Expose a `GET /api/ai/lesson/usage` endpoint (or extend the existing route) that returns `{ tier, used, limit }` for the authenticated user for today; free tier returns `limit: 10`, plus returns `limit: null`
+- [x] In `AIAssistantPanel.tsx`, fetch usage on mount (and after each successful AI request) and display a "X / 10 requests remaining today" line for free tier users
+- [x] When `used >= 10` and tier is `'free'`, display an upgrade prompt in the panel: "You've reached your daily limit. Upgrade to Plus for unlimited AI access." and disable the Generate and Suggest buttons
+- [x] Map the new 429 response to a specific user-facing message in the client error-handling logic (US-05)
+
+**Acceptance Criteria**
+- [x] AC-1: A free tier user who has made 10 AI requests today receives a 429 response on the 11th attempt; the Generate and Suggest buttons become disabled and the upgrade prompt is shown
+- [x] AC-2: The daily counter resets the following UTC day — requests after midnight UTC succeed again for a free tier user who was at the limit
+- [x] AC-3: A plus tier user can make more than 10 AI requests in a day without receiving a 429 response
+- [x] AC-4: The AI panel displays the correct remaining count (e.g. "7 / 10 requests remaining today") for a free tier user and updates it after each successful request
+- [x] AC-5: The usage counter is enforced server-side; a client that omits the usage-fetch step cannot bypass the limit
+- [x] AC-6: The Firestore path `users/{uid}/aiUsage/{YYYY-MM-DD}` exists and its `count` field matches the number of successful AI requests made by that user on that UTC date
+
+---
+
+### US-08: Plus Tier & Enhanced AI Panel
+
+**As a** plus-tier educator, **I want** additional controls in the AI panel when generating a lesson plan, **so that** I can tailor the AI output to a specific grade level and provide extra context without editing the main form.
+
+**Tasks**
+- [x] In `AIAssistantPanel.tsx`, read the authenticated user's `tier` from the user profile (already fetched from Firestore; no extra request needed)
+- [x] For **plus** users: add a "Grade level override" `<select>` to the "Generate Full Lesson" section, populated with the same `GRADE_LEVELS` constant used by the lesson builder form; default to the current form grade level
+- [x] For **plus** users: add an "Optional description" `<textarea>` (max 500 chars, with a live character counter) below the grade override for additional context
+- [x] Include `gradeLevelOverride` and `description` in the POST body to `/api/ai/lesson` only when the user is plus tier and the fields have values
+- [x] In `app/api/ai/lesson/route.ts`: accept optional `gradeLevelOverride?: string` and `description?: string` in the request body; use `gradeLevelOverride` in place of `gradeLevel` in the OpenAI prompt when provided; append `description` as additional context to the user message when provided
+- [x] For **free** users: render a static notice in place of the two fields: "Upgrade to Plus for grade override and description fields"
+- [x] Validate `gradeLevelOverride` server-side against the same allowed values as `gradeLevel`; return 400 if an unrecognised value is supplied
+- [x] Validate `description` server-side: must be a string ≤ 500 characters if present; return 400 otherwise
+
+**Acceptance Criteria**
+- [x] AC-1: A plus user sees a "Grade level override" select and an "Optional description" textarea in the Generate section; a free user sees the upgrade notice in their place
+- [x] AC-2: When a plus user changes the grade override and generates a lesson, the AI panel sends `gradeLevelOverride` in the request body and the generated lesson reflects the overridden grade level
+- [x] AC-3: When a plus user enters a description, it is appended to the OpenAI prompt and influences the generated output
+- [x] AC-4: The description textarea enforces the 500-character limit client-side (character counter visible) and the API returns 400 if a longer value is submitted directly
+- [x] AC-5: Submitting an unrecognised `gradeLevelOverride` value directly to the API returns 400
+- [x] AC-6: Removing the grade override (resetting to the form's current grade level) and generating a lesson uses the original form grade level, not the overridden one

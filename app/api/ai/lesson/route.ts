@@ -61,15 +61,104 @@ async function verifyFirebaseToken(token: string): Promise<string | null> {
   }
 }
 
+// ─── Firestore REST helpers ───────────────────────────────────────────────────
+// We use the Firestore REST API with the user's own ID token so we never need
+// firebase-admin. The token was already verified above, so Firestore rules that
+// check `request.auth.uid` will accept these calls.
+
+const FREE_DAILY_LIMIT = 10;
+
+function getUtcDateKey(): string {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+async function fsGet(
+  path: string,
+  idToken: string,
+): Promise<Record<string, unknown> | null> {
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  if (!projectId) return null;
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${path}`;
+  try {
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${idToken}` },
+      cache: "no-store",
+    });
+    if (resp.status === 404) return null;
+    if (!resp.ok) return null;
+    return (await resp.json()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+async function fsIncrementCount(
+  path: string,
+  idToken: string,
+): Promise<void> {
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  if (!projectId) return;
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:commit`;
+  const docPath = `projects/${projectId}/databases/(default)/documents/${path}`;
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        writes: [{
+          transform: {
+            document: docPath,
+            fieldTransforms: [{ fieldPath: "count", increment: { integerValue: "1" } }],
+          },
+        }],
+      }),
+      cache: "no-store",
+    });
+  } catch {
+    // Non-critical — best-effort write
+  }
+}
+
+function fsStringField(
+  doc: Record<string, unknown> | null,
+  field: string,
+): string | null {
+  if (!doc) return null;
+  const fields = (doc.fields ?? {}) as Record<string, Record<string, string>>;
+  return fields[field]?.stringValue ?? null;
+}
+
+function fsIntField(
+  doc: Record<string, unknown> | null,
+  field: string,
+): number {
+  if (!doc) return 0;
+  const fields = (doc.fields ?? {}) as Record<string, Record<string, string>>;
+  const f = fields[field];
+  if (!f) return 0;
+  return parseInt(f.integerValue ?? f.doubleValue ?? "0", 10) || 0;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ValidSection = "objectives" | "materials" | "steps";
+
+import { GRADE_LEVELS as VALID_GRADE_LEVELS } from "@/lib/constants";
 
 interface GenerateBody {
   mode: "generate";
   topic: string;
   gradeLevel: string;
   subject: string;
+  gradeLevelOverride?: string;
+  description?: string;
 }
 
 interface SuggestBody {
@@ -116,6 +205,11 @@ export async function POST(request: NextRequest): Promise<Response> {
       { status: 401 },
     );
   }
+
+  // 1a. Read user tier from Firestore (best-effort; default 'free' if unavailable)
+  const userDoc = await fsGet(`users/${uid}`, token);
+  const userTier: "free" | "plus" =
+    fsStringField(userDoc, "tier") === "plus" ? "plus" : "free";
 
   // 2. OpenAI availability check — return 503, never crash
   const openai = getOpenAIClient();
@@ -201,6 +295,44 @@ export async function POST(request: NextRequest): Promise<Response> {
         { status: 400 },
       );
     }
+    // Optional Plus-tier fields
+    if (raw.gradeLevelOverride !== undefined) {
+      if (
+        typeof raw.gradeLevelOverride !== "string" ||
+        !raw.gradeLevelOverride.trim()
+      ) {
+        return Response.json(
+          { error: 'Field "gradeLevelOverride" must be a non-empty string when provided.' },
+          { status: 400 },
+        );
+      }
+      if (raw.gradeLevelOverride.length > 100) {
+        return Response.json(
+          { error: 'Field "gradeLevelOverride" must be 100 characters or fewer.' },
+          { status: 400 },
+        );
+      }
+      if (!(VALID_GRADE_LEVELS as readonly string[]).includes(raw.gradeLevelOverride)) {
+        return Response.json(
+          { error: `Field "gradeLevelOverride" must be one of: ${VALID_GRADE_LEVELS.join(", ")}.` },
+          { status: 400 },
+        );
+      }
+    }
+    if (raw.description !== undefined) {
+      if (typeof raw.description !== "string") {
+        return Response.json(
+          { error: 'Field "description" must be a string when provided.' },
+          { status: 400 },
+        );
+      }
+      if (raw.description.length > 500) {
+        return Response.json(
+          { error: 'Field "description" must be 500 characters or fewer.' },
+          { status: 400 },
+        );
+      }
+    }
   } else {
     const VALID_SECTIONS: ValidSection[] = [
       "objectives",
@@ -238,16 +370,34 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
     if (
       Array.isArray(raw.existingContent) &&
-      (raw.existingContent as string[]).some((item) => item.length > 100)
+      (raw.existingContent as string[]).some((item) => item.length > 500)
     ) {
       return Response.json(
-        { error: 'Each item in "existingContent" must be 100 characters or fewer.' },
+        { error: 'Each item in "existingContent" must be 500 characters or fewer.' },
         { status: 400 },
       );
     }
   }
 
   const body = raw as unknown as RequestBody;
+
+  // 5a. Enforce free-tier daily limit (server-side — cannot be bypassed by the client)
+  const dateKey = getUtcDateKey();
+  let currentCount = 0;
+  if (userTier === "free") {
+    const usageDoc = await fsGet(`users/${uid}/aiUsage/${dateKey}`, token);
+    currentCount = fsIntField(usageDoc, "count");
+    if (currentCount >= FREE_DAILY_LIMIT) {
+      return Response.json(
+        {
+          error:
+            "You've reached your daily AI limit (10 requests). Upgrade to Plus for unlimited access.",
+          remainingRequests: 0,
+        },
+        { status: 429 },
+      );
+    }
+  }
 
   // 6. Build prompts and call OpenAI
   let systemPrompt: string;
@@ -263,10 +413,20 @@ export async function POST(request: NextRequest): Promise<Response> {
 }
 Return only the raw JSON object — no markdown, no code fences, no explanation.`;
 
+    // Use gradeLevelOverride (plus-tier only) if provided, otherwise fall back to gradeLevel
+    const effectiveGradeLevel =
+      userTier === "plus" && body.gradeLevelOverride?.trim()
+        ? body.gradeLevelOverride.trim()
+        : body.gradeLevel;
+
     userMessage = `Create a lesson plan for:
 Topic: ${body.topic}
-Grade Level: ${body.gradeLevel}
+Grade Level: ${effectiveGradeLevel}
 Subject: ${body.subject}`;
+
+    if (userTier === "plus" && body.description?.trim()) {
+      userMessage += `\nAdditional context: ${body.description.trim()}`;
+    }
   } else {
     systemPrompt = `You are an expert educator. Given a lesson section name and its current content, return improved or alternative items for that section as a JSON object with exactly this structure:
 {
@@ -332,6 +492,10 @@ Current content: ${existing}`;
           { status: 502 },
         );
       }
+      // Increment usage counter for free tier (best-effort; do not block the response)
+      if (userTier === "free") {
+        fsIncrementCount(`users/${uid}/aiUsage/${dateKey}`, token).catch(() => {});
+      }
       return Response.json({
         lesson: {
           title: lesson.title,
@@ -339,6 +503,10 @@ Current content: ${existing}`;
           materials: lesson.materials as string[],
           steps: lesson.steps as string[],
         },
+        remainingRequests:
+          userTier === "free"
+            ? Math.max(0, FREE_DAILY_LIMIT - (currentCount + 1))
+            : null,
       });
     } else {
       const data = parsed as Record<string, unknown>;
@@ -351,7 +519,17 @@ Current content: ${existing}`;
           { status: 502 },
         );
       }
-      return Response.json({ suggestions: data.suggestions as string[] });
+      // Increment usage counter for free tier (best-effort; do not block the response)
+      if (userTier === "free") {
+        fsIncrementCount(`users/${uid}/aiUsage/${dateKey}`, token).catch(() => {});
+      }
+      return Response.json({
+        suggestions: data.suggestions as string[],
+        remainingRequests:
+          userTier === "free"
+            ? Math.max(0, FREE_DAILY_LIMIT - (currentCount + 1))
+            : null,
+      });
     }
   } catch (err: unknown) {
     // Map all OpenAI SDK errors to safe, human-readable messages — no raw objects in responses
@@ -391,4 +569,43 @@ Current content: ${existing}`;
       { status: 500 },
     );
   }
+}
+
+// ─── GET /api/ai/lesson — usage check ────────────────────────────────────────
+// Returns today's usage for the authenticated user: { tier, used, limit, remainingRequests }
+
+export async function GET(request: NextRequest): Promise<Response> {
+  const authHeader = request.headers.get("authorization");
+  const token =
+    authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+
+  if (!token) {
+    return Response.json(
+      { error: "Authentication required." },
+      { status: 401 },
+    );
+  }
+
+  const uid = await verifyFirebaseToken(token);
+  if (!uid) {
+    return Response.json(
+      { error: "Invalid or expired session. Please sign in again." },
+      { status: 401 },
+    );
+  }
+
+  const dateKey = getUtcDateKey();
+  const [userDoc, usageDoc] = await Promise.all([
+    fsGet(`users/${uid}`, token),
+    fsGet(`users/${uid}/aiUsage/${dateKey}`, token),
+  ]);
+
+  const tier: "free" | "plus" =
+    fsStringField(userDoc, "tier") === "plus" ? "plus" : "free";
+  const used = fsIntField(usageDoc, "count");
+  const limit: number | null = tier === "plus" ? null : FREE_DAILY_LIMIT;
+  const remainingRequests: number | null =
+    tier === "plus" ? null : Math.max(0, FREE_DAILY_LIMIT - used);
+
+  return Response.json({ tier, used, limit, remainingRequests });
 }

@@ -95,6 +95,11 @@ function LessonBuilderNewInner() {
   const aiPanelWasOpen = useRef(false);
   const isAvailable = process.env.NEXT_PUBLIC_AI_AVAILABLE === "true";
 
+  // US-07: Daily AI usage tracking
+  const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
+  // US-08: User tier
+  const [userTier, setUserTier] = useState<"free" | "plus">("free");
+
   // US-04: Per-section suggestions
   const [activeSuggestSection, setActiveSuggestSection] = useState<"objectives" | "materials" | "steps" | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -108,6 +113,30 @@ function LessonBuilderNewInner() {
     }
     aiPanelWasOpen.current = aiPanelOpen;
   }, [aiPanelOpen]);
+
+  // US-07: Fetch initial AI usage on mount
+  useEffect(() => {
+    if (!user || !isAvailable) return;
+    let cancelled = false;
+    async function fetchUsage() {
+      try {
+        const token = await user!.getIdToken();
+        const res = await fetch("/api/ai/lesson", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { remainingRequests?: number | null; tier?: string };
+        if (!cancelled) {
+          setRemainingRequests(data.remainingRequests ?? null);
+          if (data.tier === "plus") setUserTier("plus");
+        }
+      } catch {
+        // Non-critical — silent failure; usage will update after first request
+      }
+    }
+    fetchUsage();
+    return () => { cancelled = true; };
+  }, [user, isAvailable]);
 
   const lessonFormState: LessonFormState = {
     title,
@@ -169,6 +198,7 @@ function LessonBuilderNewInner() {
             .filter(Boolean);
 
     let responseStatus: number | undefined;
+    let responseData: Record<string, unknown> = {};
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30_000);
 
@@ -192,12 +222,18 @@ function LessonBuilderNewInner() {
 
       responseStatus = res.status;
       const data = await res.json().catch(() => ({}) as Record<string, unknown>);
+      responseData = data as Record<string, unknown>;
 
       if (!res.ok) {
         throw new Error("api_error");
       }
 
       setSuggestionItems((data as { suggestions: string[] }).suggestions);
+
+      // US-07: Update remaining requests from response
+      const remField = (data as Record<string, unknown>).remainingRequests;
+      if (typeof remField === "number") setRemainingRequests(remField);
+      else if (remField === null) setRemainingRequests(null);
     } catch (err) {
       let msg: string;
       if (err instanceof Error && err.name === "AbortError") {
@@ -207,7 +243,13 @@ function LessonBuilderNewInner() {
       } else if (responseStatus === 503) {
         msg = "AI features are not available in this environment.";
       } else if (responseStatus === 429) {
-        msg = "The AI service is busy. Please wait a moment and try again.";
+        const errBody = typeof responseData.error === "string" ? responseData.error : "";
+        msg = errBody.includes("daily AI limit")
+          ? "You've reached your daily limit (10 requests). Upgrade to Plus for unlimited access."
+          : "The AI service is busy. Please wait a moment and try again.";
+        if (typeof responseData.remainingRequests === "number") {
+          setRemainingRequests(responseData.remainingRequests);
+        }
       } else {
         msg = "Something went wrong. Please try again.";
       }
@@ -741,7 +783,7 @@ function LessonBuilderNewInner() {
                 <button
                   type="button"
                   onClick={() => handleSuggestRequest("objectives")}
-                  disabled={isSuggesting && activeSuggestSection === "objectives"}
+                  disabled={(isSuggesting && activeSuggestSection === "objectives") || remainingRequests === 0}
                   aria-label="Get AI suggestions for Learning Objectives"
                   className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 disabled:opacity-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:cursor-not-allowed"
                 >
@@ -817,7 +859,7 @@ function LessonBuilderNewInner() {
                 <button
                   type="button"
                   onClick={() => handleSuggestRequest("materials")}
-                  disabled={isSuggesting && activeSuggestSection === "materials"}
+                  disabled={(isSuggesting && activeSuggestSection === "materials") || remainingRequests === 0}
                   aria-label="Get AI suggestions for Materials Needed"
                   className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 disabled:opacity-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:cursor-not-allowed"
                 >
@@ -892,7 +934,7 @@ function LessonBuilderNewInner() {
               <button
                 type="button"
                 onClick={() => handleSuggestRequest("steps")}
-                disabled={isSuggesting && activeSuggestSection === "steps"}
+                disabled={(isSuggesting && activeSuggestSection === "steps") || remainingRequests === 0}
                 aria-label="Get AI suggestions for Lesson Steps"
                 className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 disabled:opacity-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:cursor-not-allowed"
               >
@@ -1091,6 +1133,9 @@ function LessonBuilderNewInner() {
         suggestionItems={suggestionItems}
         suggestionError={suggestionError}
         onDismissSuggestion={handleDismissSuggestion}
+        remainingRequests={remainingRequests}
+        onRemainingUpdate={setRemainingRequests}
+        userTier={userTier}
       />
     </div>
   );

@@ -77,6 +77,8 @@ Teachers are busy professionals who lack a dedicated space that combines profess
 - AI can also suggest improvements to individual lesson sections (objectives, materials, steps)
 - All OpenAI API calls are made server-side; the API key is never exposed to the browser
 - Graceful degradation: spinner and loading states for every in-flight request; 30-second client-side timeout; human-readable messages for network failures, rate limits, and missing configuration; buttons re-enable after any error so users can retry without refreshing
+- Free tier: 10 AI requests per day (resets at midnight UTC); remaining count shown in the AI panel ("X / 10 requests remaining today"); Generate and Suggest buttons disabled and an upgrade prompt shown when the limit is reached; a static notice replaces the Plus-tier controls in the Generate section
+- Plus tier: unlimited daily AI requests; no usage meter displayed; enhanced Generate section includes a "Grade Level Override" select (overrides the form's grade level for the AI prompt) and an "Additional Context" textarea (up to 500 chars with live counter) to provide extra context to the AI; both fields are validated server-side and included in the OpenAI prompt only when populated
 
 ---
 
