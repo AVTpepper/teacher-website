@@ -71,6 +71,7 @@ export async function createUser(data: UserProfileInput): Promise<void> {
     ...data,
     displayNameLower: data.displayName.toLowerCase(),
     isVerified: false,
+    tier: "free",
     createdAt: serverTimestamp(),
     badges: [],
     followerCount: 0,
