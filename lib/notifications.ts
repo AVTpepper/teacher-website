@@ -47,7 +47,7 @@ export interface Notification {
   linkURL: string;
 }
 
-export type NotificationInput = Omit<Notification, "id" | "createdAt" | "read">;
+export type NotificationInput = Omit<Notification, "id" | "createdAt" | "read" | "dismissed">;
 
 // ---------------------------------------------------------------------------
 // Firestore path helper
