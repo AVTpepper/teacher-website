@@ -393,6 +393,7 @@ export default function LessonBuilderPage() {
   const [bookmarkedExpanded, setBookmarkedExpanded] = useState(false);
 
   const [userBookmarkedIds, setUserBookmarkedIds] = useState<Set<string>>(new Set());
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   const fetchLessons = useCallback(
     async (reset: boolean) => {
@@ -467,7 +468,6 @@ export default function LessonBuilderPage() {
   const visibleBookmarked = bookmarkedExpanded ? bookmarkedLessons : bookmarkedLessons.slice(0, 3);
   // Latest draft for resume banner (most recently updated)
   const latestDraft = drafts[0] ?? null;
-  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   return (
     <div className="py-8">
