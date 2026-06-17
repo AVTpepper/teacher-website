@@ -51,6 +51,9 @@ export interface Lesson {
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
   downloadCount: number;
+  bookmarkCount: number;
+  ratingAverage: number;
+  ratingCount: number;
 }
 
 export interface LessonInput {
@@ -87,6 +90,9 @@ export async function createLesson(data: LessonInput): Promise<string> {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     downloadCount: 0,
+    bookmarkCount: 0,
+    ratingAverage: 0,
+    ratingCount: 0,
   });
 
   return ref.id;

@@ -13,6 +13,7 @@ import {
   type LessonComment,
 } from "@/lib/firestore/lessons";
 import { getUser, type UserProfile } from "@/lib/firestore/users";
+import { getUserRating, submitRating } from "@/lib/firestore/ratings";
 import { Avatar, Badge, Button, Card } from "@/components/ui";
 import CommentThread, {
   type CommentData,
@@ -40,6 +41,13 @@ export default function LessonDetailPage({
   const [localDownloadCount, setLocalDownloadCount] = useState(0);
   const [copied, setCopied] = useState(false);
 
+  // Ratings
+  const [ratingAverage, setRatingAverage] = useState(0);
+  const [ratingCount, setRatingCount] = useState(0);
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [ratingHover, setRatingHover] = useState<number | null>(null);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+
   // Comments
   const [comments, setComments] = useState<LessonComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -66,12 +74,19 @@ export default function LessonDetailPage({
         }
         setLesson(res);
         setLocalDownloadCount(res.downloadCount);
+        setRatingAverage(res.ratingAverage ?? 0);
+        setRatingCount(res.ratingCount ?? 0);
 
         const [authorData] = await Promise.all([
           getUser(res.authorId),
           loadComments(),
         ]);
         setAuthor(authorData);
+
+        // Load user's existing rating
+        if (user) {
+          getUserRating(user.uid, id).then(setUserRating).catch(() => {});
+        }
       } catch {
         setNotFound(true);
       } finally {
@@ -80,6 +95,25 @@ export default function LessonDetailPage({
     }
     load();
   }, [id, loadComments]);
+
+  async function handleRate(value: number) {
+    if (!user || !lesson || ratingSubmitting) return;
+    setRatingSubmitting(true);
+    try {
+      await submitRating(user.uid, lesson.id, value);
+      const wasRated = userRating !== null;
+      const prevTotal = ratingAverage * ratingCount;
+      const newCount = wasRated ? ratingCount : ratingCount + 1;
+      const newAvg = wasRated
+        ? (prevTotal - (userRating ?? 0) + value) / newCount
+        : (prevTotal + value) / newCount;
+      setUserRating(value);
+      setRatingCount(newCount);
+      setRatingAverage(Math.round(newAvg * 10) / 10);
+    } finally {
+      setRatingSubmitting(false);
+    }
+  }
 
   async function handleDownload() {
     if (!lesson) return;
@@ -203,6 +237,68 @@ export default function LessonDetailPage({
               <h1 className="text-2xl font-bold text-foreground">
                 {lesson.title}
               </h1>
+
+              {/* Rating display + interactive widget */}
+              <div className="mt-2 flex flex-wrap items-center gap-4">
+                {/* Aggregate display */}
+                {ratingCount > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <svg
+                          key={star}
+                          className={`h-4 w-4 shrink-0 ${
+                            ratingAverage >= star - 0.25
+                              ? "text-amber-400"
+                              : ratingAverage >= star - 0.75
+                              ? "text-amber-300"
+                              : "text-border"
+                          }`}
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 0 .95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 0-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 0 0-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 0-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 0 0 .951-.69l1.07-3.292Z" />
+                        </svg>
+                      ))}
+                    </span>
+                    <span className="text-sm font-medium text-foreground">{ratingAverage.toFixed(1)}</span>
+                    <span className="text-xs text-muted">({ratingCount} rating{ratingCount !== 1 ? "s" : ""})</span>
+                  </div>
+                )}
+
+                {/* Interactive stars for logged-in non-owners */}
+                {user && !isOwner && (
+                  <div className="flex items-center gap-1" role="group" aria-label="Rate this lesson">
+                    <span className="text-xs text-muted mr-1">{userRating ? "Your rating:" : "Rate:"}</span>
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const active = (ratingHover ?? userRating ?? 0) >= star;
+                      return (
+                        <button
+                          key={star}
+                          type="button"
+                          disabled={ratingSubmitting}
+                          onClick={() => handleRate(star)}
+                          onMouseEnter={() => setRatingHover(star)}
+                          onMouseLeave={() => setRatingHover(null)}
+                          aria-label={`Rate ${star} star${star !== 1 ? "s" : ""}`}
+                          className="cursor-pointer disabled:opacity-50 transition-transform hover:scale-110"
+                        >
+                          <svg
+                            className={`h-5 w-5 transition-colors ${active ? "text-amber-400" : "text-border"}`}
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 0 .95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 0-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 0 0-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 0-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 0 0 .951-.69l1.07-3.292Z" />
+                          </svg>
+                        </button>
+                      );
+                    })}
+                    {ratingSubmitting && <span className="ml-1 text-xs text-muted">Saving...</span>}
+                  </div>
+                )}
+              </div>
 
               <div className="mt-2 flex items-center gap-3">
                 <Link href={`/educators/${lesson.authorId}`}>
