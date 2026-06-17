@@ -178,6 +178,7 @@ interface SuggestBody {
   section: ValidSection;
   existingContent?: string[];
   lessonContext?: {
+    title?: string;
     objectives?: string[];
     steps?: Array<{ title: string; description: string }>;
   };
