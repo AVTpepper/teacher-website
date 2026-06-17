@@ -8,6 +8,7 @@ import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import {
   getPublicLessons,
   getLessonsByAuthor,
+  getLesson,
   deleteLesson,
   type Lesson,
 } from "@/lib/firestore/lessons";
@@ -237,6 +238,59 @@ function PublishedRow({ lesson, onDeleted }: PublishedRowProps) {
   );
 }
 
+// ─── Bookmarked lesson row ───────────────────────────────────────────────────
+
+function BookmarkedRow({ lesson, onUnbookmarked }: { lesson: Lesson; onUnbookmarked: (id: string) => void }) {
+  const { user } = useAuth();
+  const [removing, setRemoving] = useState(false);
+
+  async function handleRemove() {
+    if (!user) return;
+    setRemoving(true);
+    try {
+      await removeBookmark(user.uid, lesson.id);
+      onUnbookmarked(lesson.id);
+    } catch {
+      setRemoving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <Link href={`/lesson-builder/${lesson.id}`} className="text-sm font-medium text-foreground hover:text-primary-700 hover:underline truncate block">
+          {lesson.title || "Untitled"}
+        </Link>
+        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+          {lesson.gradeLevel && <span>{lesson.gradeLevel}</span>}
+          {lesson.subject && <span>{lesson.subject}</span>}
+          {lesson.duration && <span>{lesson.duration}</span>}
+          <span>by {lesson.authorName}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <Link href={`/lesson-builder/${lesson.id}`}>
+          <Button type="button" variant="outline" size="sm">View</Button>
+        </Link>
+        <button
+          type="button"
+          onClick={handleRemove}
+          disabled={removing}
+          aria-label={`Remove bookmark for "${lesson.title || "Untitled"}"`}
+          className="inline-flex items-center justify-center rounded-lg p-1.5 text-amber-500 hover:text-muted hover:bg-secondary-100 transition-colors disabled:opacity-50 cursor-pointer"
+          title="Remove bookmark"
+        >
+          {removing ? <Spinner size="sm" /> : (
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.32 2.577a49.255 49.255 0 0 1 11.36 0c1.497.174 2.57 1.46 2.57 2.93V21a.75.75 0 0 1-1.085.67L12 18.089l-7.165 3.583A.75.75 0 0 1 3.75 21V5.507c0-1.47 1.073-2.756 2.57-2.93Z" />
+            </svg>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Draft row ────────────────────────────────────────────────────────────────
 
 interface DraftRowProps {
@@ -324,7 +378,7 @@ export default function LessonBuilderPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
 
-  const [myLessonsTab, setMyLessonsTab] = useState<"drafts" | "published">("drafts");
+  const [myLessonsTab, setMyLessonsTab] = useState<"drafts" | "published" | "bookmarked">("drafts");
 
   const [drafts, setDrafts] = useState<Lesson[]>([]);
   const [draftsLoading, setDraftsLoading] = useState(false);
@@ -333,6 +387,10 @@ export default function LessonBuilderPage() {
   const [published, setPublished] = useState<Lesson[]>([]);
   const [publishedLoading, setPublishedLoading] = useState(false);
   const [publishedExpanded, setPublishedExpanded] = useState(false);
+
+  const [bookmarkedLessons, setBookmarkedLessons] = useState<Lesson[]>([]);
+  const [bookmarkedLoading, setBookmarkedLoading] = useState(false);
+  const [bookmarkedExpanded, setBookmarkedExpanded] = useState(false);
 
   const [userBookmarkedIds, setUserBookmarkedIds] = useState<Set<string>>(new Set());
 
@@ -368,9 +426,10 @@ export default function LessonBuilderPage() {
 
   useEffect(() => {
     async function loadMyLessons() {
-      if (!user) { setDrafts([]); setPublished([]); setUserBookmarkedIds(new Set()); return; }
+      if (!user) { setDrafts([]); setPublished([]); setBookmarkedLessons([]); setUserBookmarkedIds(new Set()); return; }
       setDraftsLoading(true);
       setPublishedLoading(true);
+      setBookmarkedLoading(true);
       try {
         const [lessonsResult, bookmarks] = await Promise.all([
           getLessonsByAuthor(user.uid, true, null, 200),
@@ -378,13 +437,25 @@ export default function LessonBuilderPage() {
         ]);
         setDrafts(lessonsResult.lessons.filter((l) => !l.isPublic));
         setPublished(lessonsResult.lessons.filter((l) => l.isPublic));
-        setUserBookmarkedIds(new Set(bookmarks.map((b) => b.lessonId)));
+        const bookmarkIds = bookmarks.map((b) => b.lessonId);
+        setUserBookmarkedIds(new Set(bookmarkIds));
+        // Fetch full lesson docs for bookmarks (excluding own lessons already loaded)
+        const ownIds = new Set(lessonsResult.lessons.map((l) => l.id));
+        const foreignIds = bookmarkIds.filter((id) => !ownIds.has(id));
+        const fetched = await Promise.all(foreignIds.map((id) => getLesson(id)));
+        const allBookmarked = [
+          ...lessonsResult.lessons.filter((l) => bookmarkIds.includes(l.id)),
+          ...(fetched.filter(Boolean) as Lesson[]),
+        ];
+        setBookmarkedLessons(allBookmarked);
       } catch {
         setDrafts([]);
         setPublished([]);
+        setBookmarkedLessons([]);
       } finally {
         setDraftsLoading(false);
         setPublishedLoading(false);
+        setBookmarkedLoading(false);
       }
     }
     loadMyLessons();
@@ -393,6 +464,7 @@ export default function LessonBuilderPage() {
   const hasFilters = gradeLevel || subject;
   const visibleDrafts = draftsExpanded ? drafts : drafts.slice(0, 3);
   const visiblePublished = publishedExpanded ? published : published.slice(0, 3);
+  const visibleBookmarked = bookmarkedExpanded ? bookmarkedLessons : bookmarkedLessons.slice(0, 3);
   // Latest draft for resume banner (most recently updated)
   const latestDraft = drafts[0] ?? null;
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -513,6 +585,25 @@ export default function LessonBuilderPage() {
                 </span>
               )}
             </button>
+            <button
+              role="tab"
+              id="tab-bookmarked"
+              aria-selected={myLessonsTab === "bookmarked"}
+              aria-controls="tab-panel-bookmarked"
+              onClick={() => setMyLessonsTab("bookmarked")}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+                myLessonsTab === "bookmarked"
+                  ? "border-primary-600 text-primary-700"
+                  : "border-transparent text-muted hover:text-foreground hover:border-border"
+              }`}
+            >
+              Bookmarked
+              {!bookmarkedLoading && bookmarkedLessons.length > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-border text-muted text-xs font-medium h-4 px-1.5">
+                  {bookmarkedLessons.length}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* Drafts panel */}
@@ -576,6 +667,39 @@ export default function LessonBuilderPage() {
                     className="w-full rounded-lg border border-dashed border-border py-2 text-xs text-muted hover:text-foreground hover:border-primary-400 transition-colors cursor-pointer"
                   >
                     {publishedExpanded ? "Show less" : `Show ${published.length - 3} more`}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Bookmarked panel */}
+          <div id="tab-panel-bookmarked" role="tabpanel" aria-labelledby="tab-bookmarked" hidden={myLessonsTab !== "bookmarked"}>
+            {bookmarkedLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted py-2">
+                <Spinner size="sm" />
+                Loading bookmarks...
+              </div>
+            )}
+            {!bookmarkedLoading && bookmarkedLessons.length === 0 && (
+              <p className="text-sm text-muted">No bookmarks yet. Click the bookmark icon on any lesson card to save it here.</p>
+            )}
+            {!bookmarkedLoading && bookmarkedLessons.length > 0 && (
+              <div className="space-y-2">
+                {visibleBookmarked.map((lesson) => (
+                  <BookmarkedRow
+                    key={lesson.id}
+                    lesson={lesson}
+                    onUnbookmarked={(id) => setBookmarkedLessons((prev) => prev.filter((l) => l.id !== id))}
+                  />
+                ))}
+                {bookmarkedLessons.length > 3 && (
+                  <button
+                    type="button"
+                    onClick={() => setBookmarkedExpanded((v) => !v)}
+                    className="w-full rounded-lg border border-dashed border-border py-2 text-xs text-muted hover:text-foreground hover:border-primary-400 transition-colors cursor-pointer"
+                  >
+                    {bookmarkedExpanded ? "Show less" : `Show ${bookmarkedLessons.length - 3} more`}
                   </button>
                 )}
               </div>

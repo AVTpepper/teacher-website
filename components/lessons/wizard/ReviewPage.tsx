@@ -3,6 +3,8 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import type { User } from "firebase/auth";
 import type { WizardLessonState } from "./LessonWizardState";
+import { useAIRefine, type SectionKey, SECTION_FIELD_MAP, REFINE_LABEL_MAP } from "./useAIRefine";
+import RefinePopover from "./RefinePopover";
 import Button from "@/components/ui/Button";
 import BasicInfoStep from "./steps/BasicInfoStep";
 import ObjectivesStep from "./steps/ObjectivesStep";
@@ -25,34 +27,7 @@ export type ReviewPageProps = {
   isAvailable?: boolean;
 };
 
-type SectionKey =
-  | "basicInfo"
-  | "objectives"
-  | "materials"
-  | "lessonSteps"
-  | "cfu"
-  | "assessments";
-
 type ValidationError = { field: string; message: string };
-
-// Maps a section key to the WizardLessonState field(s) it represents
-const SECTION_FIELD_MAP: Record<SectionKey, keyof WizardLessonState | null> = {
-  basicInfo: null, // multi-field - not refinable
-  objectives: "objectives",
-  materials: "materials",
-  lessonSteps: "steps",
-  cfu: "checkForUnderstanding",
-  assessments: "assessments",
-};
-
-const REFINE_LABEL_MAP: Record<SectionKey, string> = {
-  basicInfo: "Basic Info",
-  objectives: "Learning Objectives",
-  materials: "Materials Needed",
-  lessonSteps: "Lesson Steps",
-  cfu: "Check for Understanding",
-  assessments: "Suggested Assessments",
-};
 
 // ─── Pencil icon ──────────────────────────────────────────────────────────────
 
@@ -92,101 +67,6 @@ function SparklesIcon() {
   );
 }
 
-// ─── Refine Popover ───────────────────────────────────────────────────────────
-
-interface RefinePopoverProps {
-  sectionTitle: string;
-  instruction: string;
-  onInstructionChange: (v: string) => void;
-  onSubmit: () => void;
-  onClose: () => void;
-  isRefining: boolean;
-  error: string;
-}
-
-function RefinePopover({
-  sectionTitle,
-  instruction,
-  onInstructionChange,
-  onSubmit,
-  onClose,
-  isRefining,
-  error,
-}: RefinePopoverProps) {
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Escape") onClose();
-  }
-
-  return (
-    <div
-      role="dialog"
-      aria-label={`Refine ${sectionTitle}`}
-      className="mt-2 rounded-lg border border-primary-200 bg-primary-50 p-3 space-y-2 shadow-sm"
-      onKeyDown={handleKeyDown}
-    >
-      <label
-        htmlFor={`refine-instruction-${sectionTitle}`}
-        className="block text-xs font-medium text-foreground"
-      >
-        How should this be changed?
-      </label>
-      <textarea
-        id={`refine-instruction-${sectionTitle}`}
-        ref={inputRef}
-        value={instruction}
-        onChange={(e) => onInstructionChange(e.target.value.slice(0, 300))}
-        disabled={isRefining}
-        maxLength={300}
-        rows={2}
-        placeholder="e.g. Make it more concise, add a hands-on activity…"
-        className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50 resize-none"
-        aria-describedby={error ? `refine-error-${sectionTitle}` : undefined}
-      />
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted">{instruction.length} / 300</p>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isRefining}
-            aria-label="Close refine popover"
-            className="rounded p-1 text-muted hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:opacity-50"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-            </svg>
-          </button>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={onSubmit}
-            isLoading={isRefining}
-            disabled={!instruction.trim() || isRefining}
-          >
-            Refine
-          </Button>
-        </div>
-      </div>
-      {error && (
-        <p
-          id={`refine-error-${sectionTitle}`}
-          role="alert"
-          className="text-xs text-error-600"
-        >
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
 interface ReviewSectionProps {
@@ -199,7 +79,13 @@ interface ReviewSectionProps {
   refiningSection: SectionKey | null;
   onRefineRequest: (key: SectionKey) => void;
   showRefineButton: boolean;
-  refineSuccessBadge: SectionKey | null;
+  aiActionMap: Map<SectionKey, "refined" | "elaborated">;
+  // Expand
+  expandingSection: SectionKey | null;
+  onExpandRequest: (key: SectionKey) => void;
+  // Undo
+  undoMap: Map<SectionKey, unknown>;
+  onUndo: (key: SectionKey) => void;
   children: React.ReactNode;
 }
 
@@ -212,12 +98,20 @@ function ReviewSection({
   refiningSection,
   onRefineRequest,
   showRefineButton,
-  refineSuccessBadge,
+  aiActionMap,
+  expandingSection,
+  onExpandRequest,
+  undoMap,
+  onUndo,
   children,
 }: ReviewSectionProps) {
   const isEditing = editingSection === sectionKey;
   const isRefining = refiningSection === sectionKey;
-  const showBadge = refineSuccessBadge === sectionKey;
+  const isExpanding = expandingSection === sectionKey;
+  const refineBusy = isRefining || isExpanding || (expandingSection !== null && expandingSection !== sectionKey);
+  const aiAction = aiActionMap.get(sectionKey);
+  const isRefinable = SECTION_FIELD_MAP[sectionKey] !== null;
+  const hasUndo = undoMap.has(sectionKey);
 
   return (
     <section
@@ -226,34 +120,68 @@ function ReviewSection({
     >
       <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-surface">
         <div className="flex items-center gap-2">
-          <h3
-            id={id}
-            className="text-sm font-semibold text-foreground"
-          >
+          <h3 id={id} className="text-sm font-semibold text-foreground">
             {title}
           </h3>
-          {showBadge && (
-            <span
-              role="status"
-              className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
-            >
-              Refined ✓
+          {aiAction && (
+            <span role="status" className={[
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+              aiAction === "refined" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700",
+            ].join(" ")}>
+              {aiAction === "refined" ? "Refined ✓" : "Elaborated ✓"}
             </span>
           )}
         </div>
         {!isEditing && (
           <div className="flex items-center gap-1">
-            {showRefineButton && SECTION_FIELD_MAP[sectionKey] !== null && (
+            {/* Undo last AI change */}
+            {hasUndo && (
               <button
                 type="button"
-                onClick={() => onRefineRequest(sectionKey)}
-                aria-label={`Refine ${title} with AI`}
-                aria-pressed={isRefining}
-                className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer"
+                onClick={() => onUndo(sectionKey)}
+                disabled={refineBusy}
+                aria-label={`Undo last AI change to ${title}`}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted hover:text-foreground hover:bg-surface-hover transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:opacity-50"
               >
-                <SparklesIcon />
-                Refine
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                </svg>
+                Undo
               </button>
+            )}
+            {showRefineButton && isRefinable && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onExpandRequest(sectionKey)}
+                  disabled={refineBusy}
+                  aria-label={`Elaborate ${title} with AI`}
+                  className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:opacity-50"
+                >
+                  {isExpanding ? (
+                    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                    </svg>
+                  )}
+                  {isExpanding ? "Elaborating…" : "Elaborate"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRefineRequest(sectionKey)}
+                  disabled={refineBusy}
+                  aria-label={`Refine ${title} with AI`}
+                  aria-pressed={isRefining}
+                  className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:opacity-50"
+                >
+                  <SparklesIcon />
+                  Refine
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -376,13 +304,26 @@ export default function ReviewPage({
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
 
-  // Refine state
-  const [refiningSection, setRefiningSection] = useState<SectionKey | null>(null);
-  const [refineInstruction, setRefineInstruction] = useState("");
-  const [isRefining, setIsRefining] = useState(false);
-  const [refineError, setRefineError] = useState("");
-  const [refineSuccessBadge, setRefineSuccessBadge] = useState<SectionKey | null>(null);
-  const [remainingRefines, setRemainingRefines] = useState<number | null>(null);
+  // All AI refine/elaborate/undo state lives in the shared hook
+  const {
+    refiningSection,
+    setRefiningSection,
+    expandingSection,
+    aiActionMap,
+    clearUndoForSection,
+    undoMap,
+    refineInstruction,
+    setRefineInstruction,
+    refineError,
+    setRefineError,
+    isRefining,
+    remainingRefines,
+    showRefineButton,
+    handleRefineRequest,
+    handleRefineSubmit,
+    handleExpandRequest,
+    handleUndo,
+  } = useAIRefine(lesson, onChange, user, isAvailable);
 
   // Ref for the first validation error - focus management
   const firstErrorRef = useRef<HTMLLIElement>(null);
@@ -393,27 +334,6 @@ export default function ReviewPage({
       firstErrorRef.current?.focus();
     }
   }, [validationErrors]);
-
-  // Fetch remaining refines on mount
-  useEffect(() => {
-    if (!user || !isAvailable) return;
-    let cancelled = false;
-    async function fetchRefines() {
-      try {
-        const token = await user!.getIdToken();
-        const res = await fetch("/api/ai/lesson", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as { remainingRefines?: number | null };
-        if (!cancelled) setRemainingRefines(data.remainingRefines ?? null);
-      } catch {
-        // Non-critical - silent failure
-      }
-    }
-    fetchRefines();
-    return () => { cancelled = true; };
-  }, [user, isAvailable]);
 
   // ── Editing helpers ──────────────────────────────────────────────────────────
 
@@ -435,6 +355,8 @@ export default function ReviewPage({
   function handleSave(key: SectionKey) {
     if (!editDraft) return;
     onChange(editDraft);
+    // Clear undo since the user manually replaced the AI content
+    clearUndoForSection(key);
     setEditingSection(null);
     setEditSnapshot(null);
     setEditDraft(null);
@@ -447,102 +369,6 @@ export default function ReviewPage({
     setEditingSection(null);
     setEditSnapshot(null);
     setEditDraft(null);
-  }
-
-  // ── Refine helpers ────────────────────────────────────────────────────────────
-
-  function handleRefineRequest(key: SectionKey) {
-    // Close if clicking the same section
-    if (refiningSection === key) {
-      setRefiningSection(null);
-      setRefineInstruction("");
-      setRefineError("");
-      return;
-    }
-    setRefiningSection(key);
-    setRefineInstruction("");
-    setRefineError("");
-  }
-
-  async function handleRefineSubmit() {
-    if (!refiningSection || !refineInstruction.trim() || !user) return;
-
-    const field = SECTION_FIELD_MAP[refiningSection];
-    if (!field) return;
-
-    setIsRefining(true);
-    setRefineError("");
-
-    let responseStatus: number | undefined;
-    let responseData: Record<string, unknown> = {};
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30_000);
-
-    try {
-      const token = await user.getIdToken();
-      const content = lesson[field];
-      const res = await fetch("/api/ai/lesson", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          mode: "refine",
-          field,
-          content,
-          instruction: refineInstruction.trim(),
-          gradeLevel: lesson.gradeLevel || "General",
-          subject: lesson.subject || "General",
-        }),
-        signal: controller.signal,
-      });
-
-      responseStatus = res.status;
-      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
-      responseData = data;
-
-      if (!res.ok) throw new Error("api_error");
-
-      // Apply the refined content
-      onChange({ [field]: data.refined } as Partial<WizardLessonState>);
-
-      // Update remaining refines
-      if (typeof data.remainingRefines === "number") {
-        setRemainingRefines(data.remainingRefines);
-      } else if (data.remainingRefines === null) {
-        setRemainingRefines(null);
-      }
-
-      // Close popover + show badge
-      setRefiningSection(null);
-      setRefineInstruction("");
-      setRefineSuccessBadge(refiningSection);
-      setTimeout(() => setRefineSuccessBadge(null), 2000);
-    } catch (err) {
-      let msg: string;
-      if (err instanceof Error && err.name === "AbortError") {
-        msg = "The AI took too long to respond. Please try again.";
-      } else if (err instanceof TypeError) {
-        msg = "Could not reach the AI service. Check your connection and try again.";
-      } else if (responseStatus === 429) {
-        const errBody = typeof responseData.error === "string" ? responseData.error : "";
-        msg = errBody.includes("monthly refine limit")
-          ? "You've reached your monthly refine limit (20). Upgrade to Plus for unlimited refines."
-          : "The AI service is busy. Please wait a moment and try again.";
-        if (typeof responseData.remainingRefines === "number") {
-          setRemainingRefines(responseData.remainingRefines);
-        }
-      } else if (responseStatus === 503) {
-        msg = "AI features are not available in this environment.";
-      } else {
-        msg = "Something went wrong. Please try again.";
-      }
-      setRefineError(msg);
-    } finally {
-      clearTimeout(timeoutId);
-      setIsRefining(false);
-    }
   }
 
   // ── Publish validation ───────────────────────────────────────────────────────
@@ -596,9 +422,6 @@ export default function ReviewPage({
   // The lesson to display in forms (edit draft while editing; live lesson otherwise)
   const displayLesson = editDraft ?? lesson;
 
-  // Show Refine buttons when AI is available and the free limit has not been reached
-  const showRefineButton = isAvailable && remainingRefines !== 0;
-
   // Helper to render the refine popover for a given section
   function renderRefinePopover(key: SectionKey) {
     if (refiningSection !== key) return null;
@@ -617,12 +440,16 @@ export default function ReviewPage({
     );
   }
 
-  // Shared ReviewSection props for refine
+  // Shared ReviewSection props for refine + expand + undo
   const refineProps = {
     refiningSection,
     onRefineRequest: handleRefineRequest,
     showRefineButton,
-    refineSuccessBadge,
+    aiActionMap,
+    expandingSection,
+    onExpandRequest: handleExpandRequest,
+    undoMap,
+    onUndo: handleUndo,
   };
 
   // ────────────────────────────────────────────────────────────────────────────

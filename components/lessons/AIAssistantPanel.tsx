@@ -30,6 +30,7 @@ export type ApplySuggestionPayload =
       field: "all";
       lesson: {
         title: string;
+        duration: string;
         objectives: string[];
         materials: string[];
         steps: LessonStep[];
@@ -202,6 +203,7 @@ export default function AIAssistantPanel({
 
   function applyLesson(lesson: {
     title: string;
+    duration?: string;
     objectives: string[];
     materials: string[];
     steps: Array<{ title: string; description: string; duration?: string }>;
@@ -212,6 +214,7 @@ export default function AIAssistantPanel({
       field: "all",
       lesson: {
         title: lesson.title,
+        duration: lesson.duration ?? "",
         objectives: lesson.objectives,
         materials: lesson.materials,
         steps: lesson.steps,

@@ -367,6 +367,14 @@ export default function LessonDetailPage({
               </div>
             )}
 
+            {/* Duration */}
+            {user && lesson.duration && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted">⏱</span>
+                <span className="font-medium text-foreground">{lesson.duration}</span>
+              </div>
+            )}
+
             {/* Steps */}
             {user && lesson.steps.length > 0 && (
               <div>
@@ -379,10 +387,15 @@ export default function LessonDetailPage({
                       key={i}
                       className="border-l-2 border-primary-300 pl-4"
                     >
-                      <p className="text-sm font-semibold text-foreground">
-                        Step {i + 1}
-                        {step.title ? `: ${step.title}` : ""}
-                      </p>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-sm font-semibold text-foreground">
+                          Step {i + 1}
+                          {step.title ? `: ${step.title}` : ""}
+                        </p>
+                        {step.duration && (
+                          <span className="shrink-0 text-xs text-muted">{step.duration}</span>
+                        )}
+                      </div>
                       {step.description && (
                         <p className="mt-1 text-sm text-muted whitespace-pre-wrap">
                           {step.description}
@@ -391,6 +404,34 @@ export default function LessonDetailPage({
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Check for Understanding */}
+            {user && lesson.checkForUnderstanding.filter(Boolean).length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">
+                  🤔 Check for Understanding
+                </h3>
+                <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
+                  {lesson.checkForUnderstanding.filter(Boolean).map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Assessment */}
+            {user && lesson.assessments.filter(Boolean).length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">
+                  📝 Assessment
+                </h3>
+                <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
+                  {lesson.assessments.filter(Boolean).map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
               </div>
             )}
 
@@ -527,7 +568,7 @@ export default function LessonDetailPage({
           {/* Comments */}
           <Card padding="lg">
             <h2 className="text-lg font-semibold text-foreground mb-4">
-              Discussion
+              Discussion, Feedback & Suggestions
             </h2>
             <CommentThread
               comments={commentData}
@@ -608,18 +649,26 @@ export default function LessonDetailPage({
             </h3>
             <dl className="space-y-2 text-sm">
               {lesson.gradeLevel && (
-                <div className="flex justify-between">
-                  <dt className="text-muted">Grade Level</dt>
-                  <dd className="text-foreground font-medium">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted shrink-0">Grade Level</dt>
+                  <dd className="text-foreground font-medium text-right">
                     {lesson.gradeLevel}
                   </dd>
                 </div>
               )}
               {lesson.subject && (
-                <div className="flex justify-between">
-                  <dt className="text-muted">Subject</dt>
-                  <dd className="text-foreground font-medium">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted shrink-0">Subject</dt>
+                  <dd className="text-foreground font-medium text-right">
                     {lesson.subject}
+                  </dd>
+                </div>
+              )}
+              {lesson.duration && (
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted shrink-0">Duration</dt>
+                  <dd className="text-foreground font-medium text-right">
+                    {lesson.duration}
                   </dd>
                 </div>
               )}

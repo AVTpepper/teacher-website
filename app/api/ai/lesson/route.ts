@@ -571,13 +571,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     systemPrompt = `You are an expert educator. Given a topic, grade level, and subject, return a complete lesson plan as a single JSON object with exactly this structure:
 {
   "title": "<string>",
-  "duration": "<total lesson duration, e.g. 45 minutes or 2 class periods>",
+  "duration": "<total duration — must equal the exact sum of all step durations, e.g. '45 minutes' or '90 minutes'>",
   "objectives": ["<string>"],
   "materials": ["<string>"],
   "steps": [{"title": "<step title>", "description": "<1-2 sentence description of what happens in this step>", "duration": "<e.g. 5 minutes>"}],
   "checkForUnderstanding": ["<question or activity to check student comprehension>"],
   "assessments": ["<assessment method or task>"]
 }
+IMPORTANT: The top-level "duration" field MUST equal the sum of all individual step duration values. If your steps total 45 minutes, "duration" must be "45 minutes". Do not invent a different number of class periods.
 Return only the raw JSON object - no markdown, no code fences, no explanation.`;
 
     // Use gradeLevelOverride (plus-tier only) if provided, otherwise fall back to gradeLevel
@@ -631,6 +632,20 @@ Return only the raw JSON object - no markdown, no code fences, no explanation.`;
 Grade Level: ${sb.gradeLevel}
 Subject: ${sb.subject}
 Current content: ${existing}`;
+
+    // Append lesson context if provided — gives the AI the topic and objectives
+    // so suggestions are relevant to the actual lesson being built
+    if (sb.lessonContext) {
+      const ctx = sb.lessonContext;
+      if (ctx.title) userMessage += `\nLesson title: ${ctx.title}`;
+      if (ctx.objectives && ctx.objectives.length > 0) {
+        userMessage += `\nLearning objectives: ${ctx.objectives.join("; ")}`;
+      }
+      if (ctx.steps && ctx.steps.length > 0) {
+        const stepList = ctx.steps.map((s, i) => `Step ${i + 1}: ${s.title}${s.description ? ` — ${s.description}` : ""}`).join("; ");
+        userMessage += `\nLesson steps so far: ${stepList}`;
+      }
+    }
   }
 
   try {
@@ -696,6 +711,7 @@ Current content: ${existing}`;
       return Response.json({
         lesson: {
           title: lesson.title,
+          duration: typeof lesson.duration === "string" ? lesson.duration : "",
           objectives: lesson.objectives as string[],
           materials: lesson.materials as string[],
           steps: lesson.steps as Array<{ title: string; description: string; duration?: string }>,

@@ -506,6 +506,7 @@ function LessonBuilderNewInner() {
   function handleApplySuggestion(payload: ApplySuggestionPayload) {
     if (payload.field === "all") {
       setTitle(payload.lesson.title);
+      setDuration(payload.lesson.duration ?? "");
       setObjectives(
         payload.lesson.objectives.length > 0 ? payload.lesson.objectives : [""]
       );
@@ -585,6 +586,13 @@ function LessonBuilderNewInner() {
           gradeLevel,
           subject,
           existingContent,
+          lessonContext: {
+            title: title.trim() || undefined,
+            objectives: objectives.filter((o) => o.trim()),
+            steps: steps
+              .filter((s) => s.title.trim())
+              .map((s) => ({ title: s.title, description: s.description })),
+          },
         }),
         signal: controller.signal,
       });

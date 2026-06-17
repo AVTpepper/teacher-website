@@ -12,6 +12,8 @@ import type { User } from "firebase/auth";
 import { WIZARD_STEPS, type WizardLessonState, type WizardStepKey, emptyWizardState, validateStep, type ValidationError } from "./LessonWizardState";
 import { createLesson, getLesson, updateLesson, type LessonInput } from "@/lib/firestore/lessons";
 import ReviewPage from "./ReviewPage";
+import { useAIRefine, type AIRefineState, REFINE_LABEL_MAP } from "./useAIRefine";
+import RefinePopover from "./RefinePopover";
 import BasicInfoStep from "./steps/BasicInfoStep";
 import ObjectivesStep from "./steps/ObjectivesStep";
 import MaterialsStep from "./steps/MaterialsStep";
@@ -106,6 +108,9 @@ export default function WizardShell({
   const onChange = useCallback((patch: Partial<WizardLessonState>) => {
     setLesson((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  // AI refine/elaborate/undo state shared across all steps
+  const ai = useAIRefine(lesson, onChange, user, isAvailable);
 
   // ── Intersection Observer for scroll sync ──────────────────────────────────
 
@@ -518,6 +523,7 @@ export default function WizardShell({
             onBack={handleBack}
           >
             <ObjectivesStep {...stepProps("objectives")} />
+            {isAvailable && <StepAIBar sectionKey="objectives" label={REFINE_LABEL_MAP.objectives} ai={ai} />}
           </SectionCard>
 
           {/* Step 3: Materials */}
@@ -531,6 +537,7 @@ export default function WizardShell({
             onBack={handleBack}
           >
             <MaterialsStep {...stepProps("materials")} />
+            {isAvailable && <StepAIBar sectionKey="materials" label={REFINE_LABEL_MAP.materials} ai={ai} />}
           </SectionCard>
 
           {/* Step 4: Lesson Steps */}
@@ -544,6 +551,7 @@ export default function WizardShell({
             onBack={handleBack}
           >
             <LessonStepsStep {...stepProps("lessonSteps")} />
+            {isAvailable && <StepAIBar sectionKey="lessonSteps" label={REFINE_LABEL_MAP.lessonSteps} ai={ai} />}
           </SectionCard>
 
           {/* Step 5: CFU */}
@@ -557,6 +565,7 @@ export default function WizardShell({
             onBack={handleBack}
           >
             <CFUStep {...stepProps("cfu")} />
+            {isAvailable && <StepAIBar sectionKey="cfu" label={REFINE_LABEL_MAP.cfu} ai={ai} />}
           </SectionCard>
 
           {/* Step 6: Assessments */}
@@ -570,6 +579,7 @@ export default function WizardShell({
             onBack={handleBack}
           >
             <AssessmentsStep {...stepProps("assessments")} />
+            {isAvailable && <StepAIBar sectionKey="assessments" label={REFINE_LABEL_MAP.assessments} ai={ai} />}
           </SectionCard>
 
           {/* Step 7: Review & Publish */}
@@ -597,6 +607,128 @@ export default function WizardShell({
           </SectionCard>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Step AI Bar ──────────────────────────────────────────────────────────────
+
+interface StepAIBarProps {
+  sectionKey: "objectives" | "materials" | "lessonSteps" | "cfu" | "assessments";
+  label: string;
+  ai: AIRefineState;
+}
+
+function StepAIBar({ sectionKey, label, ai }: StepAIBarProps) {
+  const {
+    showRefineButton,
+    refiningSection,
+    setRefiningSection,
+    expandingSection,
+    aiActionMap,
+    undoMap,
+    refineInstruction,
+    setRefineInstruction,
+    refineError,
+    setRefineError,
+    isRefining,
+    handleRefineRequest,
+    handleRefineSubmit,
+    handleExpandRequest,
+    handleUndo,
+  } = ai;
+
+  if (!showRefineButton) return null;
+
+  const isRefiningThis = refiningSection === sectionKey;
+  const isExpandingThis = expandingSection === sectionKey;
+  const isAnyBusy = isRefining || expandingSection !== null;
+  const hasUndo = undoMap.has(sectionKey);
+  const aiAction = aiActionMap.get(sectionKey);
+
+  return (
+    <div className="mt-5 pt-4 border-t border-border space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-medium text-muted mr-auto">AI tools</span>
+
+        {aiAction && (
+          <span role="status" className={[
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+            aiAction === "refined" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700",
+          ].join(" ")}>
+            {aiAction === "refined" ? "Refined ✓" : "Elaborated ✓"}
+          </span>
+        )}
+
+        {/* Undo */}
+        {hasUndo && (
+          <button
+            type="button"
+            onClick={() => handleUndo(sectionKey)}
+            disabled={isAnyBusy}
+            aria-label={`Undo last AI change to ${label}`}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted hover:text-foreground hover:bg-surface-hover transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:opacity-50"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+            </svg>
+            Undo
+          </button>
+        )}
+
+        {/* Elaborate */}
+        <button
+          type="button"
+          onClick={() => handleExpandRequest(sectionKey)}
+          disabled={isAnyBusy}
+          aria-label={`Elaborate ${label} with AI`}
+          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:opacity-50"
+        >
+          {isExpandingThis ? (
+            <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            </svg>
+          ) : (
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+            </svg>
+          )}
+          {isExpandingThis ? "Elaborating…" : "Elaborate"}
+        </button>
+
+        {/* Refine */}
+        <button
+          type="button"
+          onClick={() => handleRefineRequest(sectionKey)}
+          disabled={isAnyBusy && !isRefiningThis}
+          aria-label={`Refine ${label} with AI`}
+          aria-pressed={isRefiningThis}
+          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:opacity-50"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+          </svg>
+          {isRefiningThis ? "Refine ▾" : "Refine"}
+        </button>
+      </div>
+
+      {/* Inline Refine popover */}
+      {isRefiningThis && (
+        <RefinePopover
+          sectionTitle={label}
+          instruction={refineInstruction}
+          onInstructionChange={setRefineInstruction}
+          onSubmit={handleRefineSubmit}
+          onClose={() => {
+            setRefiningSection(null);
+            setRefineInstruction("");
+            setRefineError("");
+          }}
+          isRefining={isRefining}
+          error={refineError}
+        />
+      )}
     </div>
   );
 }

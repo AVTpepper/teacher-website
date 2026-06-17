@@ -271,7 +271,8 @@ service cloud.firestore {
     // ratings/{ratingId}  (ratingId = "{userId}_{lessonId}")
     // -----------------------------------------------------------------------
     match /ratings/{ratingId} {
-      allow read: if isAuth() && request.auth.uid == resource.data.userId;
+      // Any authenticated user can read (needed for aggregate recalculation query)
+      allow read: if isAuth();
       allow create: if isAuth()
                     && request.auth.uid == request.resource.data.userId;
       allow update: if isAuth()
