@@ -35,6 +35,7 @@ export interface Notification {
   recipientId: string;
   type: NotificationType;
   read: boolean;
+  dismissed: boolean;
   createdAt: Timestamp | null;
   /** The user who triggered the notification. */
   actorId: string;
@@ -73,6 +74,7 @@ export async function createNotification(
   await setDoc(ref, {
     ...input,
     read: false,
+    dismissed: false,
     createdAt: serverTimestamp(),
   });
 }
@@ -114,10 +116,11 @@ export function subscribeToNotifications(
   onUpdate: (notifications: Notification[]) => void
 ): Unsubscribe {
   if (!db) return () => {};
+  // Fetch more than needed so filtering dismissed still gives us enough to show
   const q = query(
     notifCollection(recipientId),
     orderBy("createdAt", "desc"),
-    limit(pageSize)
+    limit(pageSize * 3)
   );
   return onSnapshot(q, (snap) => {
     const items = snap.docs.map((d) => ({
@@ -159,6 +162,37 @@ export async function markAllAsRead(recipientId: string): Promise<void> {
 
   const batch = writeBatch(db);
   snap.docs.forEach((d) => batch.update(d.ref, { read: true }));
+  await batch.commit();
+}
+
+// ---------------------------------------------------------------------------
+// dismissNotification - hide a single notification from the dropdown permanently
+// ---------------------------------------------------------------------------
+
+export async function dismissNotification(
+  recipientId: string,
+  notificationId: string
+): Promise<void> {
+  if (!db) return;
+  await updateDoc(
+    doc(notifCollection(recipientId), notificationId),
+    { dismissed: true }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// dismissAllVisible - soft-hide a list of notification ids from the dropdown
+// ---------------------------------------------------------------------------
+
+export async function dismissAllVisible(
+  recipientId: string,
+  ids: string[]
+): Promise<void> {
+  if (!db || ids.length === 0) return;
+  const batch = writeBatch(db);
+  ids.forEach((id) =>
+    batch.update(doc(notifCollection(recipientId), id), { dismissed: true })
+  );
   await batch.commit();
 }
 
