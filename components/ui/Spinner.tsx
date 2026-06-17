@@ -1,7 +1,14 @@
-export default function Spinner({ className = "" }: { className?: string }) {
+export default function Spinner({
+  className = "",
+  size = "md",
+}: {
+  className?: string;
+  size?: "sm" | "md" | "lg";
+}) {
+  const sizeClass = size === "sm" ? "h-4 w-4 border-2" : size === "lg" ? "h-12 w-12 border-4" : "h-8 w-8 border-4";
   return (
     <div
-      className={`h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent ${className}`}
+      className={`animate-spin rounded-full border-primary-500 border-t-transparent ${sizeClass} ${className}`}
     />
   );
 }
