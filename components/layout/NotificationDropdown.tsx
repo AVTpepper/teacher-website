@@ -308,38 +308,6 @@ export default function NotificationDropdown() {
     </div>
   );
 }
-import { useAuth } from "@/lib/auth-context";
-import {
-  subscribeToNotifications,
-  markAsRead,
-  markAllAsRead,
-  type Notification,
-  type NotificationType,
-} from "@/lib/notifications";
-import Avatar from "@/components/ui/Avatar";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-import { timeAgo } from "@/lib/utils";
-
-const TYPE_ICON: Record<NotificationType, string> = {
-  "new-follower": "👤",
-  comment: "💬",
-  upvote: "⬆️",
-  "badge-earned": "🏅",
-  "resource-liked": "❤️",
-  mention: "@",
-};
-
-// ---------------------------------------------------------------------------
-// NotificationDropdown
-// ---------------------------------------------------------------------------
-
-export default function NotificationDropdown() {
-  const { user } = useAuth();
-  const router = useRouter();
 
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
