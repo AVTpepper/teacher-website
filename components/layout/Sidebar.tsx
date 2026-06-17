@@ -237,9 +237,6 @@ export function SidebarDrawerButton() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  // Hide on lesson-builder pages - they show their own AI floating button
-  if (pathname?.startsWith("/lesson-builder")) return null;
-
   // Close on route changes
   const handleClose = useCallback(() => setOpen(false), []);
 
@@ -258,6 +255,9 @@ export function SidebarDrawerButton() {
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [open]);
+
+  // Hide on lesson-builder pages - they show their own AI floating button
+  if (pathname?.startsWith("/lesson-builder")) return null;
 
   return (
     <>
