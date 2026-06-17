@@ -154,7 +154,8 @@ service cloud.firestore {
                     && (
                       resource.data.authorId == request.auth.uid
                       || request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['downloadCount', 'updatedAt'])
+                           .hasOnly(['downloadCount', 'bookmarkCount', 'ratingAverage',
+                                     'ratingCount', 'updatedAt'])
                     );
       allow delete: if isAuth() && resource.data.authorId == request.auth.uid;
 
@@ -253,6 +254,28 @@ service cloud.firestore {
       allow create: if isAuth();
       allow update: if isOwner(userId);
       allow delete: if isOwner(userId);
+    }
+
+    // -----------------------------------------------------------------------
+    // bookmarks/{bookmarkId}  (bookmarkId = "{userId}_{lessonId}")
+    // -----------------------------------------------------------------------
+    match /bookmarks/{bookmarkId} {
+      allow read: if isAuth() && request.auth.uid == resource.data.userId;
+      allow create: if isAuth()
+                    && request.auth.uid == request.resource.data.userId;
+      allow delete: if isAuth()
+                    && request.auth.uid == resource.data.userId;
+    }
+
+    // -----------------------------------------------------------------------
+    // ratings/{ratingId}  (ratingId = "{userId}_{lessonId}")
+    // -----------------------------------------------------------------------
+    match /ratings/{ratingId} {
+      allow read: if isAuth() && request.auth.uid == resource.data.userId;
+      allow create: if isAuth()
+                    && request.auth.uid == request.resource.data.userId;
+      allow update: if isAuth()
+                    && request.auth.uid == resource.data.userId;
     }
 
     // -----------------------------------------------------------------------
