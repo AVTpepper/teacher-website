@@ -14,6 +14,7 @@ import {
   startAfter,
   getDocs,
   type DocumentSnapshot,
+  type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -220,14 +221,14 @@ export async function searchEducators(
   }
 
   // --- Filter path (no name query) ---
-  const constraints = [];
+  const constraints: QueryConstraint[] = [];
 
   if (filters.gradeLevel) {
-    constraints.push(where("gradeLevel", "==", filters.gradeLevel));
+  constraints.push(where("gradeLevel", "==", filters.gradeLevel));
   }
 
   if (filters.subject) {
-    constraints.push(where("subjects", "array-contains", filters.subject));
+  constraints.push(where("subjects", "array-contains", filters.subject));
   }
 
   constraints.push(orderBy("createdAt", "desc"));
@@ -238,7 +239,7 @@ export async function searchEducators(
   let lastSnapshotDoc: DocumentSnapshot | null = null;
 
   while (educators.length < PAGE_SIZE) {
-    const pageConstraints = [...constraints];
+    const pageConstraints: QueryConstraint[] = [...constraints];
     if (currentCursor) {
       pageConstraints.push(startAfter(currentCursor));
     }
