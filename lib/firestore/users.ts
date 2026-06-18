@@ -26,11 +26,12 @@ export interface UserProfile {
   photoURL: string | null;
   gradeLevel: string;
   subjects: string[];
-  location: string;
+  country?: string;
   school: string;
   yearsOfExperience: number;
   bio: string;
   isVerified: boolean;
+  tier?: "free" | "plus";
   createdAt: unknown;
   badges: string[];
   followerCount: number;
@@ -167,6 +168,7 @@ export async function isFollowing(
 export interface SearchEducatorsFilters {
   gradeLevel?: string;
   subject?: string;
+  country?: string;
   /** Prefix match on displayNameLower for case-insensitive name search. */
   nameQuery?: string;
 }
@@ -183,6 +185,10 @@ export async function searchEducators(
   cursor?: DocumentSnapshot | null
 ): Promise<SearchEducatorsResult> {
   if (!db) throw new Error("Firestore is not initialized");
+
+  const countryFilter = filters.country?.trim().toLowerCase();
+  const matchesCountry = (value?: string) =>
+    Boolean(countryFilter) && value?.trim().toLowerCase() === countryFilter;
 
   // --- Name search path ---
   // Uses a prefix-range query on displayNameLower (no composite index needed).
@@ -206,6 +212,9 @@ export async function searchEducators(
     if (filters.subject) {
       educators = educators.filter((e) => e.subjects?.includes(filters.subject!));
     }
+    if (countryFilter) {
+      educators = educators.filter((e) => matchesCountry(e.country));
+    }
 
     return { educators: educators.slice(0, PAGE_SIZE), lastDoc: null };
   }
@@ -224,20 +233,47 @@ export async function searchEducators(
   constraints.push(orderBy("createdAt", "desc"));
   constraints.push(limit(PAGE_SIZE));
 
-  if (cursor) {
-    constraints.push(startAfter(cursor));
+  const educators: UserProfile[] = [];
+  let currentCursor = cursor ?? null;
+  let lastSnapshotDoc: DocumentSnapshot | null = null;
+
+  while (educators.length < PAGE_SIZE) {
+    const pageConstraints = [...constraints];
+    if (currentCursor) {
+      pageConstraints.push(startAfter(currentCursor));
+    }
+
+    const q = query(collection(db, "users"), ...pageConstraints);
+    const snapshot = await getDocs(q);
+
+    if (snapshot.docs.length === 0) {
+      lastSnapshotDoc = null;
+      break;
+    }
+
+    lastSnapshotDoc = snapshot.docs[snapshot.docs.length - 1];
+    currentCursor = lastSnapshotDoc;
+
+    for (const docSnap of snapshot.docs) {
+      const educator = docSnap.data() as UserProfile;
+      if (!countryFilter || matchesCountry(educator.country)) {
+        educators.push(educator);
+      }
+
+      if (educators.length >= PAGE_SIZE) {
+        break;
+      }
+    }
+
+    if (snapshot.docs.length < PAGE_SIZE) {
+      break;
+    }
   }
 
-  const q = query(collection(db, "users"), ...constraints);
-  const snapshot = await getDocs(q);
-
-  const educators = snapshot.docs.map((d) => d.data() as UserProfile);
-  const lastDoc =
-    snapshot.docs.length === PAGE_SIZE
-      ? snapshot.docs[snapshot.docs.length - 1]
-      : null;
-
-  return { educators, lastDoc };
+  return {
+    educators,
+    lastDoc: countryFilter ? lastSnapshotDoc : currentCursor,
+  };
 }
 
 // --- Mention / @username search ---

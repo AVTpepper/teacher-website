@@ -77,7 +77,7 @@ export default function SignupPage() {
     try {
       const googleUser = await signInWithGoogle();
       const profile = await getUser(googleUser.uid);
-      router.push(profile ? "/" : "/profile/edit");
+      router.push(profile ? "/home" : "/profile/edit");
     } catch (err: unknown) {
       const code =
         err instanceof Error && "code" in err

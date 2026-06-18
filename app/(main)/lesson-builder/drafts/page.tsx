@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { getLessonsByAuthor, deleteLesson, type Lesson } from "@/lib/firestore/lessons";
-import { Badge, Button, Card, Spinner } from "@/components/ui";
+import { Badge, Button, Card, ConfirmDialog, Spinner } from "@/components/ui";
 import { timeAgo } from "@/lib/utils";
 
 export default function LessonDraftsPage() {
@@ -39,7 +39,6 @@ export default function LessonDraftsPage() {
   }, [user]);
 
   async function handleDelete(draft: Lesson) {
-    if (!window.confirm(`Delete "${draft.title || "Untitled draft"}"? This cannot be undone.`)) return;
     try {
       await deleteLesson(draft.id);
       setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
@@ -112,8 +111,10 @@ interface DraftRowProps {
 
 function DraftRow({ draft, isAvailable, onDelete }: DraftRowProps) {
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  async function handleDelete() {
+  async function handleConfirmedDelete() {
+    setConfirmOpen(false);
     setDeleting(true);
     try {
       await onDelete();
@@ -123,7 +124,17 @@ function DraftRow({ draft, isAvailable, onDelete }: DraftRowProps) {
   }
 
   return (
-    <div className="rounded-lg border border-border px-3 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <>
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleConfirmedDelete}
+        title={`Delete "${draft.title || "Untitled draft"}"?`}
+        description="This cannot be undone."
+        confirmLabel="Delete"
+        isLoading={deleting}
+      />
+      <div className="rounded-lg border border-border px-3 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="space-y-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-semibold text-foreground truncate">
@@ -159,7 +170,7 @@ function DraftRow({ draft, isAvailable, onDelete }: DraftRowProps) {
         </Link>
         <button
           type="button"
-          onClick={handleDelete}
+          onClick={() => setConfirmOpen(true)}
           disabled={deleting}
           aria-label={`Delete "${draft.title || "Untitled draft"}"`}
           className="inline-flex items-center justify-center rounded-lg p-1.5 text-muted hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 cursor-pointer"
@@ -175,5 +186,6 @@ function DraftRow({ draft, isAvailable, onDelete }: DraftRowProps) {
         </button>
       </div>
     </div>
+    </>
   );
 }

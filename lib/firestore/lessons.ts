@@ -34,6 +34,7 @@ export interface LessonAttachment {
 export interface Lesson {
   id: string;
   title: string;
+  titleLower?: string;
   authorId: string;
   authorName: string;
   authorPhotoURL: string | null;
@@ -85,6 +86,7 @@ export async function createLesson(data: LessonInput): Promise<string> {
 
   await setDoc(ref, {
     ...data,
+    titleLower: data.title.toLowerCase(),
     id: ref.id,
     remixedFromId: data.remixedFromId ?? null,
     createdAt: serverTimestamp(),
@@ -114,6 +116,7 @@ export async function updateLesson(
 
   await updateDoc(doc(db, "lessons", lessonId), {
     ...data,
+    ...(data.title !== undefined ? { titleLower: data.title.toLowerCase() } : {}),
     updatedAt: serverTimestamp(),
   });
 }
@@ -214,6 +217,7 @@ export interface LessonComment {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
   createdAt: Timestamp | null;
 }
 
@@ -223,6 +227,7 @@ export interface LessonCommentInput {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
 }
 
 export async function addLessonComment(
@@ -238,6 +243,7 @@ export async function addLessonComment(
     id: ref.id,
     lessonId,
     parentId: data.parentId ?? null,
+    mentionedUsers: data.mentionedUsers ?? [],
     createdAt: serverTimestamp(),
   });
 
@@ -256,4 +262,24 @@ export async function getLessonComments(
   const snapshot = await getDocs(q);
 
   return snapshot.docs.map((d) => d.data() as LessonComment);
+}
+
+export async function updateLessonComment(
+  lessonId: string,
+  commentId: string,
+  text: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(doc(db, "lessons", lessonId, "comments", commentId), {
+    content: text.trim().slice(0, 2000),
+    editedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteLessonComment(
+  lessonId: string,
+  commentId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "lessons", lessonId, "comments", commentId));
 }

@@ -43,15 +43,15 @@ service firebase.storage {
 
     // -----------------------------------------------------------------------
     // Profile avatars — avatars/{userId}/{filename}
-    //   • 5 MB max
-    //   • Images only
+    //   • 2 MB max
+    //   • JPEG and PNG only
     //   • Only the owner can write; anyone authenticated can read
     // -----------------------------------------------------------------------
     match /avatars/{userId}/{fileName} {
       allow read:  if isAuth();
       allow write: if isOwner(userId)
-                   && underMB(5)
-                   && isImageType();
+                   && underMB(2)
+                   && request.resource.contentType in ['image/jpeg', 'image/png'];
       allow delete: if isOwner(userId);
     }
 

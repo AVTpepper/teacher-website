@@ -96,7 +96,7 @@ function HomePageInner() {
   useEffect(() => {
     if (sharedPost && sharedPostRef.current) {
       sharedPostRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      router.replace("/");
+      router.replace("/home");
     }
   }, [sharedPost, router]);
 

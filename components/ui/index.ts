@@ -17,3 +17,5 @@ export { default as MentionInput } from "./MentionInput";
 export type { MentionedUser } from "./MentionInput";
 export { default as LinkAttacher } from "./LinkAttacher";
 export type { AttachedLink } from "./LinkAttacher";
+export { default as ConfirmDialog } from "./ConfirmDialog";
+export { default as IPNotice } from "./IPNotice";

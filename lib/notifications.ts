@@ -28,7 +28,13 @@ export type NotificationType =
   | "upvote"
   | "badge-earned"
   | "resource-liked"
-  | "mention";
+  | "mention"
+  | "lesson-rated"
+  | "lesson-downloaded"
+  | "resource-downloaded"
+  | "lesson-shared"
+  | "resource-shared"
+  | "comment-replied";
 
 export interface Notification {
   id: string;
@@ -67,8 +73,8 @@ export async function createNotification(
   input: NotificationInput
 ): Promise<void> {
   if (!db) return;
-  // Don't notify yourself
-  if (input.actorId === input.recipientId) return;
+  // Don't notify yourself (except for system notifications which use 'system' as actorId)
+  if (input.actorId !== "system" && input.actorId === input.recipientId) return;
 
   const ref = doc(notifCollection(input.recipientId));
   await setDoc(ref, {
@@ -262,7 +268,7 @@ export function notifyBadgeEarned(params: {
   return createNotification({
     recipientId: params.recipientId,
     type: "badge-earned",
-    actorId: params.recipientId, // self-triggered
+    actorId: "system", // sentinel — bypasses self-notification guard
     actorName: "EduConnect",
     actorPhotoURL: null,
     message: `You earned the "${params.badgeLabel}" badge! 🎉`,
@@ -303,6 +309,119 @@ export function notifyMention(params: {
     actorName: params.actorName,
     actorPhotoURL: params.actorPhotoURL,
     message: `${params.actorName} mentioned you.`,
+    linkURL: params.linkURL,
+  });
+}
+
+export function notifyLessonRated(params: {
+  recipientId: string;
+  actorId: string;
+  actorName: string;
+  actorPhotoURL: string | null;
+  lessonTitle: string;
+  linkURL: string;
+}): Promise<void> {
+  return createNotification({
+    recipientId: params.recipientId,
+    type: "lesson-rated",
+    actorId: params.actorId,
+    actorName: params.actorName,
+    actorPhotoURL: params.actorPhotoURL,
+    message: `${params.actorName} rated your lesson "${params.lessonTitle}".`,
+    linkURL: params.linkURL,
+  });
+}
+
+export function notifyLessonDownloaded(params: {
+  recipientId: string;
+  actorId: string;
+  actorName: string;
+  actorPhotoURL: string | null;
+  lessonTitle: string;
+  linkURL: string;
+}): Promise<void> {
+  return createNotification({
+    recipientId: params.recipientId,
+    type: "lesson-downloaded",
+    actorId: params.actorId,
+    actorName: params.actorName,
+    actorPhotoURL: params.actorPhotoURL,
+    message: `${params.actorName} downloaded your lesson "${params.lessonTitle}".`,
+    linkURL: params.linkURL,
+  });
+}
+
+export function notifyResourceDownloaded(params: {
+  recipientId: string;
+  actorId: string;
+  actorName: string;
+  actorPhotoURL: string | null;
+  resourceTitle: string;
+  linkURL: string;
+}): Promise<void> {
+  return createNotification({
+    recipientId: params.recipientId,
+    type: "resource-downloaded",
+    actorId: params.actorId,
+    actorName: params.actorName,
+    actorPhotoURL: params.actorPhotoURL,
+    message: `${params.actorName} downloaded your resource "${params.resourceTitle}".`,
+    linkURL: params.linkURL,
+  });
+}
+
+export function notifyLessonShared(params: {
+  recipientId: string;
+  actorId: string;
+  actorName: string;
+  actorPhotoURL: string | null;
+  lessonTitle: string;
+  linkURL: string;
+}): Promise<void> {
+  return createNotification({
+    recipientId: params.recipientId,
+    type: "lesson-shared",
+    actorId: params.actorId,
+    actorName: params.actorName,
+    actorPhotoURL: params.actorPhotoURL,
+    message: `${params.actorName} shared your lesson "${params.lessonTitle}".`,
+    linkURL: params.linkURL,
+  });
+}
+
+export function notifyResourceShared(params: {
+  recipientId: string;
+  actorId: string;
+  actorName: string;
+  actorPhotoURL: string | null;
+  resourceTitle: string;
+  linkURL: string;
+}): Promise<void> {
+  return createNotification({
+    recipientId: params.recipientId,
+    type: "resource-shared",
+    actorId: params.actorId,
+    actorName: params.actorName,
+    actorPhotoURL: params.actorPhotoURL,
+    message: `${params.actorName} shared your resource "${params.resourceTitle}".`,
+    linkURL: params.linkURL,
+  });
+}
+
+export function notifyCommentReplied(params: {
+  recipientId: string;
+  actorId: string;
+  actorName: string;
+  actorPhotoURL: string | null;
+  linkURL: string;
+}): Promise<void> {
+  return createNotification({
+    recipientId: params.recipientId,
+    type: "comment-replied",
+    actorId: params.actorId,
+    actorName: params.actorName,
+    actorPhotoURL: params.actorPhotoURL,
+    message: `${params.actorName} replied to your comment.`,
     linkURL: params.linkURL,
   });
 }

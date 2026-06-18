@@ -17,9 +17,9 @@ export default function TermsPage() {
         <p className="text-muted leading-relaxed">You agree to use EduConnect only for lawful purposes and in a manner that does not infringe the rights of others. You may not post content that is harmful, hateful, or violates any applicable law.</p>
       </section>
 
-      <section className="space-y-3">
+      <section id="content-ownership" className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">3. Content Ownership</h2>
-        <p className="text-muted leading-relaxed">You retain ownership of the content you create and upload. By posting content, you grant EduConnect a non-exclusive licence to display it to other users on the platform.</p>
+        <p className="text-muted leading-relaxed">Educators retain full intellectual property ownership of all lesson plans, resources, inspiration posts, and other content they publish on EduConnect. By posting content, you grant EduConnect a non-exclusive, royalty-free licence to display and distribute it to other users on the platform solely for the purpose of operating the service. This licence does not transfer ownership and may be revoked by deleting the content from your account.</p>
       </section>
 
       <section className="space-y-3">

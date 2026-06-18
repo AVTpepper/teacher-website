@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { type DocumentSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import {
@@ -12,12 +11,12 @@ import {
   deleteLesson,
   type Lesson,
 } from "@/lib/firestore/lessons";
-import { Avatar, Badge, Button, Card, Select, Spinner } from "@/components/ui";
+import { Avatar, Badge, Button, Card, ConfirmDialog, Select, Spinner } from "@/components/ui";
 import { timeAgo } from "@/lib/utils";
 
 import { addBookmark, removeBookmark, getUserBookmarks } from "@/lib/firestore/bookmarks";
 
-const PAGE_SIZE = 12;
+const LESSON_BUILDER_PREVIEW_LIMIT = 6;
 const OBJECTIVE_CHAR_LIMIT = 120;
 
 // ─── Star display ─────────────────────────────────────────────────────────────
@@ -182,9 +181,10 @@ interface PublishedRowProps {
 
 function PublishedRow({ lesson, onDeleted }: PublishedRowProps) {
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function handleDelete() {
-    if (!window.confirm(`Delete "${lesson.title || "Untitled"}"? This cannot be undone.`)) return;
+    setConfirmOpen(false);
     setDeleting(true);
     try {
       await deleteLesson(lesson.id);
@@ -196,45 +196,56 @@ function PublishedRow({ lesson, onDeleted }: PublishedRowProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        <Link href={`/lesson-builder/${lesson.id}`} className="text-sm font-medium text-foreground hover:text-primary-700 hover:underline truncate block">
-          {lesson.title || "Untitled"}
-        </Link>
-        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
-          {lesson.gradeLevel && <span>{lesson.gradeLevel}</span>}
-          {lesson.subject && <span>{lesson.subject}</span>}
-          {lesson.duration && <span>{lesson.duration}</span>}
-          <span className="flex items-center gap-1">
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-            </svg>
-            {lesson.downloadCount}
-          </span>
+    <>
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleDelete}
+        title={`Delete "${lesson.title || "Untitled"}"?`}
+        description="This cannot be undone."
+        confirmLabel="Delete"
+        isLoading={deleting}
+      />
+      <div className="flex flex-col gap-2 rounded-lg border border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <Link href={`/lesson-builder/${lesson.id}`} className="text-sm font-medium text-foreground hover:text-primary-700 hover:underline truncate block">
+            {lesson.title || "Untitled"}
+          </Link>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+            {lesson.gradeLevel && <span>{lesson.gradeLevel}</span>}
+            {lesson.subject && <span>{lesson.subject}</span>}
+            {lesson.duration && <span>{lesson.duration}</span>}
+            <span className="flex items-center gap-1">
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              {lesson.downloadCount}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Link href={`/lesson-builder/new?edit=${lesson.id}`}>
+            <Button type="button" variant="outline" size="sm">Edit</Button>
+          </Link>
+          <button
+            type="button"
+            onClick={() => setConfirmOpen(true)}
+            disabled={deleting}
+            aria-label={`Delete "${lesson.title || "Untitled"}"`}
+            className="inline-flex items-center justify-center rounded-lg p-1.5 text-muted hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {deleting
+              ? <Spinner size="sm" />
+              : (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                </svg>
+              )
+            }
+          </button>
         </div>
       </div>
-      <div className="flex items-center gap-1 shrink-0">
-        <Link href={`/lesson-builder/new?edit=${lesson.id}`}>
-          <Button type="button" variant="outline" size="sm">Edit</Button>
-        </Link>
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={deleting}
-          aria-label={`Delete "${lesson.title || "Untitled"}"`}
-          className="inline-flex items-center justify-center rounded-lg p-1.5 text-muted hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 cursor-pointer"
-        >
-          {deleting
-            ? <Spinner size="sm" />
-            : (
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-              </svg>
-            )
-          }
-        </button>
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -301,9 +312,10 @@ interface DraftRowProps {
 
 function DraftRow({ draft, isAvailable, onDeleted }: DraftRowProps) {
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function handleDelete() {
-    if (!window.confirm(`Delete "${draft.title || "Untitled draft"}"? This cannot be undone.`)) return;
+    setConfirmOpen(false);
     setDeleting(true);
     try {
       await deleteLesson(draft.id);
@@ -315,50 +327,61 @@ function DraftRow({ draft, isAvailable, onDeleted }: DraftRowProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{draft.title || "Untitled draft"}</p>
-        <p className="text-xs text-muted">
-          Updated {timeAgo(draft.updatedAt as { seconds: number } | null)}
-          {draft.gradeLevel && (
-            <span className="ml-2">
-              {draft.gradeLevel}{draft.subject ? ` · ${draft.subject}` : ""}
-            </span>
+    <>
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleDelete}
+        title={`Delete "${draft.title || "Untitled draft"}"?`}
+        description="This cannot be undone."
+        confirmLabel="Delete"
+        isLoading={deleting}
+      />
+      <div className="flex flex-col gap-2 rounded-lg border border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">{draft.title || "Untitled draft"}</p>
+          <p className="text-xs text-muted">
+            Updated {timeAgo(draft.updatedAt as { seconds: number } | null)}
+            {draft.gradeLevel && (
+              <span className="ml-2">
+                {draft.gradeLevel}{draft.subject ? ` · ${draft.subject}` : ""}
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {isAvailable && (
+            <Link href={`/lesson-builder/new?draft=${draft.id}&complete=true`}>
+              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                <svg className="h-3.5 w-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+                </svg>
+                AI Complete
+              </Button>
+            </Link>
           )}
-        </p>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        {isAvailable && (
-          <Link href={`/lesson-builder/new?draft=${draft.id}&complete=true`}>
-            <Button type="button" variant="outline" size="sm" className="gap-1.5">
-              <svg className="h-3.5 w-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
-              </svg>
-              AI Complete
-            </Button>
+          <Link href={`/lesson-builder/new?draft=${draft.id}`}>
+            <Button type="button" variant="outline" size="sm">Edit</Button>
           </Link>
-        )}
-        <Link href={`/lesson-builder/new?draft=${draft.id}`}>
-          <Button type="button" variant="outline" size="sm">Edit</Button>
-        </Link>
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={deleting}
-          aria-label={`Delete "${draft.title || "Untitled draft"}"`}
-          className="inline-flex items-center justify-center rounded-lg p-1.5 text-muted hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 cursor-pointer"
-        >
-          {deleting
-            ? <Spinner size="sm" />
-            : (
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-              </svg>
-            )
-          }
-        </button>
+          <button
+            type="button"
+            onClick={() => setConfirmOpen(true)}
+            disabled={deleting}
+            aria-label={`Delete "${draft.title || "Untitled draft"}"`}
+            className="inline-flex items-center justify-center rounded-lg p-1.5 text-muted hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {deleting
+              ? <Spinner size="sm" />
+              : (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                </svg>
+              )
+            }
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -373,10 +396,7 @@ export default function LessonBuilderPage() {
   const [subject, setSubject] = useState("");
 
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [cursor, setCursor] = useState<DocumentSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
 
   const [myLessonsTab, setMyLessonsTab] = useState<"drafts" | "published" | "bookmarked">("drafts");
 
@@ -396,34 +416,27 @@ export default function LessonBuilderPage() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
   const fetchLessons = useCallback(
-    async (reset: boolean) => {
-      if (reset) setLoading(true);
-      else setLoadingMore(true);
+    async () => {
+      setLoading(true);
       try {
         const filters = {
           gradeLevel: gradeLevel || undefined,
           subject: subject || undefined,
         };
-        const result = await getPublicLessons(filters, reset ? null : cursor);
-        setLessons((prev) => (reset ? result.lessons : [...prev, ...result.lessons]));
-        setCursor(result.lastDoc);
-        setHasMore(result.lastDoc !== null);
+        const result = await getPublicLessons(filters);
+        setLessons(result.lessons);
       } catch {
-        if (reset) setLessons([]);
+        setLessons([]);
       } finally {
         setLoading(false);
-        setLoadingMore(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [gradeLevel, subject]
   );
 
   useEffect(() => {
-    setCursor(null);
-    fetchLessons(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gradeLevel, subject]);
+    fetchLessons();
+  }, [fetchLessons]);
 
   useEffect(() => {
     async function loadMyLessons() {
@@ -463,6 +476,7 @@ export default function LessonBuilderPage() {
   }, [user]);
 
   const hasFilters = gradeLevel || subject;
+  const visibleRecentLessons = lessons.slice(0, LESSON_BUILDER_PREVIEW_LIMIT);
   const visibleDrafts = draftsExpanded ? drafts : drafts.slice(0, 3);
   const visiblePublished = publishedExpanded ? published : published.slice(0, 3);
   const visibleBookmarked = bookmarkedExpanded ? bookmarkedLessons : bookmarkedLessons.slice(0, 3);
@@ -754,7 +768,7 @@ export default function LessonBuilderPage() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {lessons.map((lesson) => (
+            {visibleRecentLessons.map((lesson) => (
               <LessonCard
                 key={lesson.id}
                 lesson={lesson}
@@ -763,13 +777,16 @@ export default function LessonBuilderPage() {
               />
             ))}
           </div>
-          {hasMore && (
-            <div className="mt-8 flex justify-center">
-              <Button variant="outline" onClick={() => fetchLessons(false)} isLoading={loadingMore}>
-                Load More
-              </Button>
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <p className="text-xs text-muted">
+              Showing the most recent {Math.min(LESSON_BUILDER_PREVIEW_LIMIT, lessons.length)} lesson plans.
+            </p>
+            <div className="flex items-center justify-center">
+              <Link href="/resources">
+                <Button variant="outline">Browse Resource Library</Button>
+              </Link>
             </div>
-          )}
+          </div>
         </>
       )}
     </div>

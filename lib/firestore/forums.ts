@@ -142,6 +142,7 @@ export interface ThreadComment {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
   createdAt: Timestamp | null;
   upvotes: number;
   downvotes: number;
@@ -153,6 +154,7 @@ export interface ThreadCommentInput {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
 }
 
 // --- Category helpers ---
@@ -425,6 +427,7 @@ export async function addThreadComment(
     id: ref.id,
     threadId,
     parentId: data.parentId ?? null,
+    mentionedUsers: data.mentionedUsers ?? [],
     createdAt: serverTimestamp(),
     upvotes: 0,
     downvotes: 0,
@@ -457,6 +460,36 @@ export async function getThreadComments(
   const snapshot = await getDocs(q);
 
   return snapshot.docs.map((d) => d.data() as ThreadComment);
+}
+
+export async function updateThreadComment(
+  categoryId: string,
+  threadId: string,
+  commentId: string,
+  text: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(
+    doc(db, "forums", categoryId, "threads", threadId, "comments", commentId),
+    {
+      content: text.trim().slice(0, 2000),
+      editedAt: serverTimestamp(),
+    }
+  );
+}
+
+export async function deleteThreadComment(
+  categoryId: string,
+  threadId: string,
+  commentId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(
+    doc(db, "forums", categoryId, "threads", threadId, "comments", commentId)
+  );
+  await updateDoc(doc(db, "forums", categoryId, "threads", threadId), {
+    commentCount: increment(-1),
+  });
 }
 
 // --- Comment voting ---

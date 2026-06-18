@@ -8,9 +8,10 @@ import NavSearchBar from "@/components/layout/NavSearchBar";
 import Avatar from "@/components/ui/Avatar";
 import Dropdown from "@/components/ui/Dropdown";
 import NotificationDropdown from "@/components/layout/NotificationDropdown";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const navLinks = [
-  { href: "/", label: "Home" },
+  { href: "/home", label: "Home" },
   { href: "/educators", label: "Educators" },
   { href: "/forums", label: "Forums" },
   { href: "/resources", label: "Resources" },
@@ -25,6 +26,7 @@ export default function Navbar() {
   const { user, loading, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
   useEffect(() => setMounted(true), []);
 
   function isActive(href: string) {
@@ -34,13 +36,26 @@ export default function Navbar() {
 
   return (
     <>
+    <ConfirmDialog
+      isOpen={signOutOpen}
+      onClose={() => setSignOutOpen(false)}
+      onConfirm={async () => {
+        setSignOutOpen(false);
+        await signOut();
+        router.push("/");
+      }}
+      title="Sign out?"
+      description="You will be returned to the home page."
+      confirmLabel="Sign out"
+      isDestructive={false}
+    />
     <header className="sticky top-0 z-50 border-b border-border bg-surface/95 backdrop-blur supports-backdrop-filter:bg-surface/80">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* Top row: Logo + Search + Actions */}
         <div className="flex h-14 items-center justify-between gap-4">
           {/* Logo */}
           <Link
-            href="/"
+            href={mounted && user ? "/home" : "/"}
             className="shrink-0 text-lg font-bold text-primary-900"
           >
             EduConnect
@@ -77,17 +92,14 @@ export default function Navbar() {
                         },
                       },
                       {
-                        label: "Settings",
+                        label: "Account Management",
                         onClick: () => {
-                          router.push("/profile/edit");
+                          router.push("/account");
                         },
                       },
                       {
                         label: "Sign out",
-                        onClick: async () => {
-                          await signOut();
-                          router.push("/");
-                        },
+                        onClick: () => setSignOutOpen(true),
                         destructive: true,
                       },
                     ]}

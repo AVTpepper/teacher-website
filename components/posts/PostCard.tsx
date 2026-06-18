@@ -12,6 +12,8 @@ import {
   likeComment,
   unlikeComment,
   hasLikedComment,
+  updatePostComment,
+  deletePostComment,
   updatePost,
   deletePost,
   type Post,
@@ -20,9 +22,10 @@ import {
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Dropdown from "@/components/ui/Dropdown";
 import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
-import { notifyMention, notifyComment } from "@/lib/notifications";
+import { notifyMention, notifyComment, notifyCommentReplied } from "@/lib/notifications";
 import { timeAgo } from "@/lib/utils";
 import Tag from "@/components/ui/Tag";
 import type { MentionedUserRef } from "@/lib/firestore/posts";
@@ -270,24 +273,15 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
         </div>
       )}
 
-      {/* Delete confirmation */}
-      {confirmDelete && (
-        <div className="mt-3 rounded-lg border border-error-200 bg-error-50 px-4 py-3 flex items-center gap-3">
-          <p className="flex-1 text-sm text-error-700">Delete this post? This cannot be undone.</p>
-          <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleDelete}
-            isLoading={deleting}
-            className="text-error-600 border-error-300 hover:bg-error-50"
-          >
-            Delete
-          </Button>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+        title="Delete post?"
+        description="This cannot be undone."
+        confirmLabel="Delete"
+        isLoading={deleting}
+      />
 
       {/* Content - click to expand comments */}
       {!editing && (
@@ -431,6 +425,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
                 authorName: c.authorName,
                 authorPhotoURL: c.authorPhotoURL,
                 content: c.content,
+                mentionedUsers: c.mentionedUsers,
                 createdAt: c.createdAt as { seconds: number } | null,
                 likesCount: c.likesCount ?? 0,
               })
@@ -451,7 +446,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
               if (!user) return false;
               return hasLikedComment(post.id, commentId, user.uid);
             }}
-            onAddComment={async (content, parentId, mentionedUids) => {
+            onAddComment={async (content, parentId, mentionedUsers) => {
               if (!user) throw new Error("Not authenticated");
               const newId = await commentOnPost(post.id, {
                 parentId: parentId ?? null,
@@ -459,10 +454,11 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
                 authorName: user.displayName || "Anonymous",
                 authorPhotoURL: user.photoURL,
                 content,
+                mentionedUsers: mentionedUsers ?? [],
               });
               if (!parentId) setCommentsCount((c) => c + 1);
-              // Notify post author (fire-and-forget, skip if self-comment)
-              if (post.authorId !== user.uid) {
+              // Notify post author on top-level comments (skip replies + self)
+              if (!parentId && post.authorId !== user.uid) {
                 notifyComment({
                   recipientId: post.authorId,
                   actorId: user.uid,
@@ -472,9 +468,22 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
                   linkURL: `/?post=${post.id}`,
                 }).catch(() => {});
               }
+              // Notify parent comment author on replies (skip self)
+              if (parentId) {
+                const parentComment = comments.find((c) => c.id === parentId);
+                if (parentComment && parentComment.authorId !== user.uid) {
+                  notifyCommentReplied({
+                    recipientId: parentComment.authorId,
+                    actorId: user.uid,
+                    actorName: user.displayName || "Someone",
+                    actorPhotoURL: user.photoURL,
+                    linkURL: `/?post=${post.id}`,
+                  }).catch(() => {});
+                }
+              }
               // Send mention notifications (fire-and-forget)
-              if (mentionedUids?.length) {
-                mentionedUids.forEach((uid) => {
+              if (mentionedUsers?.length) {
+                mentionedUsers.forEach(({ uid }) => {
                   notifyMention({
                     recipientId: uid,
                     actorId: user.uid,
@@ -487,6 +496,13 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
               const result = await getPostComments(post.id);
               setComments(result);
               return newId;
+            }}
+            onUpdateComment={async (commentId, text) => {
+              await updatePostComment(post.id, commentId, text);
+            }}
+            onDeleteComment={async (commentId) => {
+              await deletePostComment(post.id, commentId);
+              setCommentsCount((c) => Math.max(0, c - 1));
             }}
           />
         </div>

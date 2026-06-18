@@ -27,6 +27,12 @@ const TYPE_ICON: Record<NotificationType, string> = {
   "badge-earned": "🏅",
   "resource-liked": "❤️",
   mention: "@",
+  "lesson-rated": "⭐",
+  "lesson-downloaded": "📥",
+  "resource-downloaded": "📥",
+  "lesson-shared": "🔗",
+  "resource-shared": "🔗",
+  "comment-replied": "↩️",
 };
 
 const DROPDOWN_LIMIT = 5;
@@ -69,6 +75,13 @@ export default function NotificationDropdown() {
     const unsub = subscribeToNotifications(user.uid, DROPDOWN_LIMIT, setAllNotifications);
     return unsub;
   }, [user]);
+
+  // Auto mark-all-read when dropdown is opened
+  useEffect(() => {
+    if (!open || !user) return;
+    markAllAsRead(user.uid).catch(console.error);
+    setAllNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }, [open, user]);
 
   // Close on outside click
   useEffect(() => {
@@ -180,6 +193,7 @@ export default function NotificationDropdown() {
       {open && (
         <div
           role="dialog"
+          aria-modal="true"
           aria-label="Notifications"
           className="fixed left-4 right-4 top-14 rounded-xl border border-border bg-surface shadow-xl z-50 overflow-hidden sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96"
         >
@@ -239,21 +253,25 @@ export default function NotificationDropdown() {
                     </div>
 
                     {/* Message + actions */}
-                    <div className="flex-1 min-w-0">
+                    <div
+                      className="flex-1 min-w-0 cursor-pointer"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleView(n)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleView(n);
+                        }
+                      }}
+                    >
                       <p className={`text-sm leading-snug ${!n.read ? "font-medium text-foreground" : "text-secondary-700"}`}>
                         {n.message}
                       </p>
                       <p className="text-xs text-muted mt-0.5">
                         {timeAgo(n.createdAt as { seconds: number } | null)}
                       </p>
-                      <div className="mt-1.5 flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => handleView(n)}
-                          className="text-xs font-medium text-primary hover:underline cursor-pointer"
-                        >
-                          View
-                        </button>
+                      <div className="mt-1.5 flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                         {!n.read && (
                           <button
                             type="button"

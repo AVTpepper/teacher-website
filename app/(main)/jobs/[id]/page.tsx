@@ -249,7 +249,7 @@ export default function JobDetailPage({
                 {poster.displayName}
               </p>
               <p className="text-sm text-muted">
-                {poster.gradeLevel} · {poster.school || poster.location}
+                {poster.gradeLevel} · {poster.school || poster.country}
               </p>
             </div>
           </Link>

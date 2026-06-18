@@ -382,3 +382,315 @@
 - [x] AC-6: A plus tier user can make more than 20 refines per month without receiving a 429
 - [x] AC-7: The API returns 400 if `instruction` is empty or exceeds 300 characters
 - [x] AC-8: The monthly refine counter resets on the 1st of the next UTC month
+
+---
+
+## Milestone 3: Social Graph, Content Ownership, Notifications, and Platform Polish
+
+**Goal**: Round out the platform with a follower/following social graph, full CRUD ownership over all user-created content, a comprehensive notification system, lesson plan preview and PDF copyright footers, account management and profile editing, a reusable confirmation dialog, intellectual property notices, and a public landing page with an authenticated home-feed redirect.
+
+| #    | Name | Goal | User Stories |
+|------|------|------|--------------|
+| M3   | Platform Polish | Social graph, full content CRUD, notifications, IP notices, landing page, account management | US-15, US-16, US-17, US-18, US-19, US-20, US-21, US-22, US-23, US-24, US-25 |
+
+---
+
+### US-15: Follower / Following Social Graph
+
+**As an** educator, **I want** to follow other educators and see who follows me, **so that** I can build a professional network and stay updated on the people I care about.
+
+**Tasks**
+- [x] Add a `followers` and `following` subcollection (or top-level `follows/{followerId_followeeId}` documents) to the Firestore data model; document each relationship with `{ followerId, followeeId, createdAt }`
+- [x] Add `followersCount` and `followingCount` denormalised fields to the `users/{uid}` document; increment/decrement them atomically using Firestore transactions when a follow/unfollow is performed
+- [x] Create `lib/firestore/follows.ts` exporting `followUser(followerId, followeeId)`, `unfollowUser(followerId, followeeId)`, `isFollowing(followerId, followeeId)`, `getFollowers(userId, limit?)`, and `getFollowing(userId, limit?)`
+- [x] Update Firestore security rules to allow only the authenticated `followerId` to create/delete their own follow documents; deny reads to unauthenticated users
+- [x] On the educator profile page (`/educators/[id]`), make the follower count and following count clickable links pointing to `/educators/[id]/followers` and `/educators/[id]/following` respectively
+- [x] Create `app/(main)/educators/[id]/followers/page.tsx` — a paginated list of users who follow this educator; each row shows avatar, display name, short bio, and a Follow/Unfollow button (disabled for the viewer's own profile)
+- [x] Create `app/(main)/educators/[id]/following/page.tsx` — same layout as followers page but for users this educator follows
+- [x] The Follow/Unfollow button uses optimistic UI: update local state immediately, then call Firestore; revert on error with a toast notification
+- [x] Trigger a "follow" notification (see US-18) after a successful `followUser` call
+- [x] The Follow button is not rendered on the viewer's own profile page
+
+**Acceptance Criteria**
+- [x] AC-1: Navigating to `/educators/[id]/followers` shows a list of users who follow that educator, each with avatar, name, bio, and Follow/Unfollow button
+- [x] AC-2: Navigating to `/educators/[id]/following` shows the users that educator follows, with the same card layout
+- [x] AC-3: Clicking Follow on an educator's card immediately reflects the change in button state (optimistic update) and persists in Firestore
+- [x] AC-4: Clicking Unfollow removes the follow relationship; the count on the profile page updates accordingly
+- [x] AC-5: The follower and following counts on the profile page are rendered as `<a>` links; clicking them navigates to the correct list pages
+- [x] AC-6: The Follow/Unfollow button is not shown when the viewer is viewing their own followers/following page
+- [x] AC-7: Unauthenticated users cannot write to follow documents (Firestore rules reject the write and the UI shows a sign-in prompt)
+
+---
+
+### US-16: Comment and Reply CRUD
+
+**As an** educator, **I want** to edit and delete my own comments and replies anywhere on the platform, **so that** I can correct mistakes and remove content I no longer stand behind.
+
+**Tasks**
+- [x] Extend the `CommentThread` component (`components/comments/CommentThread.tsx`) to accept an `authorId` prop per comment/reply and compare it to the currently authenticated user's `uid`
+- [x] For comments and replies owned by the current user (or an admin), render an overflow menu (three-dot icon) with "Edit" and "Delete" options
+- [x] "Edit" replaces the comment text with an inline `<textarea>` pre-filled with the current content, and shows "Save" and "Cancel" buttons
+- [x] "Save" calls `updateComment` (or equivalent) in `lib/firestore/` with the edited text and a `editedAt` timestamp; the comment then renders with a subtle "(edited)" label
+- [x] "Cancel" closes the inline editor and restores the original text without persisting any change
+- [x] "Delete" opens the reusable `ConfirmDialog` (US-22) with the message "Delete this comment? This cannot be undone." and a destructive Confirm button
+- [x] On deletion confirmation, call `deleteComment`; remove the comment from local state immediately (optimistic); show a toast "Comment deleted"
+- [x] Add `updateComment(commentId, newText)` and `deleteComment(commentId)` functions to the relevant firestore module; strip and trim `newText` server-side in Firestore security rules using `request.resource.data.text.size() <= 2000`
+- [x] Update Firestore security rules: only the comment author (`request.auth.uid == resource.data.authorId`) or an admin role may update or delete a comment document
+- [x] The edit textarea enforces a 2 000-character limit client-side with a live counter
+
+**Acceptance Criteria**
+- [x] AC-1: A user sees Edit and Delete options only on their own comments and replies; they do not see these options on other users' content
+- [x] AC-2: Clicking Edit opens an inline textarea with the original text pre-filled; clicking Save persists the update and shows "(edited)" on the comment
+- [x] AC-3: Clicking Cancel in edit mode leaves the comment text exactly as it was
+- [x] AC-4: Clicking Delete opens a confirmation dialog; confirming removes the comment from the UI and Firestore
+- [x] AC-5: Attempting to delete or update another user's comment via direct Firestore write is rejected by security rules
+- [x] AC-6: The edit textarea shows a character counter and prevents saving when the text exceeds 2 000 characters or is empty
+- [x] AC-7: After deleting a comment with replies, the thread handles the missing parent gracefully (e.g. shows "Comment deleted" placeholder or removes the thread)
+
+---
+
+### US-17: Full CRUD for Posts, Lessons, Resources, and Inspiration
+
+**As an** educator, **I want** to edit and delete my own forum posts, lesson plans, resources, and inspiration posts, **so that** I have full control over my published content.
+
+**Tasks**
+- [x] **Forum posts**: add Edit (pencil icon) and Delete (trash icon) action buttons to `PostCard` when the viewer is the author; Edit opens the existing `CreatePost` form inline or as a modal pre-filled with post data; Delete uses `ConfirmDialog` (US-22)
+- [x] **Lesson plans**: on the lesson detail/view page (`/lesson-builder/[id]`), add an Edit button (navigates to `/lesson-builder/new?edit=[id]` which already exists) and a Delete button that opens `ConfirmDialog`; on the drafts list, add the same Delete action
+- [x] **Resources**: on the resource detail page (`/resources/[id]`), add Edit (navigates to `/resources/upload?edit=[id]` or opens an edit modal) and Delete with `ConfirmDialog`
+- [x] **Inspiration posts**: on each inspiration card/detail view, add Edit (inline or modal form) and Delete with `ConfirmDialog`
+- [x] All Delete actions call the appropriate `deleteX` function in `lib/firestore/`; on success, redirect to the parent list page or remove the card from the feed; show a success toast
+- [x] All Edit actions pre-populate the form with the existing document data; saving calls `updateX` with the changed fields and a `updatedAt` timestamp
+- [x] Update Firestore security rules for each collection to permit `update` and `delete` only when `request.auth.uid == resource.data.authorId`
+- [x] Hide Edit/Delete UI from users who do not own the content; do not rely solely on UI hiding — enforce in rules
+- [x] After a successful delete of a lesson plan, decrement the author's `lessonCount` field atomically (same pattern as follower counts); apply equivalent denormalised count maintenance for resources and inspiration posts if those counts exist
+
+**Acceptance Criteria**
+- [x] AC-1: The author of a forum post sees Edit and Delete controls on their post card; other users do not
+- [x] AC-2: Editing a forum post pre-fills the form with existing content; saving updates the post in Firestore and reflects the change in the feed immediately
+- [x] AC-3: Deleting a lesson plan opens a confirmation dialog; confirming removes the document and redirects the user to `/lesson-builder`
+- [x] AC-4: Deleting a resource opens a confirmation dialog; confirming removes the document and redirects to `/resources`
+- [x] AC-5: Editing a resource pre-fills all fields; saving persists changes and shows the updated resource detail
+- [x] AC-6: Inspiration posts support the same Edit/Delete flow; deletion removes the card from the inspiration feed
+- [x] AC-7: Direct Firestore writes attempting to modify or delete another user's content are rejected by security rules
+
+---
+
+### US-18: Notification System Full Coverage
+
+**As an** educator, **I want** to receive a notification every time someone interacts meaningfully with my content or profile, **so that** I stay engaged with my community without having to check everything manually.
+
+**Tasks**
+- [x] Audit `lib/notifications.ts` and all Firestore write call sites; identify every action that should trigger a notification but currently does not
+- [x] Ensure a notification is created (via `createNotification` or equivalent) for every one of the following events — each notification must include `type`, `actorId`, `actorName`, `actorAvatarUrl`, `targetContentId`, `targetContentType`, `targetContentTitle`, and a deep-link `url` field:
+  - `followed` — someone follows you (triggered from `followUser` in `lib/firestore/follows.ts`)
+  - `lesson_rated` — someone rates your lesson plan
+  - `lesson_commented` — someone comments on your lesson plan
+  - `resource_commented` — someone comments on your resource (N/A: no comments UI on resource page)
+  - `forum_post_commented` — someone comments on your forum post
+  - `comment_replied` — someone replies to your comment
+  - `mentioned` — someone tags `@yourUsername` anywhere (post body, comment, reply)
+  - `lesson_liked` — someone likes your lesson plan (N/A: no lesson like system; bookmarks don't have public owner info)
+  - `resource_liked` — someone likes your resource
+  - `inspiration_liked` — someone likes your inspiration post (N/A: no like system for inspiration)
+  - `forum_post_liked` — someone likes your forum post (covered by upvote notification)
+  - `lesson_downloaded` — someone downloads your lesson plan
+  - `resource_downloaded` — someone downloads your resource
+  - `lesson_shared` — someone shares your lesson plan
+  - `resource_shared` — someone shares your resource
+- [x] Each notification document must not be created when the actor and the content owner are the same user (no self-notifications)
+- [x] In `NotificationDropdown` and/or the `/notifications` page, render a human-readable sentence for each notification type, e.g. "**Alex** followed you", "**Maria** commented on **Introduction to Fractions**"
+- [x] Each notification item links to the relevant content via the `url` field
+- [x] Mark notifications as read when the dropdown is opened or the `/notifications` page is visited (batch update `isRead: true`)
+- [x] Update Firestore security rules: `notifications/{uid}/items/{notifId}` — only the owning `uid` may read or update their notifications; writes come from trusted paths (server actions or rules-validated client writes)
+- [x] Implement `@mention` detection: when saving a post, comment, or reply that contains `@username` tokens, resolve each username to a `uid` and create a `mentioned` notification for each unique mentioned user (excluding the author)
+
+**Acceptance Criteria**
+- [x] AC-1: Following an educator creates a `followed` notification in their notifications feed immediately
+- [x] AC-2: Rating, commenting on, liking, downloading, and sharing a lesson plan each create the correct notification type for the lesson author
+- [x] AC-3: Replying to a comment creates a `comment_replied` notification for the comment author (not for the content owner, unless they are the same person)
+- [x] AC-4: Mentioning `@username` in a post or comment creates a `mentioned` notification for that user
+- [x] AC-5: No notification is created when a user interacts with their own content (self-interaction)
+- [x] AC-6: Each notification in the dropdown or notifications page renders a human-readable sentence and a clickable link to the relevant content
+- [x] AC-7: Opening the notifications dropdown marks all visible notifications as read; the unread badge count updates to reflect this
+
+---
+
+### US-19: Lesson Plan Preview Modal and PDF Copyright Footer
+
+**As an** educator, **I want** to preview a lesson plan in full before downloading it and see a copyright notice on the export, **so that** I know exactly what will be downloaded and my authorship is clearly attributed.
+
+**Tasks**
+- [x] Add a **"Preview"** button to the lesson plan view page (`/lesson-builder/[id]`) and to any lesson card that has a download action
+- [x] Clicking Preview opens a full-screen modal (or navigates to `/lesson-builder/[id]/preview`) showing a read-only, print-friendly layout of the lesson plan — identical structure to the PDF output
+- [x] The preview modal has two action buttons in a sticky header/footer: **"Download PDF"** and **"Print"**; Print calls `window.print()` targeting only the preview content
+- [x] Update `components/lessons/LessonPDFDocument.tsx` to include a copyright footer on every page: "© [year] [Author Display Name] — All rights reserved. Created on EduConnect."
+- [x] The preview page/modal renders the same copyright footer at the bottom of the content so WYSIWYG matches the PDF exactly
+- [x] Add a short IP ownership notice on the lesson plan view page (not inside the preview): "The content of this lesson plan is the intellectual property of [Author Name]. All rights reserved." displayed as a subtle callout below the lesson metadata
+- [x] The Preview modal is accessible: `role="dialog"`, `aria-modal="true"`, `aria-label="Lesson Plan Preview"`, focus trapped inside the modal while open, Escape closes it
+- [x] The Print stylesheet (`@media print`) hides the modal chrome (header, close button, action buttons) and shows only the lesson content and copyright footer
+
+**Acceptance Criteria**
+- [x] AC-1: Clicking "Preview" on a lesson plan opens a full-screen, read-only view of the lesson content
+- [x] AC-2: The preview displays a copyright footer: "© [year] [Author Name] — All rights reserved. Created on EduConnect."
+- [x] AC-3: Clicking "Download PDF" from the preview triggers the same PDF download as before, and the downloaded PDF includes the copyright footer on every page
+- [x] AC-4: Clicking "Print" from the preview opens the browser print dialog; the printed output contains only lesson content and the copyright footer, with no modal UI chrome
+- [x] AC-5: Pressing Escape closes the preview modal and returns focus to the element that triggered it
+- [x] AC-6: The lesson view page displays the IP ownership notice as a callout below the lesson metadata; it does not appear inside the preview modal itself
+
+---
+
+### US-20: Account Management Page
+
+**As an** educator, **I want** a dedicated Account Management page where I can change my password, view my account details, and delete my account if needed, **so that** I have full control over my account security and data.
+
+**Tasks**
+- [x] Rename all references to the current "Settings" page/link to "Account Management" across the codebase (`Navbar`, `Sidebar`, `Footer`, route file names if applicable)
+- [x] Create or update the Account Management page at `/profile` (or a new `/account` route) with the following sections:
+  - **Account Details**: read-only display of current email address and account creation date
+  - **Display Name**: editable text field with a Save button (updates Firebase Auth `displayName` and the Firestore `users/{uid}` document)
+  - **Current Tier**: read-only badge showing "Free" or "Plus" with a "Upgrade to Plus" link for free-tier users
+  - **Change Password**: form with three fields — Current Password, New Password (min 8 chars, at least one number and one letter), Confirm New Password; submits via `reauthenticateWithCredential` then `updatePassword` from Firebase Auth
+  - **Danger Zone**: "Delete Account" button (red, outlined) that opens `ConfirmDialog` (US-22) with a two-step warning; on confirmation, deletes all user data from Firestore (`users/{uid}` and subcollections) then calls `deleteUser` from Firebase Auth and redirects to `/`
+- [x] Change Password form validation: New Password and Confirm New Password must match; New Password must differ from Current Password; show inline field-level errors
+- [x] Reauthentication errors (wrong current password) must surface as a human-readable field error, not a raw Firebase error code
+- [x] After a successful password change, show a success toast and clear all three password fields
+- [x] After successful account deletion, clear any auth state and local storage, then redirect to the landing page
+
+**Acceptance Criteria**
+- [x] AC-1: The nav/sidebar link previously labelled "Settings" now reads "Account Management" everywhere in the UI
+- [x] AC-2: The Account Management page displays the user's email address and account creation date as read-only fields
+- [x] AC-3: Submitting the Change Password form with a correct current password and a valid new password updates the Firebase Auth password and shows a success toast
+- [x] AC-4: Submitting the Change Password form with an incorrect current password shows a field-level error "Current password is incorrect" without exposing Firebase error codes
+- [x] AC-5: The Danger Zone "Delete Account" button opens a confirmation dialog before taking any action; cancelling leaves the account intact
+- [x] AC-6: Confirming account deletion removes the user's Firestore documents and Firebase Auth account, then redirects to the landing page (`/`)
+- [x] AC-7: The tier badge correctly shows "Free" or "Plus" based on the user's Firestore `tier` field
+
+---
+
+### US-21: Edit Profile Page
+
+**As an** educator, **I want** a dedicated Edit Profile page where I can update my public-facing information, **so that** my profile accurately represents me to the community.
+
+**Tasks**
+- [x] Create `app/(main)/profile/edit/page.tsx` (the directory stub already exists); build a form with the following fields: Display Name (text, required), Bio (textarea, max 500 chars with live counter), Profile Photo (file upload — JPEG/PNG only, max 2 MB; upload to Firebase Storage at `avatars/{uid}`; show preview before saving), Subject Specialisms (multi-select or tag input using existing `Tag` component), Grade Levels Taught (multi-select), School / Organisation (text, optional)
+- [x] On save, write updated fields to `users/{uid}` in Firestore; update Firebase Auth `displayName` and `photoURL` if those fields changed
+- [x] Validate file type and size client-side before uploading; reject unsupported types with a field error "Only JPEG and PNG files are allowed"
+- [x] Show an upload progress indicator while the photo is uploading to Firebase Storage; disable the Save button during upload
+- [x] After a successful save, show a success toast "Profile updated" and redirect to `/profile` (the read-only public profile page)
+- [x] The Edit Profile page is linked from the public profile page (`/profile`) via an "Edit Profile" button visible only to the profile owner
+- [x] Update Firestore security rules to allow `users/{uid}` updates only from the owning authenticated user; disallow client-side writes to `tier`, `createdAt`, or `role` fields
+- [x] Add Firebase Storage security rules: `avatars/{uid}/**` — write allowed only for the owning authenticated user; max file size 2 MB enforced in rules (`request.resource.size < 2 * 1024 * 1024`)
+
+**Acceptance Criteria**
+- [x] AC-1: Navigating to `/profile/edit` shows a form pre-filled with the current user's display name, bio, subject specialisms, grade levels, and school/organisation
+- [x] AC-2: Uploading a new profile photo shows a preview and an upload progress indicator; the photo is saved to Firebase Storage and the URL is written to Firestore and Firebase Auth
+- [x] AC-3: Uploading a file that is not a JPEG or PNG shows a field error and does not begin the upload
+- [x] AC-4: Uploading a file larger than 2 MB shows a field error and does not begin the upload
+- [x] AC-5: Saving the form with valid data updates `users/{uid}` in Firestore, shows a success toast, and redirects to `/profile`
+- [x] AC-6: The "Edit Profile" button on `/profile` is visible only to the profile owner; other users do not see it
+- [x] AC-7: A direct Firestore write attempting to change the `tier` or `role` field is rejected by security rules
+
+---
+
+### US-22: Reusable ConfirmDialog Component
+
+**As a** developer (and as a user), **I want** every destructive or sensitive action to trigger a consistent confirmation dialog, **so that** accidental data loss is prevented and the UX is predictable across the platform.
+
+**Tasks**
+- [x] Create `components/ui/ConfirmDialog.tsx` — a modal dialog component accepting props: `isOpen: boolean`, `onClose: () => void`, `onConfirm: () => void`, `title: string`, `description: string`, `confirmLabel?: string` (default "Confirm"), `cancelLabel?: string` (default "Cancel"), `isDestructive?: boolean` (default `true`), `isLoading?: boolean`
+- [x] When `isDestructive` is `true`, the Confirm button uses red/destructive styling; when `false`, it uses the primary style
+- [x] When `isLoading` is `true`, the Confirm button shows a spinner and is disabled; the Cancel button is also disabled to prevent concurrent actions
+- [x] The dialog always shows the `title` as a heading, `description` as body text, and the two action buttons
+- [x] The dialog is accessible: `role="alertdialog"`, `aria-modal="true"`, `aria-labelledby` pointing to the title, `aria-describedby` pointing to the description; focus is trapped inside while open; Escape triggers `onClose`
+- [x] Export `ConfirmDialog` from `components/ui/index.ts`
+- [x] Replace all existing ad-hoc confirmation prompts (`window.confirm`, inline modal JSX for deletion) across the codebase with this component:
+  - Delete comment / reply (US-16)
+  - Delete forum post, lesson, resource, inspiration post (US-17)
+  - Sign out (in `Navbar` or wherever sign-out is triggered)
+  - Delete account (US-20)
+  - Overwrite AI-generated content (the existing dialog in the lesson wizard — replace with `ConfirmDialog` if it uses a custom implementation)
+
+**Acceptance Criteria**
+- [x] AC-1: `ConfirmDialog` renders a dialog with the provided title, description, Cancel button, and Confirm button
+- [x] AC-2: When `isDestructive` is `true`, the Confirm button has red/destructive styling; when `false`, it has primary styling
+- [x] AC-3: Clicking Confirm calls `onConfirm`; clicking Cancel or pressing Escape calls `onClose`
+- [x] AC-4: When `isLoading` is `true`, both buttons are disabled and the Confirm button shows a spinner
+- [x] AC-5: Focus is trapped inside the dialog while it is open; the first interactive element (Cancel or Confirm) receives focus on open
+- [x] AC-6: The sign-out action in the navigation uses `ConfirmDialog` before calling Firebase `signOut`
+- [x] AC-7: No `window.confirm` calls remain in the codebase for destructive actions
+
+---
+
+### US-23: Intellectual Property Notices
+
+**As an** educator, **I want** to see a clear, tasteful IP notice on lesson plans, resources, and inspiration posts, **so that** I and other educators understand that content ownership stays with the author.
+
+**Tasks**
+- [x] Create a reusable `IPNotice` component (`components/ui/IPNotice.tsx`) that renders a small, non-intrusive callout: "The content shared by educators on EduConnect remains the intellectual property of its author." with a link to the relevant section of the Terms of Service page
+- [x] Render `IPNotice` on:
+  - Individual lesson plan view pages (`/lesson-builder/[id]`)
+  - Individual resource view pages (`/resources/[id]`)
+  - Individual inspiration post view pages (if a detail page exists; otherwise on the inspiration feed card expanded view)
+- [x] Style the notice as subtle secondary text (e.g. small font, muted colour, info icon) positioned near the bottom of the content card — it must not compete visually with the main content
+- [x] Verify that `app/(main)/terms/page.tsx` mentions author IP ownership; if it does not, add a short "Content Ownership" section stating that educators retain full ownership of the content they publish on EduConnect
+- [x] Verify that `app/(main)/privacy/page.tsx` is consistent with the IP ownership statement; add or update content if needed
+- [x] The notice must be accessible: the link inside it has a descriptive `aria-label`; the callout is not hidden from screen readers
+
+**Acceptance Criteria**
+- [x] AC-1: An IP notice callout is visible at the bottom of every individual lesson plan view page
+- [x] AC-2: An IP notice callout is visible at the bottom of every individual resource view page
+- [x] AC-3: An IP notice callout is visible on inspiration post detail/expanded views
+- [x] AC-4: The notice links to the Terms of Service page and the link is keyboard-navigable with a descriptive label
+- [x] AC-5: The Terms of Service page contains a "Content Ownership" section stating that educators retain IP over their published content
+- [x] AC-6: The notice is visually unobtrusive — it uses small, muted styling and does not obscure or compete with the primary content
+
+---
+
+### US-24: Public Landing Page for Unauthenticated Visitors
+
+**As an** unauthenticated visitor, **I want** to land on an engaging, informative page when I visit the site, **so that** I understand what EduConnect offers and am motivated to sign up or sign in.
+
+**Tasks**
+- [x] Create a new landing page component rendered at `/` for unauthenticated users (the route logic is handled in US-25)
+- [x] The landing page is a server component (or static page) — no Firebase Auth checks required; it must not import `AuthContext`
+- [x] **Hero section**: full-width banner with tagline (e.g. "Where Great Teachers Connect"), a one-sentence value proposition, and two CTA buttons: "Sign In" (links to `/auth/login`) and "Get Started Free" (links to `/auth/signup`)
+- [x] **Features section**: highlight 4–5 platform features (Lesson Builder, AI Assistant, Forums, Resource Library, Community) using icon + heading + short description cards arranged in a responsive grid
+- [x] **Social proof section**: display 2–3 static (hardcoded) example content preview cards — a sample lesson plan card, a sample forum post, a sample resource — styled identically to their real counterparts but non-interactive (no click actions, no auth-gated data)
+- [x] **Footer**: consistent with the existing site footer; includes links to About, Blog, Careers, Terms, Privacy, and Contact pages
+- [x] Tone is warm, encouraging, and professional — "teacher energy"; avoid corporate jargon
+- [x] The landing page is fully responsive (320 px to 1440 px), meets WCAG 2.1 AA contrast requirements, and has no horizontal scroll at any breakpoint
+- [x] The landing page is statically renderable (no `use client` at the page level unless required for a minor interaction); add `export const dynamic = 'force-static'` or equivalent if appropriate
+
+**Acceptance Criteria**
+- [x] AC-1: Unauthenticated users visiting `/` see the landing page with the hero, features, social proof, and footer sections — not the authenticated home feed
+- [x] AC-2: The hero section displays "Sign In" and "Get Started Free" CTA buttons that navigate to `/auth/login` and `/auth/signup` respectively
+- [x] AC-3: The features section displays at least four platform features, each with an icon, heading, and description, in a responsive grid
+- [x] AC-4: The social proof section shows at least two non-interactive example content cards
+- [x] AC-5: The landing page passes a basic accessibility check: all images have `alt` text, colour contrast meets 4.5:1 for body text, and all interactive elements are keyboard-navigable
+- [x] AC-6: The page renders without errors when Firebase Auth is not initialised (no auth-gated imports at the top level)
+- [x] AC-7: On a 320 px viewport there is no horizontal scroll and all content is readable
+
+---
+
+### US-25: Route Restructuring — Home Feed at `/home`, Landing Page at `/`
+
+**As an** authenticated educator, **I want** to be redirected to `/home` when I sign in, and as an unauthenticated user **I want** any protected route to redirect me to `/` rather than `/auth/login`, **so that** the routing is intuitive and the landing page is always the entry point for new visitors.
+
+**Tasks**
+- [x] Move the authenticated home feed from `app/(main)/page.tsx` to `app/(main)/home/page.tsx`; ensure this page still requires authentication and renders the same content as before
+- [x] Update `app/(main)/page.tsx` to serve the landing page (US-24) for unauthenticated users and redirect authenticated users to `/home` using a server-side redirect (`redirect('/home')` from `next/navigation` after checking the session)
+- [x] Search the entire codebase for all internal `href="/"` and `router.push('/')` references that point to the home feed and update them to `/home` (this includes `Navbar` logo link, post-login redirects, "Go home" links in error pages, etc.)
+- [x] Update the post-login redirect in `app/(auth)/auth/login/page.tsx` (and signup) to redirect to `/home` instead of `/` after successful authentication
+- [x] Update the auth guard / middleware so that unauthenticated users visiting any protected route are redirected to `/` (the landing page) instead of `/auth/login`; the landing page's CTA buttons already link to `/auth/login`, so the user can still sign in
+- [x] Update the `Navbar` logo link from `href="/"` to `href="/home"` for authenticated users; keep `href="/"` for unauthenticated users (they should return to the landing page)
+- [x] Verify that `next.config.ts` (or middleware) does not cache the `/` route for authenticated sessions in a way that would serve the landing page to signed-in users
+- [x] Update any `redirect` calls in Firestore-protected server components that currently send to `/auth/login` and change them to send to `/`
+
+**Acceptance Criteria**
+- [x] AC-1: An authenticated user visiting `/` is immediately redirected to `/home`; the home feed renders at `/home` with all existing functionality intact
+- [x] AC-2: An unauthenticated user visiting `/` sees the landing page (US-24); they are not redirected to `/auth/login`
+- [x] AC-3: An unauthenticated user visiting a protected route (e.g. `/lesson-builder`) is redirected to `/` (the landing page), not `/auth/login`
+- [x] AC-4: After a successful sign-in, the user is redirected to `/home`, not `/`
+- [x] AC-5: After a successful sign-up, the user is redirected to `/home`, not `/`
+- [x] AC-6: The `Navbar` logo link navigates to `/home` for authenticated users and to `/` for unauthenticated users
+- [x] AC-7: No internal link in the codebase incorrectly points to `/` when intending to navigate to the authenticated home feed

@@ -6,6 +6,7 @@ import type { WizardLessonState } from "./LessonWizardState";
 import { useAIRefine, type SectionKey, SECTION_FIELD_MAP, REFINE_LABEL_MAP } from "./useAIRefine";
 import RefinePopover from "./RefinePopover";
 import Button from "@/components/ui/Button";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import BasicInfoStep from "./steps/BasicInfoStep";
 import ObjectivesStep from "./steps/ObjectivesStep";
 import MaterialsStep from "./steps/MaterialsStep";
@@ -301,6 +302,7 @@ export default function ReviewPage({
   // Local edit state while a section is open
   const [editDraft, setEditDraft] = useState<WizardLessonState | null>(null);
 
+  const [unsavedWarningOpen, setUnsavedWarningOpen] = useState(false);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
 
@@ -340,7 +342,7 @@ export default function ReviewPage({
   function handleEditRequest(key: SectionKey) {
     if (editingSection !== null) {
       // One section is already open
-      window.confirm("You have unsaved changes - save or cancel first");
+      setUnsavedWarningOpen(true);
       return;
     }
     setEditSnapshot({ ...lesson });
@@ -456,6 +458,16 @@ export default function ReviewPage({
 
   return (
     <div className="space-y-5">
+      <ConfirmDialog
+        isOpen={unsavedWarningOpen}
+        onClose={() => setUnsavedWarningOpen(false)}
+        onConfirm={() => setUnsavedWarningOpen(false)}
+        title="Unsaved Changes"
+        description="Please save or cancel the current section before editing another."
+        confirmLabel="OK"
+        cancelLabel="Dismiss"
+        isDestructive={false}
+      />
       {/* Back to Edit link */}
       <button
         type="button"

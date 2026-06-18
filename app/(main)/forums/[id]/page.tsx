@@ -10,6 +10,8 @@ import {
   getUserVote,
   getThreadComments,
   addThreadComment,
+  updateThreadComment,
+  deleteThreadComment,
   upvoteComment,
   getUserCommentVote,
   FORUM_CATEGORIES,
@@ -22,7 +24,7 @@ import Button from "@/components/ui/Button";
 import Tag from "@/components/ui/Tag";
 import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
-import { notifyUpvote, notifyComment } from "@/lib/notifications";
+import { notifyUpvote, notifyComment, notifyCommentReplied, notifyMention } from "@/lib/notifications";
 
 // ─── Main page component ───
 
@@ -189,6 +191,7 @@ export default function ForumThreadPage({
     authorName: c.authorName,
     authorPhotoURL: c.authorPhotoURL,
     content: c.content,
+    mentionedUsers: c.mentionedUsers,
     createdAt: c.createdAt as { seconds: number } | null,
     upvotes: c.upvotes,
     downvotes: c.downvotes,
@@ -361,7 +364,7 @@ export default function ForumThreadPage({
             loading={loadingComments}
             maxDepth={2}
             mode="upvote"
-            onAddComment={async (content, parentId) => {
+            onAddComment={async (content, parentId, mentionedUsers) => {
               if (!categoryId) throw new Error("No category");
               const newId = await addThreadComment(categoryId, threadId, {
                 parentId,
@@ -369,6 +372,7 @@ export default function ForumThreadPage({
                 authorName: user!.displayName || "Anonymous",
                 authorPhotoURL: user!.photoURL,
                 content,
+                mentionedUsers: mentionedUsers ?? [],
               });
               // Notify thread author when someone comments (fire-and-forget)
               if (thread && thread.authorId !== user!.uid && !parentId) {
@@ -381,11 +385,46 @@ export default function ForumThreadPage({
                   linkURL: window.location.href,
                 }).catch(() => {});
               }
+              // Notify parent comment author on reply (fire-and-forget)
+              if (parentId) {
+                const parentComment = comments.find((c) => c.id === parentId);
+                if (parentComment && parentComment.authorId !== user!.uid) {
+                  notifyCommentReplied({
+                    recipientId: parentComment.authorId,
+                    actorId: user!.uid,
+                    actorName: user!.displayName || "Someone",
+                    actorPhotoURL: user!.photoURL,
+                    linkURL: window.location.href,
+                  }).catch(() => {});
+                }
+              }
+              // Fire mention notifications (fire-and-forget)
+              if (mentionedUsers?.length) {
+                mentionedUsers.forEach(({ uid }) => {
+                  if (uid !== user!.uid) {
+                    notifyMention({
+                      recipientId: uid,
+                      actorId: user!.uid,
+                      actorName: user!.displayName || "Anonymous",
+                      actorPhotoURL: user!.photoURL,
+                      linkURL: window.location.href,
+                    }).catch(() => {});
+                  }
+                });
+              }
               return newId;
             }}
             onUpvote={async (commentId) => {
               if (!categoryId || !user) return;
               await upvoteComment(categoryId, threadId, commentId, user.uid);
+            }}
+            onUpdateComment={async (commentId, text) => {
+              if (!categoryId) return;
+              await updateThreadComment(categoryId, threadId, commentId, text);
+            }}
+            onDeleteComment={async (commentId) => {
+              if (!categoryId) return;
+              await deleteThreadComment(categoryId, threadId, commentId);
             }}
             getUserVote={async (commentId) => {
               if (!categoryId || !user) return null;

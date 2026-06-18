@@ -31,6 +31,43 @@ export function timeAgo(timestamp: { seconds: number } | null): string {
 }
 
 // ---------------------------------------------------------------------------
+// Mention rendering — converts @Name tokens into styled links
+// ---------------------------------------------------------------------------
+
+export interface MentionRef {
+  uid: string;
+  displayName: string;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Splits `content` on @mention tokens and returns an array of plain strings
+ * and `{ uid, displayName }` objects. Consumers render each element as a link
+ * or plain text accordingly.
+ */
+export function parseMentions(
+  content: string,
+  mentionedUsers?: MentionRef[]
+): Array<string | MentionRef> {
+  if (!mentionedUsers?.length) return [content];
+  const sorted = [...mentionedUsers].sort(
+    (a, b) => b.displayName.length - a.displayName.length
+  );
+  const pattern = sorted
+    .map((u) => `@${escapeRegex(u.displayName)}`)
+    .join("|");
+  const regex = new RegExp(`(${pattern})`, "g");
+  const segments = content.split(regex);
+  return segments.map((seg) => {
+    const match = sorted.find((u) => seg === `@${u.displayName}`);
+    return match ?? seg;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // URL slug helpers
 // ---------------------------------------------------------------------------
 

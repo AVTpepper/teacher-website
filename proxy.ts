@@ -15,16 +15,14 @@ export function proxy(request: NextRequest) {
   );
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
 
-  // Unauthenticated user hitting a protected route → login
+  // Unauthenticated user hitting a protected route → landing page
   if (isProtected && !hasSession) {
-    const loginUrl = new URL("/auth/login", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // Authenticated user hitting auth pages → home
+  // Authenticated user hitting auth pages → home feed
   if (isAuthRoute && hasSession) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL("/home", request.url));
   }
 
   return NextResponse.next();

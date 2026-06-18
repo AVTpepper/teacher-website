@@ -12,6 +12,11 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+export interface LessonRatingSummary {
+  ratingAverage: number;
+  ratingCount: number;
+}
+
 export interface Rating {
   id: string;         // "{userId}_{lessonId}"
   userId: string;
@@ -68,4 +73,47 @@ export async function submitRating(userId: string, lessonId: string, value: numb
     ratingAverage: Math.round(avg * 10) / 10,
     ratingCount: values.length,
   });
+}
+
+/**
+ * Returns aggregate rating summaries for the provided lesson IDs.
+ * Uses chunked `in` queries (max 10 values per Firestore query).
+ */
+export async function getLessonRatingSummaries(
+  lessonIds: string[]
+): Promise<Record<string, LessonRatingSummary>> {
+  if (!db || lessonIds.length === 0) return {};
+
+  const uniqueIds = Array.from(new Set(lessonIds));
+  const chunks: string[][] = [];
+  for (let i = 0; i < uniqueIds.length; i += 10) {
+    chunks.push(uniqueIds.slice(i, i + 10));
+  }
+
+  const totals = new Map<string, { sum: number; count: number }>();
+
+  for (const chunk of chunks) {
+    const q = query(collection(db, "ratings"), where("lessonId", "in", chunk));
+    const snap = await getDocs(q);
+
+    snap.docs.forEach((d) => {
+      const data = d.data() as { lessonId?: string; value?: number };
+      if (!data.lessonId || typeof data.value !== "number") return;
+
+      const current = totals.get(data.lessonId) ?? { sum: 0, count: 0 };
+      current.sum += data.value;
+      current.count += 1;
+      totals.set(data.lessonId, current);
+    });
+  }
+
+  const summary: Record<string, LessonRatingSummary> = {};
+  totals.forEach((value, lessonId) => {
+    summary[lessonId] = {
+      ratingAverage: Math.round((value.sum / value.count) * 10) / 10,
+      ratingCount: value.count,
+    };
+  });
+
+  return summary;
 }

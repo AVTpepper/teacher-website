@@ -14,8 +14,12 @@ Teachers are busy professionals who lack a dedicated space that combines profess
 
 ### Educator Profiles & Discovery
 - Create a professional profile with photo, grade level, subjects, school, location, years of experience, and bio
+- Edit your profile at any time via the "Edit Profile" button (visible only to the profile owner); form pre-fills all current values; supports live bio character counter (500-char max)
+- Profile photo upload to Firebase Storage (`avatars/{uid}`): JPEG and PNG only (2 MB max) validated client-side before upload begins; real-time upload progress bar; preview shown before save
+- Firestore security rules protect `tier`, `createdAt`, and `role` fields from client-side writes on `users/{uid}`; Firebase Storage rules enforce the 2 MB limit and JPEG/PNG content-type restriction server-side
 - Browse and filter educators by grade level, subject, location, and experience
-- Follow educators to personalise your home feed
+- Follow educators to personalise your home feed; follower and following counts on each profile are clickable links to dedicated list pages (`/educators/[id]/followers`, `/educators/[id]/following`)
+- Each follower/following list page shows avatar, display name, bio, and a Follow/Unfollow button with optimistic UI and toast-on-error revert; the button is hidden when viewing your own page
 - Verified educator badges for credentialed educators
 
 ### Home Feed
@@ -68,10 +72,14 @@ Teachers are busy professionals who lack a dedicated space that combines profess
 - Badges display on profiles and next to usernames in discussions
 
 ### Notifications
-- Real-time notification dropdown in the navbar
-- Notification types: new follower, comment on your content, upvote, badge earned, resource liked
-- Unread count badge on the notification bell
-- Mark individual notifications as read
+- Real-time notification dropdown in the navbar with unread badge count
+- Full notification coverage: new follower, lesson comment, forum thread comment, comment reply, `@username` mention, lesson rated, lesson downloaded, lesson shared, resource liked/saved, resource downloaded, resource shared, forum upvote, badge earned
+- Each notification renders a human-readable sentence (e.g. "Alex commented on your lesson 'Introduction to Fractions'") and links directly to the relevant content
+- Opening the dropdown automatically marks all visible notifications as read and clears the unread badge
+- Full-page `/notifications` view with pagination ("Load more") for the complete history
+- Mark all as read, mark individual items as read, or dismiss individual notifications from the dropdown
+- `@mention` detection in posts, post comments, lesson comments, and forum thread comments — mentions are resolved to user UIDs and a `mentioned` notification is sent to each tagged user (excluding the author)
+- Self-interaction guard: no notification is created when a user interacts with their own content
 
 ### Universal Search
 - Search across all content types from the navbar
@@ -84,6 +92,15 @@ Teachers are busy professionals who lack a dedicated space that combines profess
 - Graceful degradation: spinner and loading states for every in-flight request; 30-second client-side timeout; human-readable messages for network failures, rate limits, and missing configuration; buttons re-enable after any error so users can retry without refreshing
 - Free tier: 10 AI requests per day (resets at midnight UTC); remaining count shown in the AI panel ("X / 10 requests remaining today"); Generate and Suggest buttons disabled and an upgrade prompt shown when the limit is reached; a static notice replaces the Plus-tier controls in the Generate section
 - Plus tier: unlimited daily AI requests; no usage meter displayed; enhanced Generate section includes a "Grade Level Override" select (overrides the form's grade level for the AI prompt) and an "Additional Context" textarea (up to 500 chars with live counter) to provide extra context to the AI; both fields are validated server-side and included in the OpenAI prompt only when populated
+
+### Platform Polish
+- Reusable `ConfirmDialog` component used consistently across all destructive or sensitive actions (delete lesson, delete draft, delete post, sign out); supports destructive (red) and non-destructive (primary) styling, a loading/spinner state that disables both buttons, full keyboard accessibility (Escape to close, focus trap, focus restoration), and ARIA semantics (`role="alertdialog"`, `aria-labelledby`, `aria-describedby`)
+- Intellectual property notice (`IPNotice`) displayed at the bottom of individual lesson plan pages, individual resource pages, and the Inspiration Hub; links to the Content Ownership section of the Terms of Service; uses muted secondary styling so it does not compete with primary content; accessible to screen readers via `<aside aria-label>`
+- Public landing page at `/` for unauthenticated visitors: hero section with tagline and sign-in/sign-up CTAs, responsive feature grid (Lesson Builder, AI Assistant, Forums, Resource Library, Community), social proof section with sample content cards, and site footer — fully static, no Firebase Auth dependency
+- Route restructuring: authenticated home feed moved to `/home`; unauthenticated users visiting `/` see the landing page; unauthenticated users hitting any protected route (`/profile`, `/lesson-builder`) are redirected to `/` (the landing page) rather than `/auth/login`; the Navbar logo links to `/home` for authenticated users and `/` for unauthenticated users
+- Account Management page at `/account`: read-only display of email address and account creation date; editable display name (synced to Firebase Auth and Firestore); subscription tier badge ("Free" / "Plus") with an upgrade prompt for free-tier users; change-password form with reauthentication, field-level validation, and human-readable Firebase error mapping; Danger Zone with a `ConfirmDialog`-gated account deletion flow that removes the Firestore profile document and Firebase Auth account then redirects to `/`; all nav references previously labelled "Settings" renamed to "Account Management"
+- Lesson Plan Preview Modal: authenticated users can open a full-screen, read-only preview of any lesson plan from the lesson detail page; the preview modal includes Download PDF and Print action buttons in a sticky header; Print targets only the lesson content via `@media print` (modal chrome hidden); the PDF export and the preview display the same copyright footer ("© [year] [Author Name] — All rights reserved. Created on EduConnect."); the modal is fully accessible (`role="dialog"`, `aria-modal="true"`, focus trap, Escape to close, focus restored to trigger on close)
+- Comment and reply edit/delete (posts and lessons): authenticated users see a three-dot overflow menu on their own comments and replies; "Edit" opens an inline textarea pre-filled with the original text, a live character counter (2 000-char limit), and Save/Cancel buttons; "Save" persists the update and shows an "(edited)" label; "Delete" opens a `ConfirmDialog` confirmation and removes the comment from the UI with a toast; Firestore security rules enforce author-only updates and deletes on all comment sub-collections; comments with replies show a "(Comment deleted)" placeholder rather than removing the thread
 
 ---
 

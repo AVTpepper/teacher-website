@@ -73,6 +73,7 @@ export interface PostComment {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: MentionedUserRef[];
   createdAt: Timestamp | null;
   likesCount: number;
 }
@@ -83,6 +84,7 @@ export interface PostCommentInput {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: MentionedUserRef[];
 }
 
 // --- Post CRUD ---
@@ -225,6 +227,7 @@ export async function commentOnPost(
     id: ref.id,
     postId,
     parentId: data.parentId ?? null,
+    mentionedUsers: data.mentionedUsers ?? [],
     likesCount: 0,
     createdAt: serverTimestamp(),
   });
@@ -300,4 +303,27 @@ export async function updatePost(
 export async function deletePost(postId: string): Promise<void> {
   if (!db) throw new Error("Firestore is not initialized");
   await deleteDoc(doc(db, "posts", postId));
+}
+
+export async function updatePostComment(
+  postId: string,
+  commentId: string,
+  text: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(doc(db, "posts", postId, "comments", commentId), {
+    content: text.trim().slice(0, 2000),
+    editedAt: serverTimestamp(),
+  });
+}
+
+export async function deletePostComment(
+  postId: string,
+  commentId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "posts", postId, "comments", commentId));
+  await updateDoc(doc(db, "posts", postId), {
+    commentsCount: increment(-1),
+  });
 }

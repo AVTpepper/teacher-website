@@ -34,7 +34,7 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") || "/";
+  const redirectTo = searchParams.get("redirect") || "/home";
   const { signIn, signInWithGoogle } = useAuth();
 
   const [email, setEmail] = useState("");

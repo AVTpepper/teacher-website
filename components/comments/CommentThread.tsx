@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import BadgeIcon from "@/components/badges/BadgeIcon";
 import MentionInput, { type MentionedUser } from "@/components/ui/MentionInput";
+import Dropdown from "@/components/ui/Dropdown";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 // ─── Generic comment type ───
 
@@ -20,6 +22,10 @@ export interface CommentData {
   authorBadges?: string[];
   content: string;
   createdAt: { seconds: number } | null;
+  editedAt?: { seconds: number } | null;
+  deleted?: boolean;
+  /** Mentioned users for rendering @Name as links. */
+  mentionedUsers?: MentionRef[];
   /** Used for upvote-based interactions (forums). */
   upvotes?: number;
   downvotes?: number;
@@ -42,7 +48,7 @@ export interface CommentThreadProps {
   // --- Callbacks ---
 
   /** Called when user submits a new comment. Return the new comment ID. */
-  onAddComment: (content: string, parentId: string | null, mentionedUids?: string[]) => Promise<string>;
+  onAddComment: (content: string, parentId: string | null, mentionedUsers?: MentionRef[]) => Promise<string>;
   /** Called when user upvotes a comment. Only used when mode="upvote". */
   onUpvote?: (commentId: string) => Promise<void>;
   /** Get the current user's vote on a comment. Only used when mode="upvote". */
@@ -51,11 +57,17 @@ export interface CommentThreadProps {
   onLikeComment?: (commentId: string) => Promise<void>;
   /** Whether the current user has already liked a comment. Only used when mode="like". */
   hasLikedComment?: (commentId: string) => Promise<boolean>;
+  /** Called to update the text of a comment the current user owns. */
+  onUpdateComment?: (commentId: string, text: string) => Promise<void>;
+  /** Called to delete a comment the current user owns. */
+  onDeleteComment?: (commentId: string) => Promise<void>;
 }
 
 // ─── Helper ───
 
-import { timeAgo } from "@/lib/utils";
+import { timeAgo, parseMentions, type MentionRef } from "@/lib/utils";
+
+const MAX_COMMENT_LENGTH = 2000;
 
 // ─── Single comment item (recursive) ───
 
@@ -66,11 +78,16 @@ interface CommentItemProps {
   depth: number;
   maxDepth: number;
   mode: "like" | "upvote";
-  onAddComment: (content: string, parentId: string | null, mentionedUids?: string[]) => Promise<string>;
+  onAddComment: (content: string, parentId: string | null, mentionedUsers?: MentionRef[]) => Promise<string>;
   onUpvote?: (commentId: string) => Promise<void>;
   getUserVote?: (commentId: string) => Promise<"up" | "down" | null>;
   onLikeComment?: (commentId: string) => Promise<void>;
   hasLikedComment?: (commentId: string) => Promise<boolean>;
+  onUpdateComment?: (commentId: string, text: string) => Promise<void>;
+  onDeleteComment?: (commentId: string) => Promise<void>;
+  onSelfDeleted?: (commentId: string, hasReplies: boolean) => void;
+  onSelfUpdated?: (commentId: string, newText: string) => void;
+  onAnyDeleted?: () => void;
 }
 
 function CommentItem({
@@ -85,6 +102,11 @@ function CommentItem({
   getUserVote,
   onLikeComment,
   hasLikedComment,
+  onUpdateComment,
+  onDeleteComment,
+  onSelfDeleted,
+  onSelfUpdated,
+  onAnyDeleted,
 }: CommentItemProps) {
   const { user } = useAuth();
   const [vote, setVote] = useState<"up" | "down" | null>(null);
@@ -98,6 +120,12 @@ function CommentItem({
   const [replyMentions, setReplyMentions] = useState<MentionedUser[]>([]);
   const [submittingReply, setSubmittingReply] = useState(false);
   const [localReplies, setLocalReplies] = useState<CommentData[]>(replies);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(comment.content);
+  const [editSaving, setEditSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (user && mode === "upvote" && getUserVote) {
@@ -160,7 +188,7 @@ function CommentItem({
       const newId = await onAddComment(
         replyText.trim(),
         comment.id,
-        replyMentions.map((m) => m.uid)
+        replyMentions
       );
       setLocalReplies((prev) => [
         ...prev,
@@ -170,6 +198,7 @@ function CommentItem({
           authorId: user.uid,
           authorName: user.displayName || "Anonymous",
           authorPhotoURL: user.photoURL,
+          mentionedUsers: replyMentions,
           content: replyText.trim(),
           createdAt: { seconds: Date.now() / 1000 },
           upvotes: 0,
@@ -186,8 +215,103 @@ function CommentItem({
     }
   }
 
+  useEffect(() => {
+    if (isEditing) {
+      editTextareaRef.current?.focus();
+    }
+  }, [isEditing]);
+
+  async function handleSaveEdit() {
+    if (!editText.trim() || editText.trim().length > MAX_COMMENT_LENGTH) return;
+    setEditSaving(true);
+    try {
+      await onUpdateComment!(comment.id, editText.trim());
+      onSelfUpdated?.(comment.id, editText.trim());
+      setIsEditing(false);
+    } catch {
+      // ignore
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  function handleCancelEdit() {
+    setEditText(comment.content);
+    setIsEditing(false);
+  }
+
+  async function handleConfirmDelete() {
+    setDeleteLoading(true);
+    try {
+      await onDeleteComment!(comment.id);
+      setShowDeleteConfirm(false);
+      onSelfDeleted?.(comment.id, localReplies.length > 0);
+      onAnyDeleted?.();
+    } catch {
+      // ignore
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
+  const isOwn = !!user && user.uid === comment.authorId;
+  const canEdit = isOwn && !!onUpdateComment;
+  const canDelete = isOwn && !!onDeleteComment;
+  const showMenu = canEdit || canDelete;
+
   const score = upvotes - (comment.downvotes ?? 0);
   const canNest = depth < maxDepth;
+
+  if (comment.deleted) {
+    return (
+      <div className={depth > 0 ? "ml-6 sm:ml-10 border-l-2 border-border pl-4" : ""}>
+        <div className="py-3">
+          <p className="text-sm italic text-muted">(Comment deleted)</p>
+        </div>
+        {canNest && localReplies.length > 0 && (
+          <div>
+            {localReplies.map((reply) => (
+              <CommentItem
+                key={reply.id}
+                comment={reply}
+                replies={allComments.filter((c) => c.parentId === reply.id)}
+                allComments={allComments}
+                depth={depth + 1}
+                maxDepth={maxDepth}
+                mode={mode}
+                onAddComment={onAddComment}
+                onUpvote={onUpvote}
+                getUserVote={getUserVote}
+                onLikeComment={onLikeComment}
+                hasLikedComment={hasLikedComment}
+                onUpdateComment={onUpdateComment}
+                onDeleteComment={onDeleteComment}
+                onSelfDeleted={(replyId, hasSubReplies) => {
+                  if (hasSubReplies) {
+                    setLocalReplies((prev) =>
+                      prev.map((r) => (r.id === replyId ? { ...r, deleted: true } : r))
+                    );
+                  } else {
+                    setLocalReplies((prev) => prev.filter((r) => r.id !== replyId));
+                  }
+                }}
+                onSelfUpdated={(replyId, newText) => {
+                  setLocalReplies((prev) =>
+                    prev.map((r) =>
+                      r.id === replyId
+                        ? { ...r, content: newText, editedAt: { seconds: Date.now() / 1000 } }
+                        : r
+                    )
+                  );
+                }}
+                onAnyDeleted={onAnyDeleted}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -221,13 +345,120 @@ function CommentItem({
             <span className="text-xs text-muted">
               {timeAgo(comment.createdAt)}
             </span>
+            {showMenu && !isEditing && (
+              <div className="ml-auto shrink-0">
+                <Dropdown
+                  trigger={
+                    <span
+                      aria-label="Comment options"
+                      className="flex items-center justify-center w-6 h-6 rounded text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                      </svg>
+                    </span>
+                  }
+                  align="right"
+                  items={[
+                    ...(canEdit
+                      ? [
+                          {
+                            label: "Edit",
+                            onClick: () => {
+                              setEditText(comment.content);
+                              setIsEditing(true);
+                            },
+                            icon: (
+                              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                              </svg>
+                            ),
+                          },
+                        ]
+                      : []),
+                    ...(canDelete
+                      ? [
+                          {
+                            label: "Delete",
+                            onClick: () => setShowDeleteConfirm(true),
+                            destructive: true,
+                            icon: (
+                              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                              </svg>
+                            ),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              </div>
+            )}
           </div>
-          <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">
-            {comment.content}
-          </p>
+          {isEditing ? (
+            <div className="mt-1">
+              <textarea
+                ref={editTextareaRef}
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                rows={3}
+                maxLength={MAX_COMMENT_LENGTH + 1}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-ring resize-none"
+                aria-label="Edit comment"
+              />
+              <div className="flex items-center justify-between mt-1.5">
+                <span
+                  className={`text-xs ${
+                    editText.length > MAX_COMMENT_LENGTH
+                      ? "text-error-500 font-medium"
+                      : "text-muted"
+                  }`}
+                >
+                  {editText.length}/{MAX_COMMENT_LENGTH}
+                </span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveEdit}
+                    disabled={!editText.trim() || editText.length > MAX_COMMENT_LENGTH}
+                    isLoading={editSaving}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">
+                {parseMentions(comment.content, comment.mentionedUsers).map((seg, i) =>
+                  typeof seg === "string" ? (
+                    seg
+                  ) : (
+                    <Link
+                      key={i}
+                      href={`/educators/${seg.uid}`}
+                      className="text-primary-900 font-semibold hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      @{seg.displayName}
+                    </Link>
+                  )
+                )}
+              </p>
+              {comment.editedAt && (
+                <span className="text-xs text-muted italic">(edited)</span>
+              )}
+            </>
+          )}
 
-          {/* Actions */}
-          <div className="flex items-center gap-3 mt-2">
+          {!isEditing && (
+            <>
+              {/* Actions */}
+              <div className="flex items-center gap-3 mt-2">
             {mode === "like" && (
               <button
                 type="button"
@@ -319,8 +550,20 @@ function CommentItem({
               </Button>
             </div>
           )}
+            </>
+          )}
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete comment"
+        description="This comment will be permanently removed. This cannot be undone."
+        confirmLabel="Delete"
+        isDestructive
+        isLoading={deleteLoading}
+      />
 
       {/* Nested replies */}
       {canNest && localReplies.length > 0 && (
@@ -339,6 +582,27 @@ function CommentItem({
               getUserVote={getUserVote}
               onLikeComment={onLikeComment}
               hasLikedComment={hasLikedComment}
+              onUpdateComment={onUpdateComment}
+              onDeleteComment={onDeleteComment}
+              onSelfDeleted={(replyId, hasSubReplies) => {
+                if (hasSubReplies) {
+                  setLocalReplies((prev) =>
+                    prev.map((r) => (r.id === replyId ? { ...r, deleted: true } : r))
+                  );
+                } else {
+                  setLocalReplies((prev) => prev.filter((r) => r.id !== replyId));
+                }
+              }}
+              onSelfUpdated={(replyId, newText) => {
+                setLocalReplies((prev) =>
+                  prev.map((r) =>
+                    r.id === replyId
+                      ? { ...r, content: newText, editedAt: { seconds: Date.now() / 1000 } }
+                      : r
+                  )
+                );
+              }}
+              onAnyDeleted={onAnyDeleted}
             />
           ))}
           {/* Reply button/input sits below all existing replies */}
@@ -397,10 +661,14 @@ export default function CommentThread({
   getUserVote,
   onLikeComment,
   hasLikedComment,
+  onUpdateComment,
+  onDeleteComment,
 }: CommentThreadProps) {
   const { user } = useAuth();
   const [replyText, setReplyText] = useState("");
   const [topLevelMentions, setTopLevelMentions] = useState<MentionedUser[]>([]);
+  const [deleteToast, setDeleteToast] = useState(false);
+  const deleteToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [localComments, setLocalComments] = useState<CommentData[]>(comments);
 
@@ -410,6 +678,12 @@ export default function CommentThread({
 
   const topLevel = localComments.filter((c) => !c.parentId);
 
+  function handleAnyDeleted() {
+    if (deleteToastTimerRef.current) clearTimeout(deleteToastTimerRef.current);
+    setDeleteToast(true);
+    deleteToastTimerRef.current = setTimeout(() => setDeleteToast(false), 3000);
+  }
+
   async function handleTopLevelComment() {
     if (!user || !replyText.trim()) return;
     setSubmitting(true);
@@ -417,7 +691,7 @@ export default function CommentThread({
       const newId = await onAddComment(
         replyText.trim(),
         null,
-        topLevelMentions.map((m) => m.uid)
+        topLevelMentions
       );
       setLocalComments((prev) => [
         ...prev,
@@ -428,6 +702,7 @@ export default function CommentThread({
           authorName: user.displayName || "Anonymous",
           authorPhotoURL: user.photoURL,
           content: replyText.trim(),
+          mentionedUsers: topLevelMentions,
           createdAt: { seconds: Date.now() / 1000 },
           upvotes: 0,
           downvotes: 0,
@@ -444,6 +719,16 @@ export default function CommentThread({
 
   return (
     <div className="space-y-3">
+      {deleteToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-lg border border-border bg-secondary-50 px-3 py-2 text-sm text-muted"
+        >
+          Comment deleted
+        </div>
+      )}
+
       {/* Comment input */}
       {user && (
         <div className="flex gap-2">
@@ -501,6 +786,27 @@ export default function CommentThread({
               getUserVote={getUserVote}
               onLikeComment={onLikeComment}
               hasLikedComment={hasLikedComment}
+              onUpdateComment={onUpdateComment}
+              onDeleteComment={onDeleteComment}
+              onSelfDeleted={(commentId, hasReplies) => {
+                if (hasReplies) {
+                  setLocalComments((prev) =>
+                    prev.map((c) => (c.id === commentId ? { ...c, deleted: true } : c))
+                  );
+                } else {
+                  setLocalComments((prev) => prev.filter((c) => c.id !== commentId));
+                }
+              }}
+              onSelfUpdated={(commentId, newText) => {
+                setLocalComments((prev) =>
+                  prev.map((c) =>
+                    c.id === commentId
+                      ? { ...c, content: newText, editedAt: { seconds: Date.now() / 1000 } }
+                      : c
+                  )
+                );
+              }}
+              onAnyDeleted={handleAnyDeleted}
             />
           ))}
         </div>

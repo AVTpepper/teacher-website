@@ -22,6 +22,12 @@ const TYPE_ICON: Record<NotificationType, string> = {
   "badge-earned": "🏅",
   "resource-liked": "❤️",
   mention: "@",
+  "lesson-rated": "⭐",
+  "lesson-downloaded": "📥",
+  "resource-downloaded": "📥",
+  "lesson-shared": "🔗",
+  "resource-shared": "🔗",
+  "comment-replied": "↩️",
 };
 
 const PAGE_SIZE = 20;
@@ -60,7 +66,11 @@ export default function NotificationsPage() {
   }
 
   useEffect(() => {
-    if (!authLoading && user) load(true);
+    if (!authLoading && user) {
+      load(true);
+      // Mark all as read when the page is visited
+      markAllAsRead(user.uid).catch(console.error);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading]);
 

@@ -1,7 +1,8 @@
 ﻿"use client";
 
-import { useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense } from "react";
+import { useRef, useState, useEffect, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { pdf } from "@react-pdf/renderer";
 import { storage } from "@/lib/firebase";
@@ -9,6 +10,8 @@ import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import {
   createResource,
+  updateResource,
+  getResource,
   resourceSlug,
   RESOURCE_TYPES,
   SUGGESTED_TAGS,
@@ -22,8 +25,19 @@ import { checkAndAwardBadges } from "@/lib/badges";
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
 export default function UploadResourcePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" /></div>}>
+      <UploadResourceForm />
+    </Suspense>
+  );
+}
+
+function UploadResourceForm() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+  const isEditMode = Boolean(editId);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -37,7 +51,33 @@ export default function UploadResourcePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
+  const [loadingEdit, setLoadingEdit] = useState(isEditMode);
   const formTopRef = useRef<HTMLDivElement>(null);
+
+  // Pre-populate form when editing an existing resource
+  useEffect(() => {
+    if (!editId) return;
+    let cancelled = false;
+    async function load() {
+      try {
+        const resource = await getResource(editId!);
+        if (cancelled || !resource) return;
+        setTitle(resource.title ?? "");
+        setDescription(resource.description ?? "");
+        setGradeLevel(resource.gradeLevel ?? "");
+        setSubject(resource.subject ?? "");
+        setResType(resource.type ?? "");
+        setTags(resource.tags ?? []);
+        setLinks((resource.links as AttachedLink[]) ?? []);
+      } catch {
+        setError("Failed to load resource for editing.");
+      } finally {
+        if (!cancelled) setLoadingEdit(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [editId]);
 
   if (!user) {
     return (
@@ -48,6 +88,14 @@ export default function UploadResourcePage() {
         <p className="mt-1 text-sm text-muted">
           You need to be logged in to share resources with the community.
         </p>
+      </div>
+    );
+  }
+
+  if (loadingEdit) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
       </div>
     );
   }
@@ -148,26 +196,43 @@ export default function UploadResourcePage() {
         console.warn("Firebase Storage not activated - skipping file upload");
       }
 
-      const id = await createResource({
-        title: title.trim(),
-        description: description.trim(),
-        authorId: user.uid,
-        authorName: user.displayName || "Anonymous",
-        authorPhotoURL: user.photoURL,
-        gradeLevel,
-        subject,
-        type: resType as ResourceType,
-        fileURL,
-        fileName,
-        tags,
-        links,
-      });
-
-      checkAndAwardBadges(user.uid).catch(() => {});
-      router.push(`/resources/${resourceSlug(title, id)}`);  
-    } catch (err) {
-      console.error("Upload resource error:", err);
-      showError("Failed to upload resource. Please try again.", {});
+      if (isEditMode && editId) {
+        await updateResource(editId, {
+          title: title.trim(),
+          description: description.trim(),
+          gradeLevel,
+          subject,
+          type: resType as ResourceType,
+          tags,
+          links,
+          ...(fileURL ? { fileURL, fileName } : {}),
+        });
+        router.push(`/resources/${resourceSlug(title, editId)}`);
+      } else {
+        const id = await createResource({
+          title: title.trim(),
+          description: description.trim(),
+          authorId: user.uid,
+          authorName: user.displayName || "Anonymous",
+          authorPhotoURL: user.photoURL,
+          gradeLevel,
+          subject,
+          type: resType as ResourceType,
+          fileURL,
+          fileName,
+          tags,
+          links,
+        });
+        checkAndAwardBadges(user.uid).catch(() => {});
+        router.push(`/resources/${resourceSlug(title, id)}`);
+      }
+    } catch {
+      showError(
+        isEditMode
+          ? "Failed to update resource. Please try again."
+          : "Failed to upload resource. Please try again.",
+        {}
+      );
     } finally {
       setSaving(false);
     }
@@ -181,9 +246,13 @@ export default function UploadResourcePage() {
   return (
     <div className="mx-auto max-w-2xl py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Upload Resource</h1>
+        <h1 className="text-2xl font-bold text-foreground">
+          {isEditMode ? "Edit Resource" : "Upload Resource"}
+        </h1>
         <p className="mt-1 text-sm text-muted">
-          Share a teaching resource with the EduConnect community.
+          {isEditMode
+            ? "Update your resource details below."
+            : "Share a teaching resource with the EduConnect community."}
         </p>
       </div>
 
@@ -344,13 +413,15 @@ export default function UploadResourcePage() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => router.push("/resources")}
+              onClick={() =>
+                router.push(isEditMode && editId ? `/resources/${resourceSlug(title, editId)}` : "/resources")
+              }
               disabled={saving}
             >
               Cancel
             </Button>
             <Button type="submit" isLoading={saving}>
-              Upload Resource
+              {isEditMode ? "Save Changes" : "Upload Resource"}
             </Button>
           </div>
         </form>

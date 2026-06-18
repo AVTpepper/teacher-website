@@ -3,6 +3,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   collection,
   query,
@@ -117,4 +118,19 @@ export async function getInspirationItem(id: string): Promise<InspirationItem | 
   const snap = await getDoc(doc(db, "inspiration", id));
   if (!snap.exists()) return null;
   return { id: snap.id, ...(snap.data() as Omit<InspirationItem, "id">) };
+}
+
+export type InspirationUpdateInput = Partial<Omit<InspirationItem, "id" | "createdAt" | "isApproved" | "submittedBy">>;
+
+export async function updateInspirationItem(
+  id: string,
+  data: InspirationUpdateInput
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(doc(db, "inspiration", id), data);
+}
+
+export async function deleteInspirationItem(id: string): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "inspiration", id));
 }
