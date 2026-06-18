@@ -220,6 +220,7 @@ export default function NavSearchBar({
   useEffect(() => {
     const trimmed = value.trim();
     if (!trimmed) {
+      setLoading(false);
       setSuggestions([]);
       setOpen(false);
       setActiveIndex(-1);
