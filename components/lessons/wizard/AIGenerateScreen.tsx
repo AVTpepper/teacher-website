@@ -65,6 +65,8 @@ const ACTIVITY_STYLE_OPTIONS = [
   "Project-based learning",
 ] as const;
 
+const ASSET_LIMIT = 2;
+
 const ASSET_LABELS: Record<AssetKind, string> = {
   worksheet: "Worksheet",
   rubric: "Rubric",
@@ -197,7 +199,7 @@ export default function AIGenerateScreen({
   const [subject, setSubject] = useState<string>(SUBJECTS[0]);
   const [learningGoal, setLearningGoal] = useState("");
   const [studentSupports, setStudentSupports] = useState("");
-  const [activityStyle, setActivityStyle] = useState("");
+  const [activityStyles, setActivityStyles] = useState<string[]>([]);
   const [gradeLevelOverride, setGradeLevelOverride] = useState("");
   const [additionalContext, setAdditionalContext] = useState("");
   const [assetOptions, setAssetOptions] = useState<Record<AssetKind, AssetOptionState>>({
@@ -211,7 +213,6 @@ export default function AIGenerateScreen({
   const [previewAssets, setPreviewAssets] = useState<GeneratedAssetPreview[]>([]);
   const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
 
-  const assetLimit = userTier === "plus" ? 2 : 1;
   const selectedAssetCount = useMemo(
     () => Object.values(assetOptions).filter((option) => option.selected).length,
     [assetOptions]
@@ -288,7 +289,7 @@ export default function AIGenerateScreen({
           subject,
           ...(learningGoal.trim() ? { learningGoal: learningGoal.trim() } : {}),
           ...(studentSupports.trim() ? { studentSupports: studentSupports.trim() } : {}),
-          ...(activityStyle ? { activityStyle } : {}),
+          ...(activityStyles.length > 0 ? { activityStyles } : {}),
           ...(assetRequests.length > 0 ? { assetRequests } : {}),
           ...(userTier === "plus" && gradeLevelOverride ? { gradeLevelOverride } : {}),
           ...(userTier === "plus" && additionalContext.trim()
@@ -568,23 +569,41 @@ export default function AIGenerateScreen({
               </p>
             </div>
 
-            <div>
-              <label htmlFor="ai-activity-style" className="block text-sm font-medium text-foreground mb-1.5">
-                Preferred Activity Style
-              </label>
-              <select
-                id="ai-activity-style"
-                value={activityStyle}
-                onChange={(e) => setActivityStyle(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="">No preference</option>
-                {ACTIVITY_STYLE_OPTIONS.map((style) => (
-                  <option key={style} value={style}>
-                    {style}
-                  </option>
-                ))}
-              </select>
+            <div className="rounded-xl border border-border bg-surface px-4 py-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">Preferred Activity Styles</h2>
+                  <p className="mt-1 text-sm text-muted">
+                    Select one or more approaches you want emphasized in the generated lesson.
+                  </p>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-secondary-100 px-2.5 py-0.5 text-xs font-medium text-secondary-700">
+                  {activityStyles.length} selected
+                </span>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                {ACTIVITY_STYLE_OPTIONS.map((style) => {
+                  const checked = activityStyles.includes(style);
+                  return (
+                    <label key={style} className="flex items-start gap-3 rounded-lg border border-border px-3 py-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setActivityStyles((prev) => Array.from(new Set([...prev, style])));
+                          } else {
+                            setActivityStyles((prev) => prev.filter((item) => item !== style));
+                          }
+                        }}
+                        className="mt-1 h-4 w-4 rounded border-border text-primary-600 focus:ring-primary-500"
+                      />
+                      <span className="text-sm text-foreground">{style}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="rounded-xl border border-border bg-surface px-4 py-4 space-y-3">
@@ -596,13 +615,13 @@ export default function AIGenerateScreen({
                   </p>
                 </div>
                 <span className="inline-flex items-center rounded-full bg-secondary-100 px-2.5 py-0.5 text-xs font-medium text-secondary-700">
-                  {selectedAssetCount} / {assetLimit} selected
+                  {selectedAssetCount} / {ASSET_LIMIT} selected
                 </span>
               </div>
 
               {(["worksheet", "rubric"] as AssetKind[]).map((kind) => {
                 const option = assetOptions[kind];
-                const limitReachedForNew = !option.selected && selectedAssetCount >= assetLimit;
+                const limitReachedForNew = !option.selected && selectedAssetCount >= ASSET_LIMIT;
                 return (
                   <div key={kind} className="rounded-lg border border-border px-3 py-3 space-y-2">
                     <label className="flex items-start gap-3 cursor-pointer">
@@ -615,7 +634,7 @@ export default function AIGenerateScreen({
                             updateAssetOption(kind, { selected: false });
                             return;
                           }
-                          if (selectedAssetCount < assetLimit) {
+                          if (selectedAssetCount < ASSET_LIMIT) {
                             updateAssetOption(kind, { selected: true });
                           }
                         }}

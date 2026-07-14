@@ -68,8 +68,17 @@ async function verifyFirebaseToken(token: string): Promise<string | null> {
 
 const FREE_DAILY_LIMIT = 10;
 const FREE_MONTHLY_REFINE_LIMIT = 20;
-const FREE_GENERATED_ASSET_LIMIT = 1;
+const FREE_GENERATED_ASSET_LIMIT = 2;
 const PLUS_GENERATED_ASSET_LIMIT = 2;
+
+const VALID_ACTIVITY_STYLES = [
+  "Hands-on exploration",
+  "Discussion-based learning",
+  "Direct instruction with practice",
+  "Collaborative group work",
+  "Inquiry-based learning",
+  "Project-based learning",
+] as const;
 
 function getUtcDateKey(): string {
   const now = new Date();
@@ -185,6 +194,7 @@ interface GenerateBody {
   learningGoal?: string;
   studentSupports?: string;
   activityStyle?: string;
+  activityStyles?: string[];
   assetRequests?: AssetRequest[];
   gradeLevelOverride?: string;
   description?: string;
@@ -609,6 +619,34 @@ export async function POST(request: NextRequest): Promise<Response> {
         );
       }
     }
+    if (raw.activityStyles !== undefined) {
+      if (!Array.isArray(raw.activityStyles)) {
+        return Response.json(
+          { error: 'Field "activityStyles" must be an array of strings when provided.' },
+          { status: 400 },
+        );
+      }
+      if ((raw.activityStyles as unknown[]).some((item) => typeof item !== "string")) {
+        return Response.json(
+          { error: 'Field "activityStyles" must be an array of strings when provided.' },
+          { status: 400 },
+        );
+      }
+      if ((raw.activityStyles as string[]).length > VALID_ACTIVITY_STYLES.length) {
+        return Response.json(
+          { error: `Field "activityStyles" can include at most ${VALID_ACTIVITY_STYLES.length} options.` },
+          { status: 400 },
+        );
+      }
+      for (const style of raw.activityStyles as string[]) {
+        if (!VALID_ACTIVITY_STYLES.includes(style as (typeof VALID_ACTIVITY_STYLES)[number])) {
+          return Response.json(
+            { error: "Field \"activityStyles\" contains an invalid style option." },
+            { status: 400 },
+          );
+        }
+      }
+    }
     if (raw.assetRequests !== undefined) {
       if (!Array.isArray(raw.assetRequests)) {
         return Response.json(
@@ -780,8 +818,16 @@ Subject: ${body.subject}`;
     if (body.studentSupports?.trim()) {
       userMessage += `\nStudent support needs: ${body.studentSupports.trim()}`;
     }
-    if (body.activityStyle?.trim()) {
-      userMessage += `\nPreferred activity style: ${body.activityStyle.trim()}`;
+    const preferredStyles = Array.from(
+      new Set(
+        [
+          ...(body.activityStyles ?? []),
+          ...(body.activityStyle?.trim() ? [body.activityStyle.trim()] : []),
+        ].filter((style) => style.trim() !== "")
+      )
+    );
+    if (preferredStyles.length > 0) {
+      userMessage += `\nPreferred activity styles: ${preferredStyles.join(", ")}`;
     }
 
     if (userTier === "plus" && body.description?.trim()) {
