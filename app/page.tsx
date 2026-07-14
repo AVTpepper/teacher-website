@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import LandingPage from "@/components/landing/LandingPage";
 import Spinner from "@/components/ui/Spinner";
@@ -9,12 +9,17 @@ import Spinner from "@/components/ui/Spinner";
 export default function RootPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const linkedPostId = searchParams.get("post");
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace("/home");
+      const target = linkedPostId
+        ? `/home?post=${encodeURIComponent(linkedPostId)}`
+        : "/home";
+      router.replace(target);
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, linkedPostId]);
 
   if (loading) {
     return (

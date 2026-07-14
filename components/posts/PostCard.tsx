@@ -140,7 +140,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
   }
 
   function handleShare() {
-    const url = `${window.location.origin}/?post=${post.id}`;
+    const url = `${window.location.origin}/home?post=${post.id}`;
     if (navigator.share) {
       navigator.share({ title: `Post by ${post.authorName}`, url });
     } else {
@@ -437,7 +437,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
             title="Comments"
             ownerId={post.authorId}
             contentLabel="your post"
-            linkURL={`/?post=${post.id}`}
+            linkURL={`/home?post=${post.id}`}
             maxDepth={1}
             mode="like"
             composerPlaceholder="Add a comment..."

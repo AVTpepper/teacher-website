@@ -649,7 +649,7 @@ function PostsTabContent({
       {visiblePosts.map((post) => (
         <Link
           key={post.id}
-          href={`/?post=${post.id}`}
+          href={`/home?post=${post.id}`}
           className="block rounded-lg border border-border px-4 py-3 hover:bg-surface-hover transition-colors"
         >
           <div className="mb-1 flex items-center gap-2">

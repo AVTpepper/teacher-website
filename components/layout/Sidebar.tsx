@@ -75,7 +75,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
             {trendingPosts.map((post) => (
               <li key={post.id}>
                 <Link
-                  href={`/?post=${post.id}`}
+                  href={`/home?post=${post.id}`}
                   className="group block rounded-md hover:bg-surface-hover transition-colors -mx-1 px-1 py-0.5"
                 >
                   <p className="text-xs text-foreground line-clamp-2 leading-relaxed group-hover:text-primary-900">

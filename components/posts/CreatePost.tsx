@@ -93,7 +93,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
           actorId: user!.uid,
           actorName: user!.displayName || "Anonymous",
           actorPhotoURL: user!.photoURL,
-          linkURL: `/?post=${postId}`,
+          linkURL: `/home?post=${postId}`,
         }).catch(() => {});
       });
       void postId;

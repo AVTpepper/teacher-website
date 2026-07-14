@@ -259,6 +259,12 @@ export default function LessonDetailPage({
   }
 
   const isOwner = user?.uid === lesson.authorId;
+  const objectives = lesson.objectives ?? [];
+  const materials = lesson.materials ?? [];
+  const steps = lesson.steps ?? [];
+  const checkForUnderstanding = lesson.checkForUnderstanding ?? [];
+  const assessments = lesson.assessments ?? [];
+  const attachments = lesson.attachments ?? [];
 
   return (
     <div className="py-8 space-y-8">
@@ -393,13 +399,13 @@ export default function LessonDetailPage({
               <span className="font-medium text-foreground">{lesson.authorName}</span>. All rights reserved.
             </p>
 
-            {lesson.objectives.length > 0 && (
+            {objectives.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">
                   🎯 Learning Objectives
                 </h3>
                 <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                  {lesson.objectives.map((obj, i) => (
+                  {objectives.map((obj, i) => (
                     <li key={i}>{obj}</li>
                   ))}
                 </ul>
@@ -408,13 +414,13 @@ export default function LessonDetailPage({
 
             {/* Materials */}
             {user ? (
-              lesson.materials.length > 0 && (
+              materials.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-foreground mb-2">
                     📦 Materials Needed
                   </h3>
                   <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                    {lesson.materials.map((mat, i) => (
+                    {materials.map((mat, i) => (
                       <li key={i}>{mat}</li>
                     ))}
                   </ul>
@@ -444,13 +450,13 @@ export default function LessonDetailPage({
             )}
 
             {/* Steps */}
-            {user && lesson.steps.length > 0 && (
+            {user && steps.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-3">
                   📋 Lesson Plan
                 </h3>
                 <div className="space-y-4">
-                  {lesson.steps.map((step, i) => (
+                  {steps.map((step, i) => (
                     <div
                       key={i}
                       className="border-l-2 border-primary-300 pl-4"
@@ -476,13 +482,13 @@ export default function LessonDetailPage({
             )}
 
             {/* Check for Understanding */}
-            {user && lesson.checkForUnderstanding.filter(Boolean).length > 0 && (
+            {user && checkForUnderstanding.filter(Boolean).length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">
                   🤔 Check for Understanding
                 </h3>
                 <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                  {lesson.checkForUnderstanding.filter(Boolean).map((item, i) => (
+                  {checkForUnderstanding.filter(Boolean).map((item, i) => (
                     <li key={i}>{item}</li>
                   ))}
                 </ul>
@@ -490,13 +496,13 @@ export default function LessonDetailPage({
             )}
 
             {/* Assessment */}
-            {user && lesson.assessments.filter(Boolean).length > 0 && (
+            {user && assessments.filter(Boolean).length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">
                   📝 Assessment
                 </h3>
                 <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                  {lesson.assessments.filter(Boolean).map((item, i) => (
+                  {assessments.filter(Boolean).map((item, i) => (
                     <li key={i}>{item}</li>
                   ))}
                 </ul>
@@ -504,13 +510,13 @@ export default function LessonDetailPage({
             )}
 
             {/* Attachments */}
-            {user && lesson.attachments.length > 0 && (
+            {user && attachments.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">
                   📎 Attachments
                 </h3>
                 <div className="space-y-1">
-                  {lesson.attachments.map((att, i) => (
+                  {attachments.map((att, i) => (
                     <a
                       key={i}
                       href={att.url}
