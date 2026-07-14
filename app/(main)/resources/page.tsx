@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DocumentSnapshot } from "firebase/firestore";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -45,90 +45,37 @@ export default function ResourcesPage() {
   const [resourceType, setResourceType] = useState("");
   const [sortBy, setSortBy] = useState<LibrarySortBy>("newest");
   const [searchQuery, setSearchQuery] = useState("");
-  const [visibleCount, setVisibleCount] = useState(RESULTS_PER_PAGE);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
 
   // Resources (uploaded files)
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
-  const [resourceCursor, setResourceCursor] = useState<DocumentSnapshot | null>(null);
   const [resourcesHasMore, setResourcesHasMore] = useState(false);
 
   // Lesson plans (from lessons collection)
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [lessonsLoading, setLessonsLoading] = useState(false);
   const [lessonRatingSummaries, setLessonRatingSummaries] = useState<Record<string, LessonRatingSummary>>({});
-  const [lessonCursor, setLessonCursor] = useState<DocumentSnapshot | null>(null);
   const [lessonsHasMore, setLessonsHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+
+  // Keep pagination cursors and merged lessons stable across callback re-creations.
+  const resourceCursorRef = useRef<DocumentSnapshot | null>(null);
+  const lessonCursorRef = useRef<DocumentSnapshot | null>(null);
+  const lessonsRef = useRef<Lesson[]>([]);
 
   // Whether to include lesson plans: when no type selected, or "lessonPlan" selected
   const includeLessons = !resourceType || resourceType === "lessonPlan";
   // Whether to include uploaded resources: when no type selected, or a non-lesson type selected
   const includeResources = !resourceType || resourceType !== "lessonPlan";
-  const useBackendPagination = searchQuery.trim().length === 0 && sortBy === "newest";
+  const isSearchMode = debouncedSearchQuery.trim().length > 0;
 
-  const fetchAllResources = useCallback(async () => {
-    if (!includeResources) {
-      setResources([]);
-      setLoading(false);
-      return;
-    }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
 
-    setLoading(true);
-    try {
-      const allResources: Resource[] = [];
-      let cursor: Parameters<typeof getResources>[1] = null;
-      let keepLoading = true;
-
-      while (keepLoading) {
-        const result = await getResources(
-          {
-            gradeLevel: gradeLevel || undefined,
-            subject: subject || undefined,
-            type: (resourceType as ResourceType) || undefined,
-            sortBy: "newest",
-          },
-          cursor
-        );
-
-        allResources.push(...result.resources);
-        cursor = result.lastDoc;
-        keepLoading = Boolean(result.lastDoc);
-      }
-
-      setResources(allResources);
-    } catch (err) {
-      console.error("getResources error:", err);
-      setResources([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [gradeLevel, subject, resourceType, includeResources]);
-
-  const fetchAllLessons = useCallback(async () => {
-    if (!includeLessons) {
-      setLessons([]);
-      setLessonRatingSummaries({});
-      return;
-    }
-    setLessonsLoading(true);
-    try {
-      const result = await getPublicLessons({
-        gradeLevel: gradeLevel || undefined,
-        subject: subject || undefined,
-      });
-      setLessons(result.lessons);
-
-      const lessonIds = result.lessons.map((l) => l.id);
-      const summaries = await getLessonRatingSummaries(lessonIds);
-      setLessonRatingSummaries(summaries);
-    } catch {
-      setLessons([]);
-      setLessonRatingSummaries({});
-    } finally {
-      setLessonsLoading(false);
-    }
-  }, [gradeLevel, subject, includeLessons]);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const fetchNextBrowseBatch = useCallback(async (reset = false) => {
     if (reset) {
@@ -145,9 +92,9 @@ export default function ResourcesPage() {
                 gradeLevel: gradeLevel || undefined,
                 subject: subject || undefined,
                 type: (resourceType as ResourceType) || undefined,
-                sortBy: "newest",
+                sortBy,
               },
-              reset ? null : resourceCursor,
+              reset ? null : resourceCursorRef.current,
               RESULTS_PER_PAGE
             )
           : Promise.resolve({ resources: [], lastDoc: null }),
@@ -156,9 +103,9 @@ export default function ResourcesPage() {
               {
                 gradeLevel: gradeLevel || undefined,
                 subject: subject || undefined,
-                sortBy: "newest",
+                sortBy,
               },
-              reset ? null : lessonCursor,
+              reset ? null : lessonCursorRef.current,
               RESULTS_PER_PAGE
             )
           : Promise.resolve({ lessons: [], lastDoc: null }),
@@ -166,18 +113,19 @@ export default function ResourcesPage() {
 
       if (includeResources) {
         setResources((prev) => (reset ? resourceResult.resources : [...prev, ...resourceResult.resources]));
-        setResourceCursor(resourceResult.lastDoc);
+        resourceCursorRef.current = resourceResult.lastDoc;
         setResourcesHasMore(Boolean(resourceResult.lastDoc));
       } else {
         setResources([]);
-        setResourceCursor(null);
+        resourceCursorRef.current = null;
         setResourcesHasMore(false);
       }
 
       if (includeLessons) {
-        const nextLessons = reset ? lessonResult.lessons : [...lessons, ...lessonResult.lessons];
+        const nextLessons = reset ? lessonResult.lessons : [...lessonsRef.current, ...lessonResult.lessons];
+        lessonsRef.current = nextLessons;
         setLessons(nextLessons);
-        setLessonCursor(lessonResult.lastDoc);
+        lessonCursorRef.current = lessonResult.lastDoc;
         setLessonsHasMore(Boolean(lessonResult.lastDoc));
 
         const lessonIds = nextLessons.map((lesson) => lesson.id);
@@ -185,7 +133,8 @@ export default function ResourcesPage() {
         setLessonRatingSummaries(summaries);
       } else {
         setLessons([]);
-        setLessonCursor(null);
+        lessonsRef.current = [];
+        lessonCursorRef.current = null;
         setLessonsHasMore(false);
         setLessonRatingSummaries({});
       }
@@ -193,39 +142,111 @@ export default function ResourcesPage() {
       console.error("browse fetch error:", err);
       setResources([]);
       setLessons([]);
+      lessonsRef.current = [];
       setLessonRatingSummaries({});
-      setResourceCursor(null);
-      setLessonCursor(null);
+      resourceCursorRef.current = null;
+      lessonCursorRef.current = null;
       setResourcesHasMore(false);
       setLessonsHasMore(false);
     } finally {
       setLoading(false);
       setLoadingMore(false);
-      setLessonsLoading(false);
     }
-  }, [gradeLevel, subject, resourceType, includeResources, includeLessons, resourceCursor, lessonCursor, lessons]);
+  }, [gradeLevel, subject, resourceType, sortBy, includeResources, includeLessons]);
 
-  useEffect(() => {
-    setVisibleCount(RESULTS_PER_PAGE);
+  const fetchAllForSearch = useCallback(async () => {
+    setLoading(true);
+    setLoadingMore(false);
 
-    if (useBackendPagination) {
-      setResources([]);
-      setLessons([]);
-      setResourceCursor(null);
-      setLessonCursor(null);
+    try {
+      let allResources: Resource[] = [];
+      let allLessons: Lesson[] = [];
+
+      if (includeResources) {
+        let cursor: DocumentSnapshot | null = null;
+        let hasNext = true;
+
+        while (hasNext) {
+          const result = await getResources(
+            {
+              gradeLevel: gradeLevel || undefined,
+              subject: subject || undefined,
+              type: (resourceType as ResourceType) || undefined,
+              sortBy,
+            },
+            cursor,
+            RESULTS_PER_PAGE
+          );
+
+          allResources = [...allResources, ...result.resources];
+          cursor = result.lastDoc;
+          hasNext = Boolean(result.lastDoc);
+        }
+      }
+
+      if (includeLessons) {
+        let cursor: DocumentSnapshot | null = null;
+        let hasNext = true;
+
+        while (hasNext) {
+          const result = await getPublicLessons(
+            {
+              gradeLevel: gradeLevel || undefined,
+              subject: subject || undefined,
+              sortBy,
+            },
+            cursor,
+            RESULTS_PER_PAGE
+          );
+
+          allLessons = [...allLessons, ...result.lessons];
+          cursor = result.lastDoc;
+          hasNext = Boolean(result.lastDoc);
+        }
+      }
+
+      setResources(allResources);
+      setLessons(allLessons);
+      lessonsRef.current = allLessons;
+
+      const lessonIds = allLessons.map((lesson) => lesson.id);
+      const summaries = await getLessonRatingSummaries(lessonIds);
+      setLessonRatingSummaries(summaries);
+
+      resourceCursorRef.current = null;
+      lessonCursorRef.current = null;
       setResourcesHasMore(false);
       setLessonsHasMore(false);
-      fetchNextBrowseBatch(true);
+    } catch (err) {
+      console.error("search fetch error:", err);
+      setResources([]);
+      setLessons([]);
+      lessonsRef.current = [];
+      setLessonRatingSummaries({});
+      resourceCursorRef.current = null;
+      lessonCursorRef.current = null;
+      setResourcesHasMore(false);
+      setLessonsHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [gradeLevel, subject, resourceType, sortBy, includeResources, includeLessons]);
+
+  useEffect(() => {
+    setResources([]);
+    setLessons([]);
+    lessonsRef.current = [];
+    resourceCursorRef.current = null;
+    lessonCursorRef.current = null;
+    setResourcesHasMore(false);
+    setLessonsHasMore(false);
+    if (isSearchMode) {
+      fetchAllForSearch();
       return;
     }
 
-    fetchAllResources();
-    fetchAllLessons();
-  }, [fetchAllResources, fetchAllLessons, fetchNextBrowseBatch, useBackendPagination]);
-
-  useEffect(() => {
-    setVisibleCount(RESULTS_PER_PAGE);
-  }, [gradeLevel, subject, resourceType, sortBy, searchQuery]);
+    fetchNextBrowseBatch(true);
+  }, [fetchNextBrowseBatch, fetchAllForSearch, isSearchMode]);
 
   // Build combined display list
   const resourceItems: DisplayItem[] = resources.map((r) => ({
@@ -315,9 +336,9 @@ export default function ResourcesPage() {
   });
 
   // Client-side search
-  const displayed = searchQuery.trim()
+  const displayed = debouncedSearchQuery.trim()
     ? sortedCombined.filter((item) => {
-        const q = searchQuery.toLowerCase();
+        const q = debouncedSearchQuery.toLowerCase();
         if (item.kind === "lesson") {
           return (
             item.data.title.toLowerCase().includes(q) ||
@@ -333,25 +354,15 @@ export default function ResourcesPage() {
       })
     : sortedCombined;
 
-  const visibleItems = useMemo(
-    () => displayed.slice(0, visibleCount),
-    [displayed, visibleCount]
-  );
+  const visibleItems = useMemo(() => displayed, [displayed]);
 
-  const isLoading = loading || lessonsLoading;
+  const isLoading = loading;
   const hasFilters = gradeLevel || subject || resourceType;
-  const canLoadMore = useBackendPagination
-    ? resourcesHasMore || lessonsHasMore
-    : visibleCount < displayed.length;
+  const canLoadMore = !isSearchMode && (resourcesHasMore || lessonsHasMore);
 
   async function handleLoadMore() {
-    const nextVisibleCount = visibleCount + RESULTS_PER_PAGE;
-
-    if (useBackendPagination && visibleItems.length < nextVisibleCount && (resourcesHasMore || lessonsHasMore)) {
-      await fetchNextBrowseBatch(false);
-    }
-
-    setVisibleCount(nextVisibleCount);
+    if (loadingMore || !canLoadMore) return;
+    await fetchNextBrowseBatch(false);
   }
 
   return (
@@ -494,7 +505,7 @@ export default function ResourcesPage() {
             No resources found
           </h3>
           <p className="mt-1 text-xs text-muted">
-            {hasFilters || searchQuery
+            {hasFilters || debouncedSearchQuery
               ? "Try adjusting your filters or search query."
               : "Be the first to share a resource!"}
           </p>
