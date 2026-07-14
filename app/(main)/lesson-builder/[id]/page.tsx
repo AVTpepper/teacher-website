@@ -27,7 +27,6 @@ import { timeAgo } from "@/lib/utils";
 import { notifyLessonRated, notifyLessonDownloaded, notifyLessonShared } from "@/lib/notifications";
 import { pdf } from "@react-pdf/renderer";
 import LessonPDFDocument from "@/components/lessons/LessonPDFDocument";
-import LessonPreviewModal from "@/components/lessons/LessonPreviewModal";
 
 export default function LessonDetailPage({
   params,
@@ -46,9 +45,6 @@ export default function LessonDetailPage({
   // Download
   const [localDownloadCount, setLocalDownloadCount] = useState(0);
   const [copied, setCopied] = useState(false);
-
-  // Preview
-  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Delete
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -569,27 +565,30 @@ export default function LessonDetailPage({
             <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
               {user && (
                 <>
-                  <Button variant="outline" onClick={() => setPreviewOpen(true)}>
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-                      />
-                    </svg>
-                    Preview
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push(`/lesson-builder/${lesson.id}/preview`, { scroll: true })}
+                  >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                        />
+                      </svg>
+                      Preview
                   </Button>
 
                   <Button onClick={handleDownload}>
@@ -830,18 +829,6 @@ export default function LessonDetailPage({
           </Card>
         </div>
       </div>
-
-      {/* Lesson Preview Modal */}
-      <LessonPreviewModal
-        isOpen={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        lesson={lesson}
-        authorName={lesson.authorName}
-        onDownload={() => {
-          setPreviewOpen(false);
-          handleDownload();
-        }}
-      />
 
       {/* Delete Confirmation */}
       <ConfirmDialog
