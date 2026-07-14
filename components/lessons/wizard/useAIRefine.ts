@@ -246,7 +246,7 @@ export function useAIRefine(
         setExpandingSection(null);
         setAIActionMap((prev) => new Map(prev).set(key, "elaborated"));
       },
-      (_msg) => setExpandingSection(null),
+      () => setExpandingSection(null),
       () => {},
     );
   }

@@ -251,7 +251,7 @@ export default function AIGenerateScreen({
           Generate a Lesson with AI
         </h1>
         <p className="text-sm text-muted mb-6">
-          Describe your lesson topic and we'll create a complete plan.
+          Describe your lesson topic and we&apos;ll create a complete plan.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>

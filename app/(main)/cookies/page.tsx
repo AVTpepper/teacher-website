@@ -24,14 +24,14 @@ export default function CookiesPage() {
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary-900 font-bold mt-0.5">•</span>
-            <span><strong className="text-foreground">Preferences</strong>: We may store lightweight preferences (such as theme settings) in your browser's local storage.</span>
+            <span><strong className="text-foreground">Preferences</strong>: We may store lightweight preferences (such as theme settings) in your browser&apos;s local storage.</span>
           </li>
         </ul>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Third-Party Cookies</h2>
-        <p className="text-muted leading-relaxed">We use Google Firebase services, which may set their own cookies. Please refer to <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-900 hover:underline">Google's Privacy Policy</a> for details.</p>
+        <p className="text-muted leading-relaxed">We use Google Firebase services, which may set their own cookies. Please refer to <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-900 hover:underline">Google&apos;s Privacy Policy</a> for details.</p>
       </section>
 
       <section className="space-y-3">

@@ -8,7 +8,7 @@ export default function CareersPage() {
         <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Join The Team</p>
         <h1 className="mt-1 text-3xl font-bold">Careers</h1>
         <p className="mt-2 text-primary-100/90 text-base leading-relaxed max-w-3xl">
-          Help us build the best professional community for educators. We're a small, passionate team working to make a real difference in education.
+          Help us build the best professional community for educators. We&apos;re a small, passionate team working to make a real difference in education.
         </p>
       </div>
 
@@ -16,7 +16,7 @@ export default function CareersPage() {
         <p className="text-4xl mb-3">🚀</p>
         <h2 className="text-lg font-semibold text-foreground">No Open Positions Right Now</h2>
         <p className="text-sm text-muted mt-2 max-w-md mx-auto">
-          We don't have any open roles at the moment, but we're always interested in meeting passionate people. Send us a note and we'll keep you in mind.
+          We don&apos;t have any open roles at the moment, but we&apos;re always interested in meeting passionate people. Send us a note and we&apos;ll keep you in mind.
         </p>
         <div className="mt-5">
           <Link href="/contact">

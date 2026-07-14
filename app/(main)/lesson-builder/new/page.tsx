@@ -119,34 +119,71 @@ function LessonBuilderNewEntry() {
 
   useEffect(() => {
     if (!isCompleteFlow || !draftParam) return;
-    if (!user) {
-      setCompleteLoadError("Sign in to continue a draft.");
-      setCompleteLoading(false);
-      return;
-    }
-    setCompleteLoading(true);
-    getLesson(draftParam)
-      .then((lesson) => {
-        if (!lesson) { setCompleteLoadError("Draft not found."); return; }
+    let cancelled = false;
+
+    async function loadCompleteDraft() {
+      if (!user) {
+        if (!cancelled) {
+          setCompleteLoadError("Sign in to continue a draft.");
+          setCompleteLoading(false);
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        setCompleteLoading(true);
+        setCompleteLoadError(null);
+      }
+
+      try {
+        const lesson = await getLesson(draftParam);
+        if (cancelled) return;
+        if (!lesson) {
+          setCompleteLoadError("Draft not found.");
+          return;
+        }
         if (lesson.authorId !== user.uid) {
           setCompleteLoadError("You can only continue drafts you created.");
           return;
         }
         setCompleteLoadedState(lessonToWizardState(lesson));
-      })
-      .catch(() => setCompleteLoadError("Failed to load draft. Please try again."))
-      .finally(() => setCompleteLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      } catch {
+        if (!cancelled) {
+          setCompleteLoadError("Failed to load draft. Please try again.");
+        }
+      } finally {
+        if (!cancelled) {
+          setCompleteLoading(false);
+        }
+      }
+    }
+
+    void loadCompleteDraft();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isCompleteFlow, draftParam, user]);
 
   useEffect(() => {
     if (!isEditOrRemix || !user) return;
     const lessonId = editingLessonId ?? remixLessonId;
     if (!lessonId) return;
-    setEditLoading(true);
-    getLesson(lessonId)
-      .then((lesson) => {
-        if (!lesson) { setEditLoadError("Lesson not found."); return; }
+    let cancelled = false;
+
+    async function loadEditOrRemixLesson() {
+      if (!cancelled) {
+        setEditLoading(true);
+        setEditLoadError(null);
+      }
+
+      try {
+        const lesson = await getLesson(lessonId);
+        if (cancelled) return;
+        if (!lesson) {
+          setEditLoadError("Lesson not found.");
+          return;
+        }
         if (lesson.authorId !== user.uid) {
           if (editingLessonId) {
             setEditLoadError("You can only edit lessons you created.");
@@ -159,9 +196,22 @@ function LessonBuilderNewEntry() {
           }
         }
         setEditLoadedState(lessonToWizardState(lesson));
-      })
-      .catch(() => setEditLoadError("Failed to load lesson. Please try again."))
-      .finally(() => setEditLoading(false));
+      } catch {
+        if (!cancelled) {
+          setEditLoadError("Failed to load lesson. Please try again.");
+        }
+      } finally {
+        if (!cancelled) {
+          setEditLoading(false);
+        }
+      }
+    }
+
+    void loadEditOrRemixLesson();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isEditOrRemix, user, editingLessonId, remixLessonId]);
 
   // Detect existing draft for the current user (skip when bypassing for edit/remix)
@@ -415,7 +465,7 @@ function LessonBuilderNewEntry() {
 // Existing editor (edit / remix bypass - retained for US-13)
 // ------------------------------------------------------------
 
-function LessonBuilderNewInner() {
+export function LessonBuilderNewInner() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();

@@ -237,21 +237,19 @@ interface InlineEditProps {
   currentLesson: WizardLessonState;
   onChange: (patch: Partial<WizardLessonState>) => void;
   onSave: (key: SectionKey) => void;
-  onCancel: (key: SectionKey) => void;
+  onCancel: () => void;
   children: React.ReactNode;
 }
 
-function InlineEditWrapper({
-  sectionKey,
-  sectionTitle,
-  editingSection,
-  editSnapshot,
-  currentLesson,
-  onChange,
-  onSave,
-  onCancel,
-  children,
-}: InlineEditProps) {
+function InlineEditWrapper(props: InlineEditProps) {
+  const {
+    sectionKey,
+    sectionTitle,
+    editingSection,
+    onSave,
+    onCancel,
+    children,
+  } = props;
   const isEditing = editingSection === sectionKey;
 
   if (!isEditing) return <>{children}</>;
@@ -273,7 +271,7 @@ function InlineEditWrapper({
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => onCancel(sectionKey)}
+          onClick={onCancel}
           aria-label={`Cancel ${sectionTitle} editing`}
         >
           Cancel
@@ -364,7 +362,7 @@ export default function ReviewPage({
     setEditDraft(null);
   }
 
-  function handleCancel(key: SectionKey) {
+  function handleCancel() {
     if (editSnapshot) {
       onChange(editSnapshot);
     }

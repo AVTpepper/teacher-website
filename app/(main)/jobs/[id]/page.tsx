@@ -6,12 +6,10 @@ import { useAuth } from "@/lib/auth-context";
 import {
   getJob,
   deactivateJob,
-  jobSlug,
   parseJobSlug,
   JOB_TYPES,
   JOB_TYPE_COLOR,
   type Job,
-  type JobType,
 } from "@/lib/firestore/jobs";
 import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { Avatar, Badge, Button, Card } from "@/components/ui";
@@ -186,7 +184,7 @@ export default function JobDetailPage({
               <div className="pt-1">
                 {confirmClose ? (
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm text-muted">Close this listing? It won't appear in searches.</p>
+                    <p className="text-sm text-muted">Close this listing? It won&apos;t appear in searches.</p>
                     <Button
                       variant="outline"
                       size="sm"

@@ -32,7 +32,7 @@ export default function TermsPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">5. Disclaimers</h2>
-        <p className="text-muted leading-relaxed">EduConnect is provided "as is" without warranties of any kind. We are not responsible for the accuracy of user-generated content.</p>
+        <p className="text-muted leading-relaxed">EduConnect is provided &quot;as is&quot; without warranties of any kind. We are not responsible for the accuracy of user-generated content.</p>
       </section>
 
       <section className="space-y-3">

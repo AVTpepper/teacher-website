@@ -234,7 +234,7 @@ export default function LandingPage() {
                 Tips for classroom management in mixed-ability groups
               </h3>
               <p className="text-sm text-muted line-clamp-3">
-                I've been experimenting with flexible seating and collaborative
+                I&apos;ve been experimenting with flexible seating and collaborative
                 roles in my Year 6 class. Would love to hear what strategies
                 others have found effective for keeping everyone engaged when
                 abilities vary so widely.

@@ -14,7 +14,7 @@ import {
   type JobFilters,
   type JobType,
 } from "@/lib/firestore/jobs";
-import { Avatar, Badge, Button, Card, Input, Select } from "@/components/ui";
+import { Badge, Button, Card, Input, Select } from "@/components/ui";
 
 // --- Job Card ---
 

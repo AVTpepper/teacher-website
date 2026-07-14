@@ -31,7 +31,7 @@ export default function ContactPage() {
         <div className="rounded-xl border border-success-200 bg-success-50 p-8 text-center">
           <p className="text-3xl mb-3">✅</p>
           <h2 className="text-lg font-semibold text-foreground">Message Sent!</h2>
-          <p className="text-sm text-muted mt-2">Thanks for reaching out. We'll get back to you as soon as possible.</p>
+          <p className="text-sm text-muted mt-2">Thanks for reaching out. We&apos;ll get back to you as soon as possible.</p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">

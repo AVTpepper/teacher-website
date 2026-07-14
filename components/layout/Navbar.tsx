@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import NavSearchBar from "@/components/layout/NavSearchBar";
 import Avatar from "@/components/ui/Avatar";
@@ -25,9 +25,7 @@ export default function Navbar() {
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
-  useEffect(() => setMounted(true), []);
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
@@ -55,7 +53,7 @@ export default function Navbar() {
         <div className="flex h-14 items-center justify-between gap-4">
           {/* Logo */}
           <Link
-            href={mounted && user ? "/home" : "/"}
+            href={user ? "/home" : "/"}
             className="shrink-0 text-lg font-bold text-accent-300"
           >
             EduConnect
@@ -72,7 +70,7 @@ export default function Navbar() {
             <NotificationDropdown />
 
             {/* User menu */}
-            {mounted && !loading && (
+            {!loading && (
               <>
                 {user ? (
                   <Dropdown

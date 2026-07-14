@@ -290,14 +290,11 @@ function ResetPasswordForm({ oobCode }: { oobCode: string }) {
 ────────────────────────────────────────── */
 function VerifyEmailHandler({ oobCode }: { oobCode: string }) {
   const [status, setStatus] = useState<"loading" | "success" | "error">(
-    "loading"
+    auth ? "loading" : "error"
   );
 
   useEffect(() => {
-    if (!auth) {
-      setStatus("error");
-      return;
-    }
+    if (!auth) return;
     applyActionCode(auth, oobCode)
       .then(() => setStatus("success"))
       .catch(() => setStatus("error"));

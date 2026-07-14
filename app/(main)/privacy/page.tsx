@@ -17,7 +17,7 @@ export default function PrivacyPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">2. How We Use Your Information</h2>
-        <p className="text-muted leading-relaxed">We use your information to provide and improve EduConnect, send you notifications you've opted into, and personalise your experience. We do not sell your personal data to third parties.</p>
+        <p className="text-muted leading-relaxed">We use your information to provide and improve EduConnect, send you notifications you&apos;ve opted into, and personalise your experience. We do not sell your personal data to third parties.</p>
       </section>
 
       <section className="space-y-3">
