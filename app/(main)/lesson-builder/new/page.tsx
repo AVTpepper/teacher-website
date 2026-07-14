@@ -391,56 +391,60 @@ function LessonBuilderNewEntry() {
           setAiGeneratedState(state);
           setAiDraftId(draftId);
         }}
-        onBack={() => setWizardPath(null)}
+        onBack={() => router.push("/lesson-builder")}
       />
     );
   }
 
   // Entry screen
   return (
-    <main className="flex min-h-[60vh] flex-col items-center justify-center gap-8 py-16 px-4">
-      {/* AC-5: Draft resume banner */}
-      {!bannerDismissed && draft && (
-        <div
-          role="alert"
-          className="w-full max-w-2xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <p className="text-sm font-medium text-amber-800">
-            You have an unfinished lesson draft
-            {draft.title ? `: "${draft.title}"` : ""}
-          </p>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              size="sm"
-              onClick={() => {
-                setResumeDraftId(draft.id);
-                setWizardPath("manual");
-              }}
-            >
-              Resume
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setBannerDismissed(true)}
-            >
-              Start fresh
-            </Button>
+    <main className="space-y-6 py-8 px-4 sm:px-6">
+      <div className="mx-auto w-full max-w-4xl space-y-5">
+        {/* AC-5: Draft resume banner */}
+        {!bannerDismissed && draft && (
+          <div
+            role="alert"
+            className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p className="text-sm font-medium text-amber-800">
+              You have an unfinished lesson draft
+              {draft.title ? `: "${draft.title}"` : ""}
+            </p>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                onClick={() => {
+                  setResumeDraftId(draft.id);
+                  setWizardPath("manual");
+                }}
+              >
+                Resume
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setBannerDismissed(true)}
+              >
+                Start fresh
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
-          Lesson Builder
-        </h1>
-        <p className="mt-2 text-base text-muted">
-          How would you like to create your lesson?
-        </p>
-      </div>
+        <section className="rounded-xl border border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 px-5 py-4 text-primary-50 shadow-md sm:px-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent-300">
+            Lesson Builder
+          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">
+            How would you like to create your lesson?
+          </h1>
+          <p className="mt-2 text-base text-primary-100/90">
+            Choose the path that fits your workflow, then build from there.
+          </p>
+        </section>
 
-      {/* AC-1: Two path cards */}
-      <div className="grid w-full max-w-2xl gap-4 sm:grid-cols-2">
+        {/* AC-1: Two path cards */}
+        <div className="grid w-full gap-4 sm:grid-cols-2">
         {/* Create My Own */}
         <button
           type="button"
@@ -480,6 +484,7 @@ function LessonBuilderNewEntry() {
           <span className="text-base font-semibold text-foreground">Create with AI Assistant</span>
           <span className="text-sm text-muted">Let AI generate a starting plan for you</span>
         </button>
+      </div>
       </div>
     </main>
   );

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
+import Button from "@/components/ui/Button";
 import {
   WIZARD_STEPS,
   REQUIRED_WIZARD_STEPS,
@@ -73,6 +74,8 @@ export default function WizardShell({
     () => initialState ?? emptyWizardState()
   );
   const [activeStep, setActiveStep] = useState(startAtStep ?? 1);
+  const [highestVisitedStep, setHighestVisitedStep] = useState(startAtStep ?? 1);
+  const [touchedSteps, setTouchedSteps] = useState<Set<number>>(() => new Set());
   const [, setCompletedSteps] = useState<Set<number>>(() => initialCompletedSteps ?? new Set());
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -113,6 +116,11 @@ export default function WizardShell({
 
   const onChange = useCallback((patch: Partial<WizardLessonState>) => {
     setLesson((prev) => ({ ...prev, ...patch }));
+    setTouchedSteps((prev) => {
+      const next = new Set(prev);
+      next.add(activeStepRef.current);
+      return next;
+    });
   }, []);
 
   // AI refine/elaborate/undo state shared across all steps
@@ -143,6 +151,7 @@ export default function WizardShell({
 
     if (nextStep !== activeStepRef.current) {
       setActiveStep(nextStep);
+      setHighestVisitedStep((prev) => Math.max(prev, nextStep));
     }
   }, []);
 
@@ -176,6 +185,7 @@ export default function WizardShell({
 
   function goToStep(stepId: number, focusHeading = false) {
     setActiveStep(stepId);
+    setHighestVisitedStep((prev) => Math.max(prev, stepId));
     const idx = stepId - 1;
     // Suppress observer for the duration of the scroll animation (~600ms)
     isProgrammaticScrollRef.current = true;
@@ -351,6 +361,7 @@ export default function WizardShell({
           resumeStep = step.id;
         }
         setActiveStep(resumeStep);
+        setHighestVisitedStep(resumeStep);
 
         setDraftLoaded(true);
         setTimeout(() => setDraftLoaded(false), 3000);
@@ -370,16 +381,18 @@ export default function WizardShell({
       const attention = getStepAttention(step.key, lesson);
       const isResolved = attention.length === 0;
       const isRequired = REQUIRED_WIZARD_STEPS.includes(step.key);
+      const shouldSurfaceAttention =
+        !isResolved && (highestVisitedStep > step.id || touchedSteps.has(step.id));
 
       return {
         ...step,
-        attention,
+        attention: shouldSurfaceAttention ? attention : [],
         isResolved,
         isRequired,
         state: getStepState(step.id, activeStep, isResolved),
       };
     });
-  }, [activeStep, lesson]);
+  }, [activeStep, highestVisitedStep, lesson, touchedSteps]);
 
   // ── Progress bar values ────────────────────────────────────────────────────
 
@@ -447,13 +460,18 @@ export default function WizardShell({
             <span className="text-xs font-semibold uppercase tracking-wider text-muted">
               Progress
             </span>
-            <button
+            <Button
               type="button"
               onClick={onExit}
-              className="text-xs text-muted hover:text-foreground transition-colors"
+              variant="outline"
+              size="sm"
+              className="gap-1.5 px-2.5"
             >
-              ← Exit
-            </button>
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+              </svg>
+              Back
+            </Button>
           </div>
 
           {stepStates.map((s) => {
@@ -665,12 +683,18 @@ export default function WizardShell({
           >
             <ReviewPage
               lesson={lesson}
-              onChange={(patch) => setLesson((prev) => ({ ...prev, ...patch }))}
+              onChange={(patch) => {
+                setLesson((prev) => ({ ...prev, ...patch }));
+                setTouchedSteps((prev) => {
+                  const next = new Set(prev);
+                  next.add(7);
+                  return next;
+                });
+              }}
               onSaveDraft={() => saveDraft(lesson)}
               onPublish={handlePublish}
               isSaving={saveState === "saving"}
               saveState={saveState}
-              onBackToEdit={handleBack}
               user={user}
               isAvailable={isAvailable}
             />

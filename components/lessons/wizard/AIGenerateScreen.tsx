@@ -426,7 +426,7 @@ export default function AIGenerateScreen({
 
   if (isGenerating) {
     return (
-      <main className="flex min-h-[60vh] flex-col items-center justify-center gap-6 py-16 px-4">
+      <main className="flex min-h-[60vh] flex-col items-center justify-center gap-6 py-10 px-4">
         <div role="status" className="flex flex-col items-center gap-6">
           <Spinner className="h-12 w-12 border-[3px]" />
           <p aria-live="polite" className="text-base font-medium text-foreground">
@@ -439,28 +439,41 @@ export default function AIGenerateScreen({
 
   return (
     <>
-      <main className="flex min-h-[60vh] flex-col items-center justify-center py-16 px-4">
-        <div className="w-full max-w-lg">
-          <button
-            type="button"
-            onClick={onBack}
-            className="mb-6 flex items-center gap-1 text-sm text-muted hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded"
-          >
-            ← Back
-          </button>
+      <main className="space-y-5">
+        <section className="-mx-4 -mt-4 rounded-t-2xl border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 px-5 py-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:px-6 sm:py-6">
+          <div className="mx-auto w-full max-w-4xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">AI Lesson Builder</p>
+                <h1 className="mt-1 text-3xl font-bold tracking-tight text-primary-50">
+                  Generate a Lesson with AI
+                </h1>
+                <p className="mt-2 text-sm text-primary-100/90">
+                  Describe the lesson you need, then add a few teaching constraints so the first draft is easier to trust and edit.
+                </p>
+              </div>
+              <div className="rounded-full bg-primary-50/10 px-3 py-1 text-xs font-medium text-primary-100 ring-1 ring-inset ring-primary-50/20">
+                Worksheets and rubrics can be drafted with the lesson.
+              </div>
+            </div>
+            <p className="mt-3 max-w-2xl text-sm text-primary-100/80">
+              Best results: name the topic, clarify the main learning outcome, and note any support or pacing needs the AI should respect.
+            </p>
+          </div>
+        </section>
 
-          <h1 className="text-2xl font-bold tracking-tight text-foreground mb-1">
-            Generate a Lesson with AI
-          </h1>
-          <p className="text-sm text-muted mb-6">
-            Describe the lesson you need, then add a few teaching constraints so the first draft is easier to trust and edit.
-          </p>
+        <div className="mx-auto w-full max-w-4xl space-y-5">
 
-          <div className="mb-6 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">
-            Best results: name the topic, clarify the main learning outcome, and note any support or pacing needs the AI should respect.
+          <div className="flex justify-start -mt-2">
+            <Button type="button" variant="outline" size="sm" onClick={onBack} className="gap-1.5">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+              </svg>
+              Back
+            </Button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
               <label htmlFor="ai-topic" className="block text-sm font-medium text-foreground mb-1.5">
                 Topic <span aria-hidden="true" className="text-red-500">*</span>
@@ -479,6 +492,44 @@ export default function AIGenerateScreen({
               <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
                 {topic.length} / 300
               </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="ai-grade-level" className="block text-sm font-medium text-foreground mb-1.5">
+                  Grade Level
+                </label>
+                <select
+                  id="ai-grade-level"
+                  value={gradeLevel}
+                  onChange={(e) => setGradeLevel(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {GRADE_LEVELS.map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="ai-subject" className="block text-sm font-medium text-foreground mb-1.5">
+                  Subject
+                </label>
+                <select
+                  id="ai-subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {SUBJECTS.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div>
@@ -610,42 +661,6 @@ export default function AIGenerateScreen({
               <div className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted">
                 Slides outline is planned next. This first version ships with linked worksheets and rubrics.
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="ai-grade-level" className="block text-sm font-medium text-foreground mb-1.5">
-                Grade Level
-              </label>
-              <select
-                id="ai-grade-level"
-                value={gradeLevel}
-                onChange={(e) => setGradeLevel(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                {GRADE_LEVELS.map((level) => (
-                  <option key={level} value={level}>
-                    {level}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="ai-subject" className="block text-sm font-medium text-foreground mb-1.5">
-                Subject
-              </label>
-              <select
-                id="ai-subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                {SUBJECTS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
             </div>
 
             {userTier === "plus" && (

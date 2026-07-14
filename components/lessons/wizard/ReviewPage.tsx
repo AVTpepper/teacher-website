@@ -23,7 +23,6 @@ export type ReviewPageProps = {
   onPublish: () => Promise<void>;
   isSaving: boolean;
   saveState: "idle" | "saving" | "saved" | "error";
-  onBackToEdit: () => void;
   user: User | null;
   isAvailable?: boolean;
 };
@@ -362,7 +361,6 @@ export default function ReviewPage({
   onPublish,
   isSaving,
   saveState,
-  onBackToEdit,
   user,
   isAvailable = false,
 }: ReviewPageProps) {
@@ -495,6 +493,29 @@ export default function ReviewPage({
   const displayLesson = editDraft ?? lesson;
   const reviewChecks = buildReviewChecks(lesson);
   const reviewWarnings = reviewChecks.filter((check) => check.status === "warn");
+  const firstWarningSectionKey =
+    reviewChecks.find((check) => check.status === "warn")?.label === "Objectives"
+      ? "objectives"
+      : reviewChecks.find((check) => check.status === "warn")?.label === "Lesson steps"
+      ? "lessonSteps"
+      : reviewChecks.find((check) => check.status === "warn")?.label === "Timing"
+      ? "lessonSteps"
+      : reviewChecks.find((check) => check.status === "warn")?.label === "Checks and assessment"
+      ? "cfu"
+      : reviewChecks.find((check) => check.status === "warn")?.label === "Materials"
+      ? "materials"
+      : null;
+
+  function handleJumpToFirstCheck() {
+    if (!firstWarningSectionKey) {
+      const firstSection = document.getElementById(sectionIds.basicInfo);
+      firstSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    const target = document.getElementById(sectionIds[firstWarningSectionKey]);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   // Helper to render the refine popover for a given section
   function renderRefinePopover(key: SectionKey) {
@@ -540,28 +561,27 @@ export default function ReviewPage({
         cancelLabel="Dismiss"
         isDestructive={false}
       />
-      {/* Back to Edit link */}
-      <button
+      {/* Items to check shortcut */}
+      <Button
         type="button"
-        onClick={onBackToEdit}
-        className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded cursor-pointer"
+        variant="outline"
+        size="sm"
+        onClick={handleJumpToFirstCheck}
+        className="w-fit gap-1.5 border-amber-300 text-amber-800 hover:bg-amber-50 hover:text-amber-900"
       >
         <svg
-          className="h-4 w-4"
+          className="h-3.5 w-3.5"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
           strokeWidth={2}
           aria-hidden="true"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15.75 19.5 8.25 12l7.5-7.5"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4.5m0 3h.008v.008H12V16.5Z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10.29 3.86 1.82 18a2.25 2.25 0 0 0 1.93 3.38h16.5A2.25 2.25 0 0 0 22.18 18l-8.47-14.14a2.25 2.25 0 0 0-3.42 0Z" />
         </svg>
-        Back to edit
-      </button>
+        {reviewWarnings.length > 0 ? `${reviewWarnings.length} items to check` : "Ready to review"}
+      </Button>
 
       {/* Remaining refines banner (free tier) */}
       {isAvailable && remainingRefines !== null && (
