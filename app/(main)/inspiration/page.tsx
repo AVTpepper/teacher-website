@@ -51,16 +51,13 @@ function cleanDisplayText(value: string | null | undefined): string {
   return trimmed;
 }
 
-function primaryLink(item: InspirationItem): string | null {
-  return item.videoURL || item.sourceURL || null;
-}
-
 // --- Featured card (large, hero-style) ---
 
 interface CardProps {
   item: InspirationItem;
   currentUserId?: string | null;
   isPinned?: boolean;
+  onOpen: (item: InspirationItem) => void;
   onPin: (item: InspirationItem) => void;
   onCreatorClick: (creator: string) => void;
   onSourceClick: (source: string) => void;
@@ -72,6 +69,7 @@ function FeaturedCard({
   item,
   currentUserId,
   isPinned = false,
+  onOpen,
   onPin,
   onCreatorClick,
   onSourceClick,
@@ -81,17 +79,28 @@ function FeaturedCard({
   const thumb = item.thumbnailStorageURL || item.thumbnailURL;
   const isOwner = currentUserId != null && item.submittedBy === currentUserId;
   const source = sourceHost(item.sourceURL || "");
-  const link = primaryLink(item);
   const displayTitle = cleanDisplayText(item.title) || "Untitled inspiration";
   const displayDescription = cleanDisplayText(item.description) || "No description provided.";
   const displayCreator = cleanDisplayText(item.creator) || "Community";
   return (
-    <div className="relative group">
+    <div
+      className="relative group h-full cursor-pointer"
+      role="link"
+      tabIndex={0}
+      onClick={() => onOpen(item)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(item);
+        }
+      }}
+    >
       <div className="absolute top-3 right-3 z-10 flex gap-1">
         <button
           type="button"
           onClick={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             onPin(item);
           }}
           aria-label={isPinned ? "Unpin featured inspiration" : "Pin as featured inspiration"}
@@ -109,7 +118,7 @@ function FeaturedCard({
         <>
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); onEdit(item); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(item); }}
             aria-label="Edit inspiration post"
             className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-foreground hover:bg-surface transition-colors"
           >
@@ -119,7 +128,7 @@ function FeaturedCard({
           </button>
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); onDelete(item); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(item); }}
             aria-label="Delete inspiration post"
             className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-destructive hover:bg-destructive/10 transition-colors"
           >
@@ -130,8 +139,7 @@ function FeaturedCard({
         </>
       )}
       </div>
-      {link ? (
-      <a href={link} target="_blank" rel="noopener noreferrer" className="block group">
+      <div className="block group">
         <Card className="overflow-hidden border-primary-200 hover:shadow-lg transition-shadow">
           <div className="flex flex-col sm:flex-row gap-0">
             {/* Thumbnail / colour swatch */}
@@ -173,6 +181,7 @@ function FeaturedCard({
                   className="hover:text-primary-900"
                   onClick={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     if (displayCreator !== "Community") onCreatorClick(displayCreator);
                   }}
                 >
@@ -184,6 +193,7 @@ function FeaturedCard({
                   className="hover:text-primary-900"
                   onClick={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     onSourceClick(source);
                   }}
                 >
@@ -191,7 +201,7 @@ function FeaturedCard({
                 </button>
                 <span className="text-border">•</span>
                 <span className="inline-flex items-center gap-1 text-primary-800">
-                  Open link
+                  View details
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H18m0 0v4.5M18 6l-7.5 7.5" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 10.5V18h7.5" />
@@ -201,38 +211,7 @@ function FeaturedCard({
             </div>
           </div>
         </Card>
-      </a>
-      ) : (
-        <Card className="overflow-hidden border-primary-200">
-          <div className="flex flex-col sm:flex-row gap-0">
-            <div
-              className="h-48 sm:h-auto sm:w-64 shrink-0 flex items-center justify-center text-6xl"
-              style={{ background: "var(--color-secondary-50, #f3f4f6)" }}
-            >
-              {thumb ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={thumb} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span role="img" aria-label={categoryLabel(item.category)}>
-                  {categoryIcon(item.category)}
-                </span>
-              )}
-            </div>
-            <div className="p-6 flex flex-col justify-between gap-4">
-              <div>
-                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-3 ${CATEGORY_COLOR[item.category]}`}>
-                  {categoryLabel(item.category)}
-                </span>
-                <h2 className="text-xl font-bold text-foreground leading-snug">{displayTitle}</h2>
-                <p className="mt-2 text-sm text-muted line-clamp-3">{displayDescription}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-muted font-medium">
-                <span>{displayCreator}</span>
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
+      </div>
     </div>
   );
 }
@@ -243,6 +222,7 @@ function InspirationCard({
   item,
   currentUserId,
   isPinned = false,
+  onOpen,
   onPin,
   onCreatorClick,
   onSourceClick,
@@ -252,17 +232,28 @@ function InspirationCard({
   const thumb = item.thumbnailStorageURL || item.thumbnailURL;
   const isOwner = currentUserId != null && item.submittedBy === currentUserId;
   const source = sourceHost(item.sourceURL || "");
-  const link = primaryLink(item);
   const displayTitle = cleanDisplayText(item.title) || "Untitled inspiration";
   const displayDescription = cleanDisplayText(item.description) || "No description provided.";
   const displayCreator = cleanDisplayText(item.creator) || "Community";
   return (
-    <div className="relative group h-full">
+    <div
+      className="relative group h-full cursor-pointer"
+      role="link"
+      tabIndex={0}
+      onClick={() => onOpen(item)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(item);
+        }
+      }}
+    >
       <div className="absolute top-2 right-2 z-10 flex gap-1">
         <button
           type="button"
           onClick={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             onPin(item);
           }}
           aria-label={isPinned ? "Unpin featured inspiration" : "Pin as featured inspiration"}
@@ -280,7 +271,7 @@ function InspirationCard({
         <>
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); onEdit(item); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(item); }}
             aria-label="Edit inspiration post"
             className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-foreground hover:bg-surface transition-colors"
           >
@@ -290,7 +281,7 @@ function InspirationCard({
           </button>
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); onDelete(item); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(item); }}
             aria-label="Delete inspiration post"
             className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-destructive hover:bg-destructive/10 transition-colors"
           >
@@ -301,8 +292,7 @@ function InspirationCard({
         </>
       )}
       </div>
-      {link ? (
-      <a href={link} target="_blank" rel="noopener noreferrer" className="block group h-full">
+      <div className="block group h-full">
       <Card className="h-full flex flex-col overflow-hidden border-border hover:shadow-md transition-shadow">
         {/* Thumbnail */}
         <div
@@ -341,6 +331,7 @@ function InspirationCard({
               className="hover:text-primary-900"
               onClick={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 if (displayCreator !== "Community") onCreatorClick(displayCreator);
               }}
             >
@@ -352,6 +343,7 @@ function InspirationCard({
                 className="truncate hover:text-primary-900"
                 onClick={(e) => {
                   e.preventDefault();
+                    e.stopPropagation();
                   onSourceClick(source);
                 }}
               >
@@ -361,34 +353,7 @@ function InspirationCard({
           </div>
         </div>
       </Card>
-    </a>
-      ) : (
-        <Card className="h-full flex flex-col overflow-hidden border-border">
-          <div
-            className="h-36 flex items-center justify-center text-4xl shrink-0"
-            style={{ background: "var(--color-secondary-50, #f3f4f6)" }}
-          >
-            {thumb ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={thumb} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <span role="img" aria-label={categoryLabel(item.category)}>
-                {categoryIcon(item.category)}
-              </span>
-            )}
-          </div>
-          <div className="p-4 flex flex-col flex-1 gap-2">
-            <span className={`inline-block self-start px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLOR[item.category]}`}>
-              {categoryLabel(item.category)}
-            </span>
-            <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{displayTitle}</h3>
-            <p className="text-xs text-muted line-clamp-3 flex-1">{displayDescription}</p>
-            <div className="mt-auto pt-2 border-t border-border text-xs text-muted font-medium">
-              {displayCreator}
-            </div>
-          </div>
-        </Card>
-      )}
+      </div>
     </div>
   );
 }
@@ -643,214 +608,226 @@ export default function InspirationPage() {
     setPinnedFeaturedId((prev) => (prev === item.id ? null : item.id));
   }
 
-  return (
-    <div className="space-y-6 pb-8">
-      {/* Header */}
-      <div className="-mx-4 -mt-4 flex flex-col gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Discover</p>
-          <h1 className="text-2xl font-bold">Inspiration Hub</h1>
-          <p className="mt-1 text-sm text-primary-100/90">
-            Curated podcasts, articles, videos, and stories to inspire your teaching.
-          </p>
-        </div>
-        {user ? (
-          <Link href="/inspiration/new">
-            <Button variant="secondary">+ Submit Content</Button>
-          </Link>
-        ) : (
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => router.push("/auth/signup?redirect=/inspiration/new")}>Create Account</Button>
-            <Button variant="outline" onClick={() => router.push("/auth/login?redirect=/inspiration/new")}>Sign In</Button>
-          </div>
-        )}
-      </div>
+  function handleOpen(item: InspirationItem) {
+    router.push(`/inspiration/${item.id}`);
+  }
 
-      {/* Category tabs */}
-      <div className="flex gap-2 flex-wrap" role="tablist">
-        <button
-          role="tab"
-          aria-selected={activeCategory === "all"}
-          onClick={() => setActiveCategory("all")}
-          className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-            activeCategory === "all"
-              ? "bg-primary-900 text-white"
-              : "bg-secondary-100 text-foreground hover:bg-secondary-200"
-          }`}
-        >
-          All
-        </button>
-        {INSPIRATION_CATEGORIES.map((cat) => (
+  return (
+    <div className="flex-1 min-w-0 space-y-6">
+      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+        <div className="space-y-4">
+        {/* Header */}
+        <div className="-mx-4 -mt-4 flex flex-col gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Discover</p>
+            <h1 className="text-2xl font-bold">Inspiration Hub</h1>
+            <p className="mt-1 text-sm text-primary-100/90">
+              Curated podcasts, articles, videos, and stories to inspire your teaching.
+            </p>
+          </div>
+          {user ? (
+            <Link href="/inspiration/new">
+              <Button variant="secondary">+ Submit Content</Button>
+            </Link>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => router.push("/auth/signup?redirect=/inspiration/new")}>Create Account</Button>
+              <Button variant="outline" onClick={() => router.push("/auth/login?redirect=/inspiration/new")}>Sign In</Button>
+            </div>
+          )}
+        </div>
+
+        {/* Category tabs */}
+        <div className="flex gap-2 flex-wrap" role="tablist">
           <button
-            key={cat.value}
             role="tab"
-            aria-selected={activeCategory === cat.value}
-            onClick={() => setActiveCategory(cat.value)}
+            aria-selected={activeCategory === "all"}
+            onClick={() => setActiveCategory("all")}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              activeCategory === cat.value
+              activeCategory === "all"
                 ? "bg-primary-900 text-white"
                 : "bg-secondary-100 text-foreground hover:bg-secondary-200"
             }`}
           >
-            {cat.icon} {cat.label}
+            All
           </button>
-        ))}
-      </div>
+          {INSPIRATION_CATEGORIES.map((cat) => (
+            <button
+              key={cat.value}
+              role="tab"
+              aria-selected={activeCategory === cat.value}
+              onClick={() => setActiveCategory(cat.value)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                activeCategory === cat.value
+                  ? "bg-primary-900 text-white"
+                  : "bg-secondary-100 text-foreground hover:bg-secondary-200"
+              }`}
+            >
+              {cat.icon} {cat.label}
+            </button>
+          ))}
+        </div>
 
-      {/* Discovery controls */}
-      <Card className="border-primary-200 bg-secondary-50/70">
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <Input
-              placeholder="Search title, description, or creator..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              icon={
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              }
-            />
-            <Select
-              label="Sort"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as "newest" | "oldest" | "creator")}
-              options={[
-                { value: "newest", label: "Newest" },
-                { value: "oldest", label: "Oldest" },
-                { value: "creator", label: "Creator (A-Z)" },
-              ]}
-            />
-            <Select
-              label="Freshness"
-              value={freshness}
-              onChange={(e) => setFreshness(e.target.value as "all" | "today" | "week" | "month")}
-              options={[
-                { value: "all", label: "All time" },
-                { value: "today", label: "Last 24 hours" },
-                { value: "week", label: "Last 7 days" },
-                { value: "month", label: "Last 30 days" },
-              ]}
-            />
-            <div className="flex items-end">
-              <Button
-                variant={mineOnly ? "secondary" : "outline"}
-                className="w-full"
-                disabled={!user}
-                onClick={() => setMineOnly((prev) => !prev)}
-              >
-                {mineOnly ? "Showing My Submissions" : "Show My Submissions"}
-              </Button>
+        {/* Discovery controls */}
+        <Card className="border-primary-200 bg-secondary-50/70">
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <Input
+                placeholder="Search title, description, or creator..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                icon={
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                }
+              />
+              <Select
+                label="Sort"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as "newest" | "oldest" | "creator")}
+                options={[
+                  { value: "newest", label: "Newest" },
+                  { value: "oldest", label: "Oldest" },
+                  { value: "creator", label: "Creator (A-Z)" },
+                ]}
+              />
+              <Select
+                label="Freshness"
+                value={freshness}
+                onChange={(e) => setFreshness(e.target.value as "all" | "today" | "week" | "month")}
+                options={[
+                  { value: "all", label: "All time" },
+                  { value: "today", label: "Last 24 hours" },
+                  { value: "week", label: "Last 7 days" },
+                  { value: "month", label: "Last 30 days" },
+                ]}
+              />
+              <div className="flex items-end">
+                <Button
+                  variant={mineOnly ? "secondary" : "outline"}
+                  className="w-full"
+                  disabled={!user}
+                  onClick={() => setMineOnly((prev) => !prev)}
+                >
+                  {mineOnly ? "Showing My Submissions" : "Show My Submissions"}
+                </Button>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
-            <span>
-              Showing {visibleCount} of {loadedCount} loaded items
-            </span>
-            {(searchQuery || mineOnly || sortBy !== "newest") && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery("");
-                  setSortBy("newest");
-                  setFreshness("all");
-                  setMineOnly(false);
-                  setCreatorFilter("");
-                  setSourceFilter("");
-                }}
-                className="text-primary-800 hover:text-primary-900 font-medium"
-              >
-                Reset filters
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
+              <span>
+                Showing {visibleCount} of {loadedCount} loaded items
+              </span>
+              {(searchQuery || mineOnly || sortBy !== "newest") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSortBy("newest");
+                    setFreshness("all");
+                    setMineOnly(false);
+                    setCreatorFilter("");
+                    setSourceFilter("");
+                  }}
+                  className="text-primary-800 hover:text-primary-900 font-medium"
+                >
+                  Reset filters
+                </button>
+              )}
+            </div>
+            {activeQuickFilters.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {activeQuickFilters.map((filter) => (
+                  <span key={filter} className="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-800">
+                    {filter}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
-          {activeQuickFilters.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {activeQuickFilters.map((filter) => (
-                <span key={filter} className="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-800">
-                  {filter}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      </Card>
+        </Card>
+      </div>
+      </div>
 
-      {/* Loading state */}
-      {loading && (
-        <div className="py-16 flex items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
-        </div>
-      )}
+      <div className="space-y-6 pb-8">
+        {/* Loading state */}
+        {loading && (
+          <div className="py-16 flex items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+          </div>
+        )}
 
-      {/* Empty state */}
-      {!loading && filteredItems.length === 0 && (
-        <div className="py-16 text-center">
-          <p className="text-4xl mb-3">🔍</p>
-          <p className="text-foreground font-medium">No inspiration matches your current view</p>
-          <p className="text-sm text-muted mt-1">
-            {searchQuery || mineOnly || creatorFilter || sourceFilter || freshness !== "all"
-              ? "Try a different keyword or turn off some filters."
-              : activeCategory !== "all"
-                ? "No items in this category yet."
-                : "Be the first to submit inspiring content!"}
-          </p>
-          {!user && (
-            <div className="mt-4 flex justify-center gap-2">
-              <Button variant="secondary" size="sm" onClick={() => router.push("/auth/signup?redirect=/inspiration/new")}>Create Account</Button>
-              <Button variant="outline" size="sm" onClick={() => router.push("/auth/login?redirect=/inspiration/new")}>Sign In</Button>
-            </div>
-          )}
-        </div>
-      )}
+        {/* Empty state */}
+        {!loading && filteredItems.length === 0 && (
+          <div className="py-16 text-center">
+            <p className="text-4xl mb-3">🔍</p>
+            <p className="text-foreground font-medium">No inspiration matches your current view</p>
+            <p className="text-sm text-muted mt-1">
+              {searchQuery || mineOnly || creatorFilter || sourceFilter || freshness !== "all"
+                ? "Try a different keyword or turn off some filters."
+                : activeCategory !== "all"
+                  ? "No items in this category yet."
+                  : "Be the first to submit inspiring content!"}
+            </p>
+            {!user && (
+              <div className="mt-4 flex justify-center gap-2">
+                <Button variant="secondary" size="sm" onClick={() => router.push("/auth/signup?redirect=/inspiration/new")}>Create Account</Button>
+                <Button variant="outline" size="sm" onClick={() => router.push("/auth/login?redirect=/inspiration/new")}>Sign In</Button>
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* Magazine layout */}
-      {!loading && filteredItems.length > 0 && (
-        <div className="space-y-6">
-          {featured && (
-            <FeaturedCard
-              item={featured}
-              currentUserId={user?.uid ?? null}
-              isPinned={pinnedFeaturedId === featured.id}
-              onPin={handlePin}
-              onCreatorClick={setCreatorFilter}
-              onSourceClick={setSourceFilter}
-              onEdit={handleEditOpen}
-              onDelete={handleDeleteOpen}
-            />
-          )}
-          {rest.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {rest.map((item) => (
-                <InspirationCard
-                  key={item.id}
-                  item={item}
-                  currentUserId={user?.uid ?? null}
-                  isPinned={pinnedFeaturedId === item.id}
-                  onPin={handlePin}
-                  onCreatorClick={setCreatorFilter}
-                  onSourceClick={setSourceFilter}
-                  onEdit={handleEditOpen}
-                  onDelete={handleDeleteOpen}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+        {/* Magazine layout */}
+        {!loading && filteredItems.length > 0 && (
+          <div className="space-y-6">
+            {featured && (
+              <FeaturedCard
+                item={featured}
+                currentUserId={user?.uid ?? null}
+                isPinned={pinnedFeaturedId === featured.id}
+                onOpen={handleOpen}
+                onPin={handlePin}
+                onCreatorClick={setCreatorFilter}
+                onSourceClick={setSourceFilter}
+                onEdit={handleEditOpen}
+                onDelete={handleDeleteOpen}
+              />
+            )}
+            {rest.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {rest.map((item) => (
+                  <InspirationCard
+                    key={item.id}
+                    item={item}
+                    currentUserId={user?.uid ?? null}
+                    isPinned={pinnedFeaturedId === item.id}
+                    onOpen={handleOpen}
+                    onPin={handlePin}
+                    onCreatorClick={setCreatorFilter}
+                    onSourceClick={setSourceFilter}
+                    onEdit={handleEditOpen}
+                    onDelete={handleDeleteOpen}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* Load more */}
-      {!isSearchMode && hasMore && (
-        <div className="flex flex-col items-center gap-2 pt-2">
-          <Button variant="outline" onClick={() => fetchItems(false)} disabled={loadingMore}>
-            {loadingMore ? "Loading…" : "Load More"}
-          </Button>
-          <p className="text-xs text-muted">Load more to expand search coverage and discover older posts.</p>
-        </div>
-      )}
+        {/* Load more */}
+        {!isSearchMode && hasMore && (
+          <div className="flex flex-col items-center gap-2 pt-2">
+            <Button variant="outline" onClick={() => fetchItems(false)} disabled={loadingMore}>
+              {loadingMore ? "Loading…" : "Load More"}
+            </Button>
+            <p className="text-xs text-muted">Load more to expand search coverage and discover older posts.</p>
+          </div>
+        )}
 
-      {/* IP Notice */}
-      <IPNotice />
+        {/* IP Notice */}
+        <IPNotice />
+      </div>
 
       {/* Edit modal */}
       <Modal

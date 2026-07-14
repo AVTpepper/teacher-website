@@ -27,7 +27,7 @@ interface ContentCommentSectionProps {
   maxDepth?: number;
   title?: string;
   description?: string;
-  ownerId: string;
+  ownerId: string | null;
   contentLabel: string;
   linkURL: string;
   composerPlaceholder?: string;
@@ -88,7 +88,7 @@ export default function ContentCommentSection({
       mentionedUsers,
     });
 
-    if (!parentId && ownerId !== user.uid) {
+    if (!parentId && ownerId && ownerId !== user.uid) {
       notifyComment({
         recipientId: ownerId,
         actorId: user.uid,

@@ -155,13 +155,7 @@ export default function FollowersPage({
 
       {/* Header */}
       <div className="mb-6">
-        <Link
-          href={`/educators/${id}`}
-          className="text-sm text-muted hover:text-foreground focus-ring rounded"
-        >
-          ← Back to profile
-        </Link>
-        <h1 className="mt-2 text-2xl font-bold text-foreground">
+        <h1 className="text-2xl font-bold text-foreground">
           {ownerName}&apos;s Followers
         </h1>
         <p className="mt-1 text-sm text-muted">

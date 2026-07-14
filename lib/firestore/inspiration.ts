@@ -5,6 +5,7 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  increment,
   collection,
   query,
   where,
@@ -17,6 +18,7 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { deleteCommentWithReplies, type DeleteCommentResult, migrateLegacyCommentFields } from "@/lib/firestore/commentThreads";
 
 // --- Category definitions ---
 
@@ -155,4 +157,131 @@ export async function updateInspirationItem(
 export async function deleteInspirationItem(id: string): Promise<void> {
   if (!db) throw new Error("Firestore is not initialized");
   await deleteDoc(doc(db, "inspiration", id));
+}
+
+// --- Comment system ---
+
+export interface InspirationComment {
+  id: string;
+  inspirationId: string;
+  parentId: string | null;
+  authorId: string;
+  authorName: string;
+  authorPhotoURL: string | null;
+  content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
+  createdAt: Timestamp | null;
+  editedAt?: Timestamp | null;
+  deleted?: boolean;
+  likesCount: number;
+}
+
+export interface InspirationCommentInput {
+  parentId?: string | null;
+  authorId: string;
+  authorName: string;
+  authorPhotoURL: string | null;
+  content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
+}
+
+export async function addInspirationComment(
+  inspirationId: string,
+  data: InspirationCommentInput
+): Promise<string> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const ref = doc(collection(db, "inspiration", inspirationId, "comments"));
+
+  await setDoc(ref, {
+    ...data,
+    id: ref.id,
+    inspirationId,
+    parentId: data.parentId ?? null,
+    mentionedUsers: data.mentionedUsers ?? [],
+    likesCount: 0,
+    createdAt: serverTimestamp(),
+  });
+
+  return ref.id;
+}
+
+export async function getInspirationComments(
+  inspirationId: string
+): Promise<InspirationComment[]> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const q = query(
+    collection(db, "inspiration", inspirationId, "comments"),
+    orderBy("createdAt", "asc")
+  );
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map((d) =>
+    migrateLegacyCommentFields(
+      doc(db!, "inspiration", inspirationId, "comments", d.id),
+      d.data() as InspirationComment
+    )
+  );
+}
+
+export async function updateInspirationComment(
+  inspirationId: string,
+  commentId: string,
+  text: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(doc(db, "inspiration", inspirationId, "comments", commentId), {
+    content: text.trim().slice(0, 2000),
+    editedAt: serverTimestamp(),
+  });
+}
+
+export async function likeInspirationComment(
+  inspirationId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  await setDoc(doc(db, "inspiration", inspirationId, "comments", commentId, "likes", userId), {
+    likedAt: serverTimestamp(),
+  });
+  await updateDoc(doc(db, "inspiration", inspirationId, "comments", commentId), {
+    likesCount: increment(1),
+  });
+}
+
+export async function unlikeInspirationComment(
+  inspirationId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  await deleteDoc(doc(db, "inspiration", inspirationId, "comments", commentId, "likes", userId));
+  await updateDoc(doc(db, "inspiration", inspirationId, "comments", commentId), {
+    likesCount: increment(-1),
+  });
+}
+
+export async function hasLikedInspirationComment(
+  inspirationId: string,
+  commentId: string,
+  userId: string
+): Promise<boolean> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const snap = await getDoc(doc(db, "inspiration", inspirationId, "comments", commentId, "likes", userId));
+  return snap.exists();
+}
+
+export async function deleteInspirationComment(
+  inspirationId: string,
+  commentId: string
+): Promise<DeleteCommentResult> {
+  return deleteCommentWithReplies({
+    collectionPath: ["inspiration", inspirationId, "comments"],
+    commentId,
+  });
 }

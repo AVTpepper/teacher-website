@@ -1,6 +1,8 @@
 import Navbar from "@/components/layout/Navbar";
 import Sidebar, { SidebarDrawerButton } from "@/components/layout/Sidebar";
 import Footer from "@/components/layout/Footer";
+import MainDetailBackButton from "@/components/layout/MainDetailBackButton";
+import MainContentShell from "@/components/layout/MainContentShell";
 
 export default function MainLayout({
   children,
@@ -15,10 +17,9 @@ export default function MainLayout({
           <p className="text-xs font-semibold tracking-widest uppercase text-accent-300">EduConnect</p>
           <p className="mt-1 text-sm text-accent-100/90">Built for educators who plan boldly, share generously, and grow together.</p>
         </div>
+        <MainDetailBackButton />
         <div className="flex gap-6">
-          <div className="flex-1 min-w-0 rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
-            {children}
-          </div>
+          <MainContentShell>{children}</MainContentShell>
           <Sidebar />
         </div>
       </div>

@@ -192,22 +192,16 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
                 {(() => {
                   const title = cleanDisplayText(item.title) || "Untitled inspiration";
                   const creator = cleanDisplayText(item.creator) || "Community";
-                  const href = item.videoURL || item.sourceURL || undefined;
+                  const href = `/inspiration/${item.id}`;
 
                   return (
                     <>
-                {item.videoURL || item.sourceURL ? (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-foreground hover:text-primary-900 hover:underline line-clamp-2 leading-relaxed"
-                  >
-                    {title}
-                  </a>
-                ) : (
-                  <p className="text-xs text-foreground line-clamp-2 leading-relaxed">{title}</p>
-                )}
+                <Link
+                  href={href}
+                  className="text-xs text-foreground hover:text-primary-900 hover:underline line-clamp-2 leading-relaxed"
+                >
+                  {title}
+                </Link>
                 <p className="text-xs text-muted mt-0.5">{creator}</p>
                     </>
                   );

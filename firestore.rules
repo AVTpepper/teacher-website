@@ -258,6 +258,24 @@ service cloud.firestore {
                     && request.resource.data.submittedBy == request.auth.uid;
       allow update, delete: if isAuth()
                             && resource.data.submittedBy == request.auth.uid;
+
+      // comments sub-collection — inspiration/{itemId}/comments/{commentId}
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuth()
+                      && request.resource.data.authorId == request.auth.uid;
+        allow update: if isAuth()
+                      && resource.data.authorId == request.auth.uid
+                      && request.resource.data.diff(resource.data)
+                           .affectedKeys().hasOnly(['content', 'editedAt']);
+        allow delete: if isAuth()
+                      && resource.data.authorId == request.auth.uid;
+
+        match /likes/{userId} {
+          allow read: if true;
+          allow write: if isOwner(userId);
+        }
+      }
     }
 
     // -----------------------------------------------------------------------

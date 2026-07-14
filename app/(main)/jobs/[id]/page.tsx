@@ -107,11 +107,6 @@ export default function JobDetailPage({
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Back link */}
-      <Link href="/jobs" className="text-sm text-primary hover:underline flex items-center gap-1">
-        ← Back to Job Board
-      </Link>
-
       {/* Header card */}
       <Card>
         <div className="flex flex-col gap-4">
