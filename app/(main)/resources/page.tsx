@@ -258,7 +258,7 @@ export default function ResourcesPage() {
   return (
     <div className="pb-8 space-y-6">
       {/* Header */}
-      <div className="-mx-4 -mt-4 flex flex-col gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl sm:p-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="-mx-4 -mt-4 flex flex-col gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:p-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Resource Discovery</p>
           <h1 className="mt-1 text-2xl font-bold">

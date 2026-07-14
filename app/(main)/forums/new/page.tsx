@@ -128,7 +128,7 @@ function NewDiscussionForm() {
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-8">
       {/* Header */}
-      <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl">
+      <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
         <Link href="/forums" className="text-sm text-primary-200 hover:text-primary-50 transition-colors">
           ← Forums
         </Link>

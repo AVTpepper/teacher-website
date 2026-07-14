@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Suspense } from "react";
 import { useRef, useState, useEffect, type FormEvent } from "react";
@@ -253,7 +253,7 @@ function UploadResourceForm() {
 
   return (
     <div className="mx-auto max-w-2xl pb-8">
-      <div className="-mx-4 -mt-4 mb-6 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl">
+      <div className="-mx-4 -mt-4 mb-6 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Creator Studio</p>
         <h1 className="text-2xl font-bold">
           {isEditMode ? "Edit Resource" : "Upload Resource"}
@@ -285,7 +285,7 @@ function UploadResourceForm() {
 
           <Textarea
             label="Description"
-            placeholder="Describe what this resource covers and how to use it…"
+            placeholder="Describe what this resource covers and how to use it..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
@@ -330,7 +330,7 @@ function UploadResourceForm() {
             </label>
             <div className="flex gap-2">
               <Input
-                placeholder="Add a tag…"
+                placeholder="Add a tag..."
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => {

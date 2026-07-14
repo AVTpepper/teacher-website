@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -19,7 +19,7 @@ import { addBookmark, removeBookmark, getUserBookmarks } from "@/lib/firestore/b
 const LESSON_BUILDER_PREVIEW_LIMIT = 6;
 const OBJECTIVE_CHAR_LIMIT = 120;
 
-// ─── Star display ─────────────────────────────────────────────────────────────
+// --- Star display -------------------------------------------------------------
 
 function StarRating({ average, count }: { average: number; count: number }) {
   if (count === 0) return null;
@@ -172,7 +172,7 @@ function LessonCard({ lesson, userId, initialBookmarked = false }: LessonCardPro
   );
 }
 
-// ─── Published lesson row ────────────────────────────────────────────────────
+// --- Published lesson row ----------------------------------------------------
 
 interface PublishedRowProps {
   lesson: Lesson;
@@ -249,7 +249,7 @@ function PublishedRow({ lesson, onDeleted }: PublishedRowProps) {
   );
 }
 
-// ─── Bookmarked lesson row ───────────────────────────────────────────────────
+// --- Bookmarked lesson row ---------------------------------------------------
 
 function BookmarkedRow({ lesson, onUnbookmarked }: { lesson: Lesson; onUnbookmarked: (id: string) => void }) {
   const { user } = useAuth();
@@ -302,7 +302,7 @@ function BookmarkedRow({ lesson, onUnbookmarked }: { lesson: Lesson; onUnbookmar
   );
 }
 
-// ─── Draft row ────────────────────────────────────────────────────────────────
+// --- Draft row ----------------------------------------------------------------
 
 interface DraftRowProps {
   draft: Lesson;
@@ -344,7 +344,7 @@ function DraftRow({ draft, isAvailable, onDeleted }: DraftRowProps) {
             Updated {timeAgo(draft.updatedAt as { seconds: number } | null)}
             {draft.gradeLevel && (
               <span className="ml-2">
-                {draft.gradeLevel}{draft.subject ? ` · ${draft.subject}` : ""}
+                {draft.gradeLevel}{draft.subject ? ` | ${draft.subject}` : ""}
               </span>
             )}
           </p>
@@ -385,7 +385,7 @@ function DraftRow({ draft, isAvailable, onDeleted }: DraftRowProps) {
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// --- Page ---------------------------------------------------------------------
 
 export default function LessonBuilderPage() {
   const { user } = useAuth();
@@ -486,7 +486,7 @@ export default function LessonBuilderPage() {
   return (
     <div className="pb-8">
       {/* Page header */}
-      <div className="-mx-4 -mt-4 mb-8 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-center text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl">
+      <div className="-mx-4 -mt-4 mb-8 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-center text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Lesson Studio</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">Lesson Builder</h1>
         <p className="mt-2 text-base text-primary-100/90">How would you like to create your lesson?</p>
