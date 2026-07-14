@@ -79,6 +79,21 @@ interface HighlightCard {
   statRight: string;
 }
 
+const POST_RECENCY_WINDOW_DAYS = 60;
+const POST_SCORE_HALF_LIFE_DAYS = 15;
+
+function getRecencyWeightedPostScore(post: Post, nowSeconds: number): number {
+  const createdSeconds = post.createdAt?.seconds ?? 0;
+  if (!createdSeconds) return 0;
+
+  const ageDays = Math.max(0, (nowSeconds - createdSeconds) / 86400);
+  if (ageDays > POST_RECENCY_WINDOW_DAYS) return 0;
+
+  const interactionScore = post.likesCount + post.commentCount * 2;
+  const decay = Math.exp((-Math.log(2) * ageDays) / POST_SCORE_HALF_LIFE_DAYS);
+  return interactionScore * decay;
+}
+
 export default function LandingPage() {
   const [topPosts, setTopPosts] = useState<Post[]>([]);
   const [topLessons, setTopLessons] = useState<Lesson[]>([]);
@@ -90,27 +105,63 @@ export default function LandingPage() {
     async function loadHighlights() {
       setLoadingHighlights(true);
       try {
+        const nowSeconds = Math.floor(Date.now() / 1000);
         const collectedPosts: Post[] = [];
-        let cursor: Parameters<typeof getPosts>[0] = null;
+        const collectedLessons: Lesson[] = [];
 
-        for (let i = 0; i < 3; i += 1) {
-          const result = await getPosts(cursor, null);
-          collectedPosts.push(...result.posts);
-          cursor = result.lastDoc;
-          if (!cursor) break;
+        // Fetch posts independently so a lesson query issue doesn't blank both sections.
+        try {
+          let cursor: Parameters<typeof getPosts>[0] = null;
+          for (let i = 0; i < 5; i += 1) {
+            const result = await getPosts(cursor, null);
+            collectedPosts.push(...result.posts);
+            cursor = result.lastDoc;
+            if (!cursor) break;
+          }
+        } catch {
+          // Keep rendering with whatever data is available.
         }
 
-        const rankedPosts = collectedPosts
+        // Use newest sort (index-safe) and rank lessons client-side.
+        try {
+          let lessonCursor: Parameters<typeof getPublicLessons>[1] = null;
+          for (let i = 0; i < 4; i += 1) {
+            const lessonPage = await getPublicLessons({ sortBy: "newest" }, lessonCursor, 12);
+            collectedLessons.push(...lessonPage.lessons);
+            lessonCursor = lessonPage.lastDoc;
+            if (!lessonCursor) break;
+          }
+        } catch {
+          // Keep rendering with whatever data is available.
+        }
+
+        const recentPosts = collectedPosts.filter((post) => {
+          const createdSeconds = post.createdAt?.seconds ?? 0;
+          if (!createdSeconds) return false;
+          const ageDays = Math.max(0, (nowSeconds - createdSeconds) / 86400);
+          return ageDays <= POST_RECENCY_WINDOW_DAYS;
+        });
+
+        const postPool = recentPosts.length > 0 ? recentPosts : collectedPosts;
+
+        const rankedPosts = postPool
+          .filter((post) => {
+            const createdSeconds = post.createdAt?.seconds ?? 0;
+            return Boolean(createdSeconds);
+          })
           .sort((a, b) => {
-            const scoreA = a.likesCount + a.commentCount * 2;
-            const scoreB = b.likesCount + b.commentCount * 2;
+            const scoreA = getRecencyWeightedPostScore(a, nowSeconds);
+            const scoreB = getRecencyWeightedPostScore(b, nowSeconds);
             if (scoreA !== scoreB) return scoreB - scoreA;
+            const interactionA = a.likesCount + a.commentCount * 2;
+            const interactionB = b.likesCount + b.commentCount * 2;
+            if (interactionA !== interactionB) return interactionB - interactionA;
             return (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0);
           })
           .slice(0, 2);
 
-        const lessonsResult = await getPublicLessons({ sortBy: "rating" }, null, 8);
-        const rankedLessons = lessonsResult.lessons
+        const rankedLessons = collectedLessons
+          .filter((lesson) => lesson.isPublic)
           .sort((a, b) => {
             if ((b.ratingAverage ?? 0) !== (a.ratingAverage ?? 0)) {
               return (b.ratingAverage ?? 0) - (a.ratingAverage ?? 0);
@@ -128,6 +179,7 @@ export default function LandingPage() {
         }
       } catch {
         if (!cancelled) {
+          // Only hard-fail to empty if unexpected errors escape the guarded blocks above.
           setTopPosts([]);
           setTopLessons([]);
         }
@@ -280,7 +332,7 @@ export default function LandingPage() {
               See what educators are sharing
             </h2>
             <p className="mt-4 text-base text-muted max-w-xl mx-auto">
-              Live highlights pulled from the community: top interactions and highest-rated lessons.
+              Live highlights pulled from the community: most interacted posts in the last 60 days and highest-rated lessons.
             </p>
           </div>
 
@@ -368,10 +420,13 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-foreground">Free</h3>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">Free</h3>
+                  <p className="mt-1 text-sm font-medium text-muted">$0 / month</p>
+                </div>
                 <span className="inline-flex items-center rounded-full bg-secondary-100 px-3 py-1 text-xs font-semibold text-secondary-800">
                   Starter
                 </span>
@@ -386,7 +441,10 @@ export default function LandingPage() {
 
             <div className="rounded-xl border border-accent-300 bg-surface p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-foreground">Plus</h3>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">Plus</h3>
+                  <p className="mt-1 text-sm font-medium text-muted">$9 / month</p>
+                </div>
                 <span className="inline-flex items-center gap-1 rounded-full bg-accent-100 px-3 py-1 text-xs font-semibold text-accent-800">
                   <Crown className="h-3.5 w-3.5" />
                   Recommended
