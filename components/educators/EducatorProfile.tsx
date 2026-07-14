@@ -34,7 +34,7 @@ import {
   threadSlug,
   type ForumThread,
 } from "@/lib/firestore/forums";
-import { Avatar, Badge, Button, Card, Modal, Tabs } from "@/components/ui";
+import { Avatar, Badge, Button, Card, Tabs } from "@/components/ui";
 import { BadgeList } from "@/components/badges/BadgeIcon";
 import { BADGE_LIST, checkAndAwardBadges } from "@/lib/badges";
 import { notifyNewFollower } from "@/lib/notifications";
@@ -62,13 +62,6 @@ const TIER_CLASS_MAP: Record<AchievementTier, string> = {
   common: "bg-secondary-100 text-secondary-800",
   rare: "bg-info-50 text-info-700",
   epic: "bg-warning-50 text-warning-700",
-};
-
-const CATEGORY_LABEL_MAP: Record<AchievementCategory, string> = {
-  verification: "Verification",
-  contribution: "Contribution",
-  milestone: "Milestones",
-  expertise: "Expertise",
 };
 
 function getAchievementTier(category: AchievementCategory): AchievementTier {
@@ -147,10 +140,6 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   const [threadsLoading, setThreadsLoading] = useState(false);
   const [threadsLoaded, setThreadsLoaded] = useState(false);
   const [contentSummary, setContentSummary] = useState<ContentSummary | null>(null);
-  const [achievementsOpen, setAchievementsOpen] = useState(false);
-  const [achievementSearch, setAchievementSearch] = useState("");
-  const [achievementCategoryFilter, setAchievementCategoryFilter] = useState<"all" | AchievementCategory>("all");
-  const [achievementStatusFilter, setAchievementStatusFilter] = useState<"all" | "earned" | "locked">("all");
   const [unlockToastBadges, setUnlockToastBadges] = useState<string[]>([]);
 
   const [activeTab, setActiveTab] = useState("posts");
@@ -316,20 +305,6 @@ export default function EducatorProfile({ userId }: { userId: string }) {
       .sort((a, b) => (b.progressPercent ?? 0) - (a.progressPercent ?? 0));
     return candidates[0] ?? null;
   }, [allAchievementItems]);
-
-  const filteredAchievementItems = useMemo(() => {
-    const query = achievementSearch.trim().toLowerCase();
-    return allAchievementItems.filter((item) => {
-      if (achievementCategoryFilter !== "all" && item.category !== achievementCategoryFilter) {
-        return false;
-      }
-      if (achievementStatusFilter === "earned" && !item.earned) return false;
-      if (achievementStatusFilter === "locked" && item.earned) return false;
-      if (!query) return true;
-      const haystack = `${item.label} ${item.description}`.toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [allAchievementItems, achievementCategoryFilter, achievementStatusFilter, achievementSearch]);
 
   const reputationScore = useMemo(
     () => getReputationScore(contentSummary, earnedBadgeCount),
@@ -683,164 +658,6 @@ export default function EducatorProfile({ userId }: { userId: string }) {
         </div>
       </Card>
 
-      {/* Achievements Section */}
-      <Card className="mt-6 p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Achievements</h2>
-            <p className="mt-1 text-sm text-muted">
-              {earnedBadgeCount} earned of {BADGE_LIST.length} total
-            </p>
-          </div>
-          <div className="rounded-lg border border-border bg-secondary-50 px-3 py-2 text-sm sm:text-right">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Reputation</p>
-            <p className="text-base font-bold text-foreground">{reputationScore.toLocaleString()}</p>
-            <p className="text-xs text-muted">{reputationLabel}</p>
-          </div>
-        </div>
-
-        {featuredEarnedBadges.length > 0 ? (
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Earned</p>
-            <BadgeList badgeIds={featuredEarnedBadges} />
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-muted">No achievements yet. Your first one unlocks as soon as you contribute.</p>
-        )}
-
-        {nextAchievement?.progress && (
-          <div className="mt-5 rounded-lg border border-border bg-background px-4 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Next up</p>
-                <p className="text-sm font-medium text-foreground">{nextAchievement.label}</p>
-                <p className="mt-0.5 text-xs text-muted">
-                  {Math.min(nextAchievement.progress.current, nextAchievement.progress.target)} / {nextAchievement.progress.target} {nextAchievement.progress.label}
-                </p>
-              </div>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TIER_CLASS_MAP[nextAchievement.tier]}`}>
-                {nextAchievement.tier}
-              </span>
-            </div>
-            <div className="mt-2 h-2 w-full rounded-full bg-secondary-100">
-              <div
-                className="h-2 rounded-full bg-primary-900 transition-all"
-                style={{ width: `${nextAchievement.progressPercent}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="mt-4">
-          <Button variant="outline" size="sm" onClick={() => setAchievementsOpen(true)}>
-            View all achievements
-          </Button>
-        </div>
-      </Card>
-
-      <Modal
-        open={achievementsOpen}
-        onClose={() => setAchievementsOpen(false)}
-        title="All Achievements"
-        className="max-w-3xl"
-      >
-        <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
-            <input
-              type="text"
-              value={achievementSearch}
-              onChange={(e) => setAchievementSearch(e.target.value)}
-              placeholder="Search achievements"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-300"
-            />
-
-            <div className="flex rounded-lg border border-border bg-background p-1">
-              {(["all", "earned", "locked"] as const).map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => setAchievementStatusFilter(status)}
-                  className={`rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
-                    achievementStatusFilter === status
-                      ? "bg-primary-900 text-white"
-                      : "text-muted hover:text-foreground"
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex rounded-lg border border-border bg-background p-1">
-              {(["all", "contribution", "milestone", "expertise", "verification"] as const).map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setAchievementCategoryFilter(cat)}
-                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                    achievementCategoryFilter === cat
-                      ? "bg-primary-900 text-white"
-                      : "text-muted hover:text-foreground"
-                  }`}
-                >
-                  {cat === "all" ? "All" : CATEGORY_LABEL_MAP[cat]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {filteredAchievementItems.length === 0 ? (
-            <p className="rounded-lg border border-border bg-background px-4 py-8 text-center text-sm text-muted">
-              No achievements match your filters.
-            </p>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {filteredAchievementItems.map((item) => (
-                <div
-                  key={item.id}
-                  className={`rounded-lg border px-4 py-3 ${
-                    item.earned
-                      ? "border-success-200 bg-success-50/40"
-                      : "border-border bg-background"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{item.icon} {item.label}</p>
-                      <p className="mt-1 text-xs text-muted">{item.description}</p>
-                    </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${TIER_CLASS_MAP[item.tier]}`}>
-                      {item.tier}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between text-xs">
-                    <span className="text-muted">{CATEGORY_LABEL_MAP[item.category]}</span>
-                    <span className={item.earned ? "font-semibold text-success-700" : "text-muted"}>
-                      {item.earned ? "Earned" : "Locked"}
-                    </span>
-                  </div>
-
-                  {!item.earned && item.progress && (
-                    <div className="mt-2">
-                      <p className="text-[11px] text-muted">
-                        {Math.min(item.progress.current, item.progress.target)} / {item.progress.target} {item.progress.label}
-                      </p>
-                      <div className="mt-1 h-1.5 w-full rounded-full bg-secondary-100">
-                        <div
-                          className="h-1.5 rounded-full bg-primary-900"
-                          style={{ width: `${item.progressPercent}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </Modal>
-
       {/* Content Tabs */}
       <div className="mt-6" ref={tabsSectionRef}>
         <Tabs
@@ -905,6 +722,63 @@ export default function EducatorProfile({ userId }: { userId: string }) {
           )}
         </Card>
       </div>
+
+      {/* Achievements Section */}
+      <Card className="mt-6 p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Achievements</h2>
+            <p className="mt-1 text-sm text-muted">
+              {earnedBadgeCount} earned of {BADGE_LIST.length} total
+            </p>
+          </div>
+          <div className="rounded-lg border border-border bg-secondary-50 px-3 py-2 text-sm sm:text-right">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Reputation</p>
+            <p className="text-base font-bold text-foreground">{reputationScore.toLocaleString()}</p>
+            <p className="text-xs text-muted">{reputationLabel}</p>
+          </div>
+        </div>
+
+        {featuredEarnedBadges.length > 0 ? (
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Earned</p>
+            <BadgeList badgeIds={featuredEarnedBadges} />
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-muted">No achievements yet. Your first one unlocks as soon as you contribute.</p>
+        )}
+
+        {nextAchievement?.progress && (
+          <div className="mt-5 rounded-lg border border-border bg-background px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Next up</p>
+                <p className="text-sm font-medium text-foreground">{nextAchievement.label}</p>
+                <p className="mt-0.5 text-xs text-muted">
+                  {Math.min(nextAchievement.progress.current, nextAchievement.progress.target)} / {nextAchievement.progress.target} {nextAchievement.progress.label}
+                </p>
+              </div>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TIER_CLASS_MAP[nextAchievement.tier]}`}>
+                {nextAchievement.tier}
+              </span>
+            </div>
+            <div className="mt-2 h-2 w-full rounded-full bg-secondary-100">
+              <div
+                className="h-2 rounded-full bg-primary-900 transition-all"
+                style={{ width: `${nextAchievement.progressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4">
+          <Link href={`/educators/${userId}/achievements`}>
+            <Button variant="outline" size="sm">
+              View all achievements
+            </Button>
+          </Link>
+        </div>
+      </Card>
 
       {unlockToastBadges.length > 0 && (
         <div
