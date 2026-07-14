@@ -200,7 +200,7 @@ export default function LessonPDFDocument({ lesson, authorName }: LessonPDFDocum
 
         <View fixed style={styles.footer}>
           <Text style={{ fontSize: 8, color: "#9ca3af", textAlign: "center" }}>
-            © {new Date().getFullYear()} {authorName} — All rights reserved. Created on EduConnect.
+            © {new Date().getFullYear()} {authorName}. All rights reserved. Created on EduConnect.
           </Text>
         </View>
       </Page>

@@ -264,8 +264,8 @@ export default function ResourcesPage() {
             Resource Library
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Browse, share, and download teaching resources - lesson plans,
-            worksheets, strategies, and more.
+            Browse, share, and download teaching resources including lesson
+            plans, worksheets, strategies, and more.
           </p>
         </div>
         {user && (

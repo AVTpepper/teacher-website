@@ -101,7 +101,7 @@ function ResetPasswordForm({ oobCode }: { oobCode: string }) {
       setSuccess(true);
     } catch {
       setSubmitError(
-        "Failed to reset your password. The link may have expired — please request a new one."
+        "Failed to reset your password. The link may have expired. Please request a new one."
       );
     } finally {
       setLoading(false);

@@ -122,7 +122,7 @@ export default function JobsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Job Board</h1>
           <p className="mt-1 text-sm text-muted">
-            Find education job opportunities - full-time, part-time, contract, and substitute positions.
+            Find education job opportunities for full time, part time, contract, and substitute positions.
           </p>
         </div>
         {user ? (
@@ -184,7 +184,7 @@ export default function JobsPage() {
           <p className="text-4xl mb-3">💼</p>
           <p className="text-foreground font-medium">No jobs found</p>
           <p className="text-sm text-muted mt-1">
-            {hasFilters ? "Try adjusting your filters." : "No job listings yet - be the first to post one!"}
+            {hasFilters ? "Try adjusting your filters." : "No job listings yet. Be the first to post one!"}
           </p>
           {hasFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters} className="mt-3">

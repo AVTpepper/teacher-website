@@ -51,7 +51,7 @@ export default function CFUStep({ state, onChange }: StepProps) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        How will you check that students understood the lesson? (Optional - you can skip this step.)
+        How will you check that students understood the lesson? (Optional. You can skip this step.)
       </p>
 
       <div className="space-y-3">

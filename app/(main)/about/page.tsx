@@ -14,7 +14,7 @@ export default function AboutPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-foreground">Our Mission</h2>
         <p className="text-muted leading-relaxed">
-          We're on a mission to reduce professional isolation for teachers by giving them a dedicated space to share resources, discuss challenges, discover job opportunities, and find inspiration - all in one place.
+          We're on a mission to reduce professional isolation for teachers by giving them a dedicated space to share resources, discuss challenges, discover job opportunities, and find inspiration all in one place.
         </p>
       </section>
 

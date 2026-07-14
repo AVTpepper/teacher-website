@@ -15,7 +15,7 @@ const features = [
     Icon: BookOpen,
     title: "Lesson Builder",
     description:
-      "Design rich, structured lesson plans with objectives, materials, and step-by-step activities — all in one place.",
+      "Design rich, structured lesson plans with objectives, materials, and guided activities in one place.",
   },
   {
     Icon: Sparkles,
@@ -108,7 +108,7 @@ export default function LandingPage() {
               Everything you need, in one place
             </h2>
             <p className="mt-4 text-base text-muted max-w-xl mx-auto">
-              From first-draft lesson plans to professional connections —
+              From early lesson plan drafts to professional connections,
               EduConnect has you covered.
             </p>
           </div>
@@ -154,7 +154,7 @@ export default function LandingPage() {
               See what educators are sharing
             </h2>
             <p className="mt-4 text-base text-muted max-w-xl mx-auto">
-              Real lesson plans, discussions, and resources — created by
+              Real lesson plans, discussions, and resources created by
               teachers just like you.
             </p>
           </div>
@@ -270,11 +270,11 @@ export default function LandingPage() {
                 </span>
               </div>
               <h3 className="text-base font-semibold text-foreground mb-1">
-                Phonics Worksheet Pack — Blends &amp; Digraphs
+                Phonics Worksheet Pack: Blends &amp; Digraphs
               </h3>
               <div className="flex gap-2 flex-wrap mb-3">
                 <span className="inline-flex items-center rounded-md bg-secondary-100 px-2 py-0.5 text-xs text-secondary-700">
-                  Grade 1–2
+                  Grade 1 to 2
                 </span>
                 <span className="inline-flex items-center rounded-md bg-secondary-100 px-2 py-0.5 text-xs text-secondary-700">
                   English / Literacy

@@ -47,7 +47,7 @@ export default function AssessmentsStep({ state, onChange }: StepProps) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        Suggest ways to assess student learning. (Optional - you can skip this step.)
+        Suggest ways to assess student learning. (Optional. You can skip this step.)
       </p>
 
       <div className="space-y-3">

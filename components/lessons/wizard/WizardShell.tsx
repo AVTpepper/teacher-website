@@ -953,7 +953,7 @@ function SaveIndicator({ state }: { state: "idle" | "saving" | "saved" | "error"
   // error state
   return (
     <span role="alert" className="text-xs text-amber-600">
-      Draft could not be saved - your changes are still here
+      Draft could not be saved. Your changes are still here.
     </span>
   );
 }

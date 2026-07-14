@@ -248,7 +248,7 @@ export default function EditProfilePage() {
             >
               {currentPhoto ? "Change Photo" : "Upload Photo"}
             </Button>
-            <p className="mt-1 text-xs text-muted">JPEG or PNG — max 2 MB</p>
+            <p className="mt-1 text-xs text-muted">JPEG or PNG. Maximum 2 MB.</p>
             {photoError && (
               <p role="alert" className="mt-1 text-xs text-error-500">{photoError}</p>
             )}

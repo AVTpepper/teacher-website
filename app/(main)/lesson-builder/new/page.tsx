@@ -1715,7 +1715,7 @@ function LessonBuilderNewInner() {
             <p className="mt-1 text-xs text-muted">
               {!STORAGE_CONFIGURED
                 ? "File uploads are disabled until Firebase Storage is activated."
-                : `Max file size: 25 MB${uploading ? " - Uploading..." : ""}`}
+                : `Max file size: 25 MB${uploading ? ". Uploading..." : ""}`}
             </p>
           </div>
         </Card>

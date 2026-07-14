@@ -345,7 +345,7 @@ export default function AIGenerateScreen({
                   onChange={(e) => setGradeLevelOverride(e.target.value)}
                   className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
-                  <option value="">— No override —</option>
+                  <option value="">No override</option>
                   {SPECIFIC_GRADE_LEVELS.map((level) => (
                     <option key={level} value={level}>
                       {level}

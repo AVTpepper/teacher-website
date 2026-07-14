@@ -121,7 +121,7 @@ function HomePageInner() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Home Feed</h1>
         <p className="mt-1 text-sm text-muted">
-          Your personalized educator feed - posts, trending discussions, and
+          Your personalized educator feed with posts, trending discussions, and
           more.
         </p>
       </div>

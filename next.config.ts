@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // @react-pdf/renderer uses native canvas/fontkit — keep it out of the server bundle
   serverExternalPackages: ["@react-pdf/renderer"],
-  allowedDevOrigins: ["192.168.0.5"],
+  allowedDevOrigins: ["192.168.0.5", "192.168.50.16"],
   images: {
     remotePatterns: [
       {

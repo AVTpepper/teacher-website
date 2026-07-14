@@ -496,7 +496,7 @@ export default function ReviewPage({
         <p className="text-xs text-muted text-right" aria-live="polite">
           {remainingRefines > 0
             ? `${remainingRefines} / 20 AI refines remaining this month`
-            : "Monthly refine limit reached - upgrade to Plus for unlimited refines"}
+            : "Monthly refine limit reached. Upgrade to Plus for unlimited refines."}
         </p>
       )}
 
@@ -821,7 +821,7 @@ export default function ReviewPage({
       )}
       {saveState === "error" && (
         <p role="alert" className="text-xs text-amber-600 text-right">
-          Draft could not be saved - your changes are still here
+          Draft could not be saved. Your changes are still here.
         </p>
       )}
     </div>

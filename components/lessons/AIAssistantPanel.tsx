@@ -582,7 +582,7 @@ export default function AIAssistantPanel({
                                   <span className="text-xs text-muted ml-1">({item.duration})</span>
                                 )}
                                 {item.description && (
-                                  <span className="text-muted"> - {item.description}</span>
+                                  <span className="text-muted">. {item.description}</span>
                                 )}
                               </span>
                             )}
