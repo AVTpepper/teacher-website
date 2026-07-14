@@ -13,20 +13,24 @@ import {
 } from "@/lib/firestore/users";
 import {
   getLessonsByAuthor,
+  getLessonCountByAuthor,
   type Lesson,
 } from "@/lib/firestore/lessons";
 import {
   getPostsByAuthor,
+  getPostCountByAuthor,
   type Post,
 } from "@/lib/firestore/posts";
 import {
   getResourcesByAuthor,
+  getResourceCountByAuthor,
   resourceSlug,
   RESOURCE_TYPES,
   type Resource,
 } from "@/lib/firestore/resources";
 import {
   getThreadsByAuthor,
+  getThreadCountByAuthor,
   threadSlug,
   type ForumThread,
 } from "@/lib/firestore/forums";
@@ -43,6 +47,13 @@ const PROFILE_TABS = [
 ];
 
 const PROFILE_TAB_PAGE_SIZE = 6;
+
+interface ContentSummary {
+  posts: number;
+  resources: number;
+  lessons: number;
+  discussions: number;
+}
 
 export default function EducatorProfile({ userId }: { userId: string }) {
   const { user, loading: authLoading } = useAuth();
@@ -69,6 +80,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   const [threads, setThreads] = useState<ForumThread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
   const [threadsLoaded, setThreadsLoaded] = useState(false);
+  const [contentSummary, setContentSummary] = useState<ContentSummary | null>(null);
 
   const [activeTab, setActiveTab] = useState("posts");
   const tabsSectionRef = useRef<HTMLDivElement>(null);
@@ -105,6 +117,45 @@ export default function EducatorProfile({ userId }: { userId: string }) {
     if (!user || !userId || isOwnProfile) return;
     checkIsFollowing(user.uid, userId).then(setFollowing).catch(() => {});
   }, [user, userId, isOwnProfile]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadContentSummary() {
+      try {
+        const [postsCount, resourcesCount, lessonsCount, discussionsCount] = await Promise.all([
+          getPostCountByAuthor(userId),
+          getResourceCountByAuthor(userId),
+          getLessonCountByAuthor(userId, isOwnProfile),
+          getThreadCountByAuthor(userId),
+        ]);
+
+        if (!cancelled) {
+          setContentSummary({
+            posts: postsCount,
+            resources: resourcesCount,
+            lessons: lessonsCount,
+            discussions: discussionsCount,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setContentSummary({
+            posts: 0,
+            resources: 0,
+            lessons: 0,
+            discussions: 0,
+          });
+        }
+      }
+    }
+
+    loadContentSummary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, isOwnProfile]);
 
   // Lazy-load lessons when the tab becomes active
   useEffect(() => {
@@ -411,6 +462,13 @@ export default function EducatorProfile({ userId }: { userId: string }) {
                 </strong>{" "}
                 <span className="text-muted">Following</span>
               </Link>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <SummaryStatCard label="Posts" value={contentSummary?.posts} />
+              <SummaryStatCard label="Resources" value={contentSummary?.resources} />
+              <SummaryStatCard label="Lessons" value={contentSummary?.lessons} />
+              <SummaryStatCard label="Discussions" value={contentSummary?.discussions} />
             </div>
 
             {/* Bio */}
@@ -989,6 +1047,23 @@ function EmptyTabContent({
       <h3 className="mt-3 text-sm font-medium text-foreground">{title}</h3>
       <p className="mt-1 text-xs text-muted">{description}</p>
       {cta}
+    </div>
+  );
+}
+
+function SummaryStatCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | undefined;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-secondary-50 px-3 py-3 text-center sm:text-left">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+      <p className="mt-1 text-lg font-bold text-foreground">
+        {typeof value === "number" ? value.toLocaleString() : "-"}
+      </p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 ﻿import {
   doc,
   getDoc,
+  getCountFromServer,
   setDoc,
   deleteDoc,
   updateDoc,
@@ -308,6 +309,16 @@ export async function getThreadsByAuthor(
     .sort(byCreatedAtDesc);
 
   return { threads, lastDoc: null };
+}
+
+export async function getThreadCountByAuthor(authorId: string): Promise<number> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const snapshot = await getCountFromServer(
+    query(collectionGroup(db, "threads"), where("authorId", "==", authorId))
+  );
+
+  return snapshot.data().count;
 }
 
 /** Search all categories for a thread by ID. Returns thread + categoryId. */

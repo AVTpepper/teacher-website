@@ -1,6 +1,7 @@
 import {
   doc,
   getDoc,
+  getCountFromServer,
   setDoc,
   deleteDoc,
   updateDoc,
@@ -171,6 +172,16 @@ export async function getPostsByAuthor(
     .sort(byCreatedAtDesc);
 
   return { posts, lastDoc: null };
+}
+
+export async function getPostCountByAuthor(authorId: string): Promise<number> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const snapshot = await getCountFromServer(
+    query(collection(db, "posts"), where("authorId", "==", authorId))
+  );
+
+  return snapshot.data().count;
 }
 
 export async function getPost(postId: string): Promise<Post | null> {

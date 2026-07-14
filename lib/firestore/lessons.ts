@@ -1,6 +1,7 @@
 import {
   doc,
   getDoc,
+  getCountFromServer,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -216,6 +217,25 @@ export async function getLessonsByAuthor(
   lessons.sort(byUpdatedAtDesc);
 
   return { lessons, lastDoc: null };
+}
+
+export async function getLessonCountByAuthor(
+  authorId: string,
+  includePrivate = false
+): Promise<number> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const constraints: QueryConstraint[] = [where("authorId", "==", authorId)];
+
+  if (!includePrivate) {
+    constraints.push(where("isPublic", "==", true));
+  }
+
+  const snapshot = await getCountFromServer(
+    query(collection(db, "lessons"), ...constraints)
+  );
+
+  return snapshot.data().count;
 }
 
 // --- Download tracking ---

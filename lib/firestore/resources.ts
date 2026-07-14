@@ -1,6 +1,7 @@
 import {
   doc,
   getDoc,
+  getCountFromServer,
   setDoc,
   deleteDoc,
   updateDoc,
@@ -249,6 +250,16 @@ export async function getResourcesByAuthor(
     .sort(byCreatedAtDesc);
 
   return { resources, lastDoc: null };
+}
+
+export async function getResourceCountByAuthor(authorId: string): Promise<number> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const snapshot = await getCountFromServer(
+    query(collection(db, "resources"), where("authorId", "==", authorId))
+  );
+
+  return snapshot.data().count;
 }
 
 // --- Download tracking ---
