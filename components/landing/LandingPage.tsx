@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Footer from "@/components/layout/Footer";
 import {
@@ -6,9 +9,11 @@ import {
   MessageSquare,
   FolderOpen,
   Users,
+  Crown,
+  Check,
 } from "lucide-react";
-
-// ─── Feature data ────────────────────────────────────────────────────────────
+import { getPosts, type Post } from "@/lib/firestore/posts";
+import { getPublicLessons, type Lesson } from "@/lib/firestore/lessons";
 
 const features = [
   {
@@ -43,17 +48,141 @@ const features = [
   },
 ];
 
-// ─── Component ───────────────────────────────────────────────────────────────
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+}
+
+function timeAgoFromSeconds(seconds: number | null | undefined): string {
+  if (!seconds) return "Recently";
+  const diff = Math.max(0, Math.floor(Date.now() / 1000) - seconds);
+  if (diff < 60) return "Just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return `${Math.floor(diff / 604800)}w ago`;
+}
+
+interface HighlightCard {
+  key: string;
+  kind: "post" | "lesson";
+  title: string;
+  excerpt: string;
+  authorName: string;
+  createdSeconds: number | null;
+  badgeLabel: string;
+  badgeClass: string;
+  metaChips?: string[];
+  statLeft: string;
+  statRight: string;
+}
 
 export default function LandingPage() {
+  const [topPosts, setTopPosts] = useState<Post[]>([]);
+  const [topLessons, setTopLessons] = useState<Lesson[]>([]);
+  const [loadingHighlights, setLoadingHighlights] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadHighlights() {
+      setLoadingHighlights(true);
+      try {
+        const collectedPosts: Post[] = [];
+        let cursor: Parameters<typeof getPosts>[0] = null;
+
+        for (let i = 0; i < 3; i += 1) {
+          const result = await getPosts(cursor, null);
+          collectedPosts.push(...result.posts);
+          cursor = result.lastDoc;
+          if (!cursor) break;
+        }
+
+        const rankedPosts = collectedPosts
+          .sort((a, b) => {
+            const scoreA = a.likesCount + a.commentCount * 2;
+            const scoreB = b.likesCount + b.commentCount * 2;
+            if (scoreA !== scoreB) return scoreB - scoreA;
+            return (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0);
+          })
+          .slice(0, 2);
+
+        const lessonsResult = await getPublicLessons({ sortBy: "rating" }, null, 8);
+        const rankedLessons = lessonsResult.lessons
+          .sort((a, b) => {
+            if ((b.ratingAverage ?? 0) !== (a.ratingAverage ?? 0)) {
+              return (b.ratingAverage ?? 0) - (a.ratingAverage ?? 0);
+            }
+            if ((b.ratingCount ?? 0) !== (a.ratingCount ?? 0)) {
+              return (b.ratingCount ?? 0) - (a.ratingCount ?? 0);
+            }
+            return (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0);
+          })
+          .slice(0, 2);
+
+        if (!cancelled) {
+          setTopPosts(rankedPosts);
+          setTopLessons(rankedLessons);
+        }
+      } catch {
+        if (!cancelled) {
+          setTopPosts([]);
+          setTopLessons([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingHighlights(false);
+      }
+    }
+
+    void loadHighlights();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const highlights = useMemo<HighlightCard[]>(() => {
+    const postCards: HighlightCard[] = topPosts.map((post) => ({
+      key: `post-${post.id}`,
+      kind: "post",
+      title: post.content.split("\n")[0].slice(0, 90) || "Community post",
+      excerpt: post.content,
+      authorName: post.authorName || "Educator",
+      createdSeconds: post.createdAt?.seconds ?? null,
+      badgeLabel: post.type === "discussion" ? "Discussion" : "Community Post",
+      badgeClass:
+        post.type === "discussion"
+          ? "bg-warning-50 text-warning-700"
+          : "bg-info-50 text-info-700",
+      statLeft: `❤️ ${post.likesCount} likes`,
+      statRight: `💬 ${post.commentCount} comments`,
+    }));
+
+    const lessonCards: HighlightCard[] = topLessons.map((lesson) => ({
+      key: `lesson-${lesson.id}`,
+      kind: "lesson",
+      title: lesson.title || "Top-rated lesson",
+      excerpt: lesson.objectives?.[0] || "High-quality lesson plan from the community.",
+      authorName: lesson.authorName || "Educator",
+      createdSeconds: lesson.createdAt?.seconds ?? null,
+      badgeLabel: "Top Rated Lesson",
+      badgeClass: "bg-success-50 text-success-700",
+      metaChips: [lesson.gradeLevel, lesson.subject].filter(Boolean),
+      statLeft: `⭐ ${(lesson.ratingAverage ?? 0).toFixed(1)} / 5`,
+      statRight: `🧑‍🏫 ${lesson.ratingCount ?? 0} ratings`,
+    }));
+
+    return [...postCards, ...lessonCards].slice(0, 4);
+  }, [topPosts, topLessons]);
+
   return (
     <div className="flex min-h-screen flex-col">
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section
         className="relative bg-primary-900 text-white"
         aria-labelledby="hero-heading"
       >
-        {/* Subtle warm-tinted gradient overlay */}
         <div
           className="absolute inset-0 bg-linear-to-br from-primary-950 via-primary-900 to-primary-800 opacity-90"
           aria-hidden="true"
@@ -68,8 +197,7 @@ export default function LandingPage() {
             id="hero-heading"
             className="text-4xl font-extrabold leading-tight sm:text-5xl lg:text-6xl"
           >
-            Where Great Teachers{" "}
-            <span className="text-accent-400">Connect</span>
+            Where Great Teachers <span className="text-accent-400">Connect</span>
           </h1>
 
           <p className="mt-6 mx-auto max-w-xl text-lg text-white/80 leading-relaxed">
@@ -94,7 +222,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Features ─────────────────────────────────────────────────────── */}
       <section
         className="bg-background py-16 sm:py-20"
         aria-labelledby="features-heading"
@@ -140,7 +267,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Social Proof ─────────────────────────────────────────────────── */}
       <section
         className="bg-secondary-50 py-16 sm:py-20"
         aria-labelledby="social-proof-heading"
@@ -154,147 +280,138 @@ export default function LandingPage() {
               See what educators are sharing
             </h2>
             <p className="mt-4 text-base text-muted max-w-xl mx-auto">
-              Real lesson plans, discussions, and resources created by
-              teachers just like you.
+              Live highlights pulled from the community: top interactions and highest-rated lessons.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Sample: Lesson Plan Card */}
-            <div
-              className="rounded-xl border border-border bg-surface p-5 shadow-sm"
-              aria-label="Sample lesson plan: Introduction to Fractions"
-            >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className="h-9 w-9 rounded-full bg-primary-100 flex items-center justify-center shrink-0 text-sm font-bold text-primary-900"
-                    aria-hidden="true"
-                  >
-                    S
+          {loadingHighlights ? (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="rounded-xl border border-border bg-surface p-5 shadow-sm animate-pulse">
+                  <div className="h-4 w-2/3 bg-secondary-100 rounded mb-3" />
+                  <div className="h-3 w-full bg-secondary-100 rounded mb-2" />
+                  <div className="h-3 w-5/6 bg-secondary-100 rounded mb-4" />
+                  <div className="h-3 w-1/2 bg-secondary-100 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : highlights.length === 0 ? (
+            <div className="rounded-xl border border-border bg-surface p-8 text-center text-sm text-muted">
+              Community highlights are loading up. Check back soon.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {highlights.map((card) => (
+                <div key={card.key} className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div
+                        className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold ${
+                          card.kind === "lesson"
+                            ? "bg-success-50 text-success-700"
+                            : "bg-primary-100 text-primary-900"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {initials(card.authorName)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {card.authorName}
+                        </p>
+                        <p className="text-xs text-muted">{timeAgoFromSeconds(card.createdSeconds)}</p>
+                      </div>
+                    </div>
+                    <span className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${card.badgeClass}`}>
+                      {card.badgeLabel}
+                    </span>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      Sarah Mitchell
-                    </p>
-                    <p className="text-xs text-muted">2 days ago</p>
+
+                  <h3 className="text-base font-semibold text-foreground mb-2 line-clamp-2">
+                    {card.title}
+                  </h3>
+
+                  {card.metaChips && card.metaChips.length > 0 && (
+                    <div className="flex gap-2 flex-wrap mb-3">
+                      {card.metaChips.map((chip) => (
+                        <span
+                          key={`${card.key}-${chip}`}
+                          className="inline-flex items-center rounded-md bg-secondary-100 px-2 py-0.5 text-xs text-secondary-700"
+                        >
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-sm text-muted line-clamp-3">{card.excerpt}</p>
+
+                  <div className="mt-4 flex items-center gap-4 text-xs text-muted">
+                    <span>{card.statLeft}</span>
+                    <span>{card.statRight}</span>
                   </div>
                 </div>
-                <span className="shrink-0 inline-flex items-center rounded-full bg-info-50 px-2.5 py-0.5 text-xs font-medium text-info-700">
-                  Lesson Plan
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="bg-background py-16 sm:py-20" aria-labelledby="tiers-heading">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="text-center mb-10">
+            <h2 id="tiers-heading" className="text-3xl font-bold text-foreground sm:text-4xl">
+              Free vs Plus
+            </h2>
+            <p className="mt-3 text-base text-muted max-w-2xl mx-auto">
+              Start free, then upgrade when you want more AI power and advanced planning controls.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-lg font-semibold text-foreground">Free</h3>
+                <span className="inline-flex items-center rounded-full bg-secondary-100 px-3 py-1 text-xs font-semibold text-secondary-800">
+                  Starter
                 </span>
               </div>
-              <h3 className="text-base font-semibold text-foreground mb-1">
-                Introduction to Fractions
-              </h3>
-              <div className="flex gap-2 flex-wrap mb-3">
-                <span className="inline-flex items-center rounded-md bg-secondary-100 px-2 py-0.5 text-xs text-secondary-700">
-                  Grade 4
-                </span>
-                <span className="inline-flex items-center rounded-md bg-secondary-100 px-2 py-0.5 text-xs text-secondary-700">
-                  Math
-                </span>
-              </div>
-              <p className="text-sm text-muted line-clamp-2">
-                A hands-on introduction to fractions using fraction tiles and
-                real-world examples. Students explore halves, thirds, and
-                quarters through guided discovery activities.
-              </p>
-              <div className="mt-4 flex items-center gap-4 text-xs text-muted">
-                <span>❤️ 24 likes</span>
-                <span>💬 6 comments</span>
-              </div>
+              <ul className="mt-5 space-y-3 text-sm text-muted">
+                <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 text-success-700" />Create, share, and discover resources and lessons</li>
+                <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 text-success-700" />10 AI lesson generation requests per day</li>
+                <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 text-success-700" />Community posts, forums, and inspiration hub access</li>
+                <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 text-success-700" />Monthly AI refine cap for free accounts</li>
+              </ul>
             </div>
 
-            {/* Sample: Forum Post Card */}
-            <div
-              className="rounded-xl border border-border bg-surface p-5 shadow-sm"
-              aria-label="Sample forum post: Tips for classroom management"
-            >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className="h-9 w-9 rounded-full bg-accent-100 flex items-center justify-center shrink-0 text-sm font-bold text-accent-800"
-                    aria-hidden="true"
-                  >
-                    J
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      James Okafor
-                    </p>
-                    <p className="text-xs text-muted">5 hours ago</p>
-                  </div>
-                </div>
-                <span className="shrink-0 inline-flex items-center rounded-full bg-warning-50 px-2.5 py-0.5 text-xs font-medium text-warning-700">
-                  💬 Discussion
+            <div className="rounded-xl border border-accent-300 bg-surface p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-lg font-semibold text-foreground">Plus</h3>
+                <span className="inline-flex items-center gap-1 rounded-full bg-accent-100 px-3 py-1 text-xs font-semibold text-accent-800">
+                  <Crown className="h-3.5 w-3.5" />
+                  Recommended
                 </span>
               </div>
-              <h3 className="text-base font-semibold text-foreground mb-2">
-                Tips for classroom management in mixed-ability groups
-              </h3>
-              <p className="text-sm text-muted line-clamp-3">
-                I&apos;ve been experimenting with flexible seating and collaborative
-                roles in my Year 6 class. Would love to hear what strategies
-                others have found effective for keeping everyone engaged when
-                abilities vary so widely.
-              </p>
-              <div className="mt-4 flex items-center gap-4 text-xs text-muted">
-                <span>❤️ 17 likes</span>
-                <span>💬 14 comments</span>
-              </div>
+              <ul className="mt-5 space-y-3 text-sm text-muted">
+                <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 text-success-700" />Unlimited daily AI lesson generation requests</li>
+                <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 text-success-700" />Advanced AI controls: grade override + additional context</li>
+                <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 text-success-700" />No free-tier usage meter interruptions</li>
+                <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 text-success-700" />Built for heavier planning and daily AI workflows</li>
+              </ul>
             </div>
+          </div>
 
-            {/* Sample: Resource Card */}
-            <div
-              className="rounded-xl border border-border bg-surface p-5 shadow-sm"
-              aria-label="Sample resource: Phonics Worksheet Pack"
+          <div className="mt-8 text-center">
+            <Link
+              href="/auth/signup"
+              className="inline-flex items-center justify-center rounded-lg bg-primary-900 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-800"
             >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className="h-9 w-9 rounded-full bg-success-50 flex items-center justify-center shrink-0 text-sm font-bold text-success-700"
-                    aria-hidden="true"
-                  >
-                    R
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      Rachel Tan
-                    </p>
-                    <p className="text-xs text-muted">1 week ago</p>
-                  </div>
-                </div>
-                <span className="shrink-0 inline-flex items-center rounded-full bg-success-50 px-2.5 py-0.5 text-xs font-medium text-success-700">
-                  📚 Resource
-                </span>
-              </div>
-              <h3 className="text-base font-semibold text-foreground mb-1">
-                Phonics Worksheet Pack: Blends &amp; Digraphs
-              </h3>
-              <div className="flex gap-2 flex-wrap mb-3">
-                <span className="inline-flex items-center rounded-md bg-secondary-100 px-2 py-0.5 text-xs text-secondary-700">
-                  Grade 1 to 2
-                </span>
-                <span className="inline-flex items-center rounded-md bg-secondary-100 px-2 py-0.5 text-xs text-secondary-700">
-                  English / Literacy
-                </span>
-              </div>
-              <p className="text-sm text-muted line-clamp-2">
-                20 printable worksheets covering common blends (bl, cl, fl)
-                and digraphs (sh, ch, th). Includes answer keys and a
-                suggested teaching sequence.
-              </p>
-              <div className="mt-4 flex items-center gap-4 text-xs text-muted">
-                <span>⭐ 4.8 / 5</span>
-                <span>📥 312 downloads</span>
-              </div>
-            </div>
+              Start Free
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
       <Footer />
     </div>
   );
