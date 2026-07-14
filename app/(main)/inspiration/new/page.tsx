@@ -23,6 +23,7 @@ export default function NewInspirationPage() {
   const [category, setCategory] = useState<string>("");
   const [creator, setCreator] = useState("");
   const [sourceURL, setSourceURL] = useState("");
+  const [videoURL, setVideoURL] = useState("");
   const [thumbnailURL, setThumbnailURL] = useState("");
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
@@ -83,22 +84,32 @@ export default function NewInspirationPage() {
     const errors: Record<string, boolean> = {};
     if (!title.trim()) errors.title = true;
     if (!description.trim()) errors.description = true;
-    if (!category) errors.category = true;
-    if (!creator.trim()) errors.creator = true;
-    if (!sourceURL.trim()) errors.sourceURL = true;
 
     if (Object.keys(errors).length > 0) {
       showError("Please fill in all required fields.", errors);
       return;
     }
 
-    // Validate source URL
-    try {
-      const u = new URL(sourceURL.trim().startsWith("http") ? sourceURL.trim() : `https://${sourceURL.trim()}`);
-      if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error();
-    } catch {
-      showError("Source link must be a valid http/https URL.", { sourceURL: true });
-      return;
+    // Validate source URL (optional)
+    if (sourceURL.trim()) {
+      try {
+        const u = new URL(sourceURL.trim().startsWith("http") ? sourceURL.trim() : `https://${sourceURL.trim()}`);
+        if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error();
+      } catch {
+        showError("Source link must be a valid http/https URL.", { sourceURL: true });
+        return;
+      }
+    }
+
+    // Validate video URL (optional)
+    if (videoURL.trim()) {
+      try {
+        const u = new URL(videoURL.trim().startsWith("http") ? videoURL.trim() : `https://${videoURL.trim()}`);
+        if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error();
+      } catch {
+        showError("Video link must be a valid http/https URL.", { videoURL: true });
+        return;
+      }
     }
 
     // Validate thumbnail URL if provided
@@ -127,9 +138,17 @@ export default function NewInspirationPage() {
         thumbnailStorageURL = await getDownloadURL(snap.ref);
       }
 
-      const normalizedSourceURL = sourceURL.trim().startsWith("http")
-        ? sourceURL.trim()
-        : `https://${sourceURL.trim()}`;
+      const normalizedSourceURL = sourceURL.trim()
+        ? sourceURL.trim().startsWith("http")
+          ? sourceURL.trim()
+          : `https://${sourceURL.trim()}`
+        : null;
+
+      const normalizedVideoURL = videoURL.trim()
+        ? videoURL.trim().startsWith("http")
+          ? videoURL.trim()
+          : `https://${videoURL.trim()}`
+        : null;
 
       const normalizedThumbnailURL =
         thumbnailURL.trim() && !thumbnailFile
@@ -141,9 +160,10 @@ export default function NewInspirationPage() {
       await createInspirationItem({
         title: title.trim(),
         description: description.trim(),
-        category: category as InspirationCategory,
-        creator: creator.trim(),
+        category: (category as InspirationCategory) || "general",
+        creator: creator.trim() || null,
         sourceURL: normalizedSourceURL,
+        videoURL: normalizedVideoURL,
         thumbnailURL: normalizedThumbnailURL,
         thumbnailStorageURL,
         submittedBy: user.uid,
@@ -193,32 +213,41 @@ export default function NewInspirationPage() {
           />
 
           <Select
-            label="Category *"
+            label="Category"
             value={category}
             onChange={(e) => { setCategory(e.target.value); setFieldErrors((p) => ({ ...p, category: false })); }}
             options={[
-              { value: "", label: "Select a category" },
+              { value: "", label: "General (default)" },
               ...INSPIRATION_CATEGORIES.map((c) => ({ value: c.value, label: `${c.icon} ${c.label}` })),
             ]}
-            error={fieldErrors.category ? "Required" : undefined}
           />
 
           <Input
-            label="Creator / Source *"
+            label="Creator / Source"
             value={creator}
             onChange={(e) => { setCreator(e.target.value); setFieldErrors((p) => ({ ...p, creator: false })); }}
             placeholder="e.g. Edutopia, Jennifer Gonzalez, Your Name…"
-            error={fieldErrors.creator ? "Required" : undefined}
           />
 
           <Input
-            label="Source Link *"
+            label="Source Link"
             value={sourceURL}
             onChange={(e) => { setSourceURL(e.target.value); setFieldErrors((p) => ({ ...p, sourceURL: false })); }}
             placeholder="https://…"
             type="url"
-            error={fieldErrors.sourceURL ? "Required" : undefined}
+            error={fieldErrors.sourceURL ? "Must be a valid https:// URL" : undefined}
           />
+
+          {category === "video" && (
+            <Input
+              label="Video URL"
+              value={videoURL}
+              onChange={(e) => { setVideoURL(e.target.value); setFieldErrors((p) => ({ ...p, videoURL: false })); }}
+              placeholder="https://youtube.com/... or https://vimeo.com/..."
+              type="url"
+              error={fieldErrors.videoURL ? "Must be a valid https:// URL" : undefined}
+            />
+          )}
 
           {/* Thumbnail section */}
           <div className="space-y-3">

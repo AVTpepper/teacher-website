@@ -25,7 +25,9 @@ export type InspirationCategory =
   | "article"
   | "video"
   | "education-news"
-  | "teacher-story";
+  | "teacher-story"
+  | "general"
+  | "other";
 
 export const INSPIRATION_CATEGORIES: {
   value: InspirationCategory;
@@ -37,6 +39,8 @@ export const INSPIRATION_CATEGORIES: {
   { value: "video", label: "Videos", icon: "🎬" },
   { value: "education-news", label: "Education News", icon: "📰" },
   { value: "teacher-story", label: "Teacher Stories", icon: "✨" },
+  { value: "general", label: "General", icon: "💡" },
+  { value: "other", label: "Other", icon: "🧩" },
 ];
 
 // --- Firestore schema ---
@@ -46,16 +50,27 @@ export interface InspirationItem {
   title: string;
   description: string;
   category: InspirationCategory;
-  sourceURL: string;
+  sourceURL: string | null;
+  videoURL: string | null;
   thumbnailURL: string | null;       // URL-pasted thumbnail
   thumbnailStorageURL: string | null; // uploaded file thumbnail (takes priority)
-  creator: string; // name of creator / publication / source
+  creator: string | null; // name of creator / publication / source
   submittedBy: string | null; // uid - null for seeded/admin content
   createdAt: Timestamp | null;
   isApproved: boolean;
 }
 
-export type InspirationInput = Omit<InspirationItem, "id" | "createdAt" | "isApproved">;
+export interface InspirationInput {
+  title: string;
+  description: string;
+  category?: InspirationCategory;
+  sourceURL?: string | null;
+  videoURL?: string | null;
+  thumbnailURL?: string | null;
+  thumbnailStorageURL?: string | null;
+  creator?: string | null;
+  submittedBy: string | null;
+}
 
 // --- CRUD helpers ---
 
@@ -65,8 +80,15 @@ export async function createInspirationItem(
   if (!db) throw new Error("Firestore is not initialized");
   const ref = doc(collection(db, "inspiration"));
   const item: Omit<InspirationItem, "id"> = {
-    ...input,
+    title: input.title,
+    description: input.description,
+    category: input.category ?? "general",
+    sourceURL: input.sourceURL ?? null,
+    videoURL: input.videoURL ?? null,
+    thumbnailURL: input.thumbnailURL ?? null,
     thumbnailStorageURL: input.thumbnailStorageURL ?? null,
+    creator: input.creator ?? null,
+    submittedBy: input.submittedBy,
     isApproved: true, // community-submitted content is auto-approved for MVP
     createdAt: null,
   };

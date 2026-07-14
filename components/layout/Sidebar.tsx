@@ -180,15 +180,19 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
           <ul className="space-y-2">
             {inspirationItems.map((item) => (
               <li key={item.id}>
-                <a
-                  href={item.sourceURL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-foreground hover:text-primary-900 hover:underline line-clamp-2 leading-relaxed"
-                >
-                  {item.title}
-                </a>
-                <p className="text-xs text-muted mt-0.5">{item.creator}</p>
+                {item.videoURL || item.sourceURL ? (
+                  <a
+                    href={item.videoURL || item.sourceURL || undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-foreground hover:text-primary-900 hover:underline line-clamp-2 leading-relaxed"
+                  >
+                    {item.title}
+                  </a>
+                ) : (
+                  <p className="text-xs text-foreground line-clamp-2 leading-relaxed">{item.title}</p>
+                )}
+                <p className="text-xs text-muted mt-0.5">{item.creator || "Community"}</p>
               </li>
             ))}
           </ul>
