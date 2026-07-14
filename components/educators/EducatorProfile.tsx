@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -34,17 +34,17 @@ import {
   threadSlug,
   type ForumThread,
 } from "@/lib/firestore/forums";
-import { Avatar, Badge, Button, Card, Tabs } from "@/components/ui";
+import { Avatar, Badge, Button, Card, Modal, Tabs } from "@/components/ui";
 import { BadgeList } from "@/components/badges/BadgeIcon";
-import { BADGE_LIST } from "@/lib/badges";
+import { BADGE_LIST, checkAndAwardBadges } from "@/lib/badges";
 import { notifyNewFollower } from "@/lib/notifications";
 
-const PROFILE_TABS = [
-  { label: "Posts", value: "posts" },
-  { label: "Resources Shared", value: "resources" },
-  { label: "Lessons Created", value: "lessons" },
-  { label: "Discussions", value: "discussions" },
-];
+const PROFILE_TAB_DEFS = [
+  { label: "Posts", value: "posts", summaryKey: "posts" },
+  { label: "Resources Shared", value: "resources", summaryKey: "resources" },
+  { label: "Lessons Created", value: "lessons", summaryKey: "lessons" },
+  { label: "Discussions", value: "discussions", summaryKey: "discussions" },
+] as const;
 
 const PROFILE_TAB_PAGE_SIZE = 6;
 
@@ -53,6 +53,72 @@ interface ContentSummary {
   resources: number;
   lessons: number;
   discussions: number;
+}
+
+type AchievementTier = "common" | "rare" | "epic";
+type AchievementCategory = "verification" | "contribution" | "milestone" | "expertise";
+
+const TIER_CLASS_MAP: Record<AchievementTier, string> = {
+  common: "bg-secondary-100 text-secondary-800",
+  rare: "bg-info-50 text-info-700",
+  epic: "bg-warning-50 text-warning-700",
+};
+
+const CATEGORY_LABEL_MAP: Record<AchievementCategory, string> = {
+  verification: "Verification",
+  contribution: "Contribution",
+  milestone: "Milestones",
+  expertise: "Expertise",
+};
+
+function getAchievementTier(category: AchievementCategory): AchievementTier {
+  if (category === "verification") return "epic";
+  if (category === "milestone" || category === "expertise") return "rare";
+  return "common";
+}
+
+function getReputationScore(contentSummary: ContentSummary | null, earnedCount: number): number {
+  if (!contentSummary) return earnedCount * 8;
+  const contentScore =
+    contentSummary.posts * 2 +
+    contentSummary.resources * 3 +
+    contentSummary.lessons * 4 +
+    contentSummary.discussions * 2;
+  return contentScore + earnedCount * 8;
+}
+
+function getReputationLabel(score: number): string {
+  if (score >= 220) return "Master Mentor";
+  if (score >= 140) return "Community Leader";
+  if (score >= 80) return "Trusted Contributor";
+  if (score >= 30) return "Rising Educator";
+  return "New Contributor";
+}
+
+function getBadgeProgress(
+  badgeId: string,
+  contentSummary: ContentSummary | null,
+  earnedIds: Set<string>
+): { current: number; target: number; label: string } | null {
+  if (!contentSummary) return null;
+  switch (badgeId) {
+    case "resource-creator":
+    case "first-resource":
+      return { current: contentSummary.resources, target: 1, label: "resources shared" };
+    case "lesson-builder":
+      return { current: contentSummary.lessons, target: 1, label: "lessons created" };
+    case "ten-lessons":
+      return { current: contentSummary.lessons, target: 10, label: "lessons created" };
+    case "discussion-starter":
+      return { current: contentSummary.discussions, target: 1, label: "discussions started" };
+    case "top-contributor": {
+      const contributionIds = ["resource-creator", "lesson-builder", "discussion-starter", "community-helper"];
+      const current = contributionIds.filter((id) => earnedIds.has(id)).length;
+      return { current, target: 3, label: "contribution badges" };
+    }
+    default:
+      return null;
+  }
 }
 
 export default function EducatorProfile({ userId }: { userId: string }) {
@@ -81,9 +147,15 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   const [threadsLoading, setThreadsLoading] = useState(false);
   const [threadsLoaded, setThreadsLoaded] = useState(false);
   const [contentSummary, setContentSummary] = useState<ContentSummary | null>(null);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
+  const [achievementSearch, setAchievementSearch] = useState("");
+  const [achievementCategoryFilter, setAchievementCategoryFilter] = useState<"all" | AchievementCategory>("all");
+  const [achievementStatusFilter, setAchievementStatusFilter] = useState<"all" | "earned" | "locked">("all");
+  const [unlockToastBadges, setUnlockToastBadges] = useState<string[]>([]);
 
   const [activeTab, setActiveTab] = useState("posts");
   const tabsSectionRef = useRef<HTMLDivElement>(null);
+  const unlockCheckRef = useRef(false);
   function handleTabChange(tab: string) {
     setActiveTab(tab);
     // After content settles, scroll so the tab bar is visible without losing the header
@@ -93,6 +165,19 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   }
 
   const isOwnProfile = user?.uid === userId;
+
+  const profileTabs = useMemo(
+    () =>
+      PROFILE_TAB_DEFS.map((tab) => {
+        const count = contentSummary?.[tab.summaryKey];
+        const suffix = typeof count === "number" ? ` ${count.toLocaleString()}` : "";
+        return {
+          label: `${tab.label}${suffix}`,
+          value: tab.value,
+        };
+      }),
+    [contentSummary]
+  );
 
   useEffect(() => {
     async function load() {
@@ -156,6 +241,101 @@ export default function EducatorProfile({ userId }: { userId: string }) {
       cancelled = true;
     };
   }, [userId, isOwnProfile]);
+
+  useEffect(() => {
+    if (!isOwnProfile || unlockCheckRef.current) return;
+    unlockCheckRef.current = true;
+
+    let cancelled = false;
+    async function refreshEarnedBadges() {
+      try {
+        const newlyAwarded = await checkAndAwardBadges(userId);
+        if (cancelled || newlyAwarded.length === 0) return;
+
+        setProfile((current) => {
+          if (!current) return current;
+          const merged = Array.from(new Set([...current.badges, ...newlyAwarded]));
+          return { ...current, badges: merged };
+        });
+        setUnlockToastBadges(newlyAwarded);
+      } catch {
+        // Keep profile render stable if badge refresh fails.
+      }
+    }
+
+    void refreshEarnedBadges();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwnProfile, userId]);
+
+  useEffect(() => {
+    if (unlockToastBadges.length === 0) return;
+    const timer = window.setTimeout(() => {
+      setUnlockToastBadges([]);
+    }, 4500);
+    return () => window.clearTimeout(timer);
+  }, [unlockToastBadges]);
+
+  const earnedBadgeIds = useMemo(() => profile?.badges ?? [], [profile?.badges]);
+  const earnedBadgeSet = useMemo(() => new Set(earnedBadgeIds), [earnedBadgeIds]);
+
+  const earnedBadgeCount = earnedBadgeIds.length;
+  const allAchievementItems = useMemo(
+    () =>
+      BADGE_LIST.map((badge) => {
+        const earned = earnedBadgeSet.has(badge.id);
+        const tier = getAchievementTier(badge.category);
+        const progress = earned
+          ? null
+          : getBadgeProgress(badge.id, contentSummary, earnedBadgeSet);
+        const progressPercent =
+          progress && progress.target > 0
+            ? Math.min(100, Math.round((Math.min(progress.current, progress.target) / progress.target) * 100))
+            : 0;
+        return {
+          ...badge,
+          earned,
+          tier,
+          progress,
+          progressPercent,
+        };
+      }),
+    [earnedBadgeSet, contentSummary]
+  );
+
+  const featuredEarnedBadges = useMemo(
+    () => allAchievementItems.filter((item) => item.earned).slice(0, 6).map((item) => item.id),
+    [allAchievementItems]
+  );
+
+  const nextAchievement = useMemo(() => {
+    const candidates = allAchievementItems
+      .filter((item) => !item.earned && item.progress)
+      .sort((a, b) => (b.progressPercent ?? 0) - (a.progressPercent ?? 0));
+    return candidates[0] ?? null;
+  }, [allAchievementItems]);
+
+  const filteredAchievementItems = useMemo(() => {
+    const query = achievementSearch.trim().toLowerCase();
+    return allAchievementItems.filter((item) => {
+      if (achievementCategoryFilter !== "all" && item.category !== achievementCategoryFilter) {
+        return false;
+      }
+      if (achievementStatusFilter === "earned" && !item.earned) return false;
+      if (achievementStatusFilter === "locked" && item.earned) return false;
+      if (!query) return true;
+      const haystack = `${item.label} ${item.description}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [allAchievementItems, achievementCategoryFilter, achievementStatusFilter, achievementSearch]);
+
+  const reputationScore = useMemo(
+    () => getReputationScore(contentSummary, earnedBadgeCount),
+    [contentSummary, earnedBadgeCount]
+  );
+  const reputationLabel = useMemo(() => getReputationLabel(reputationScore), [reputationScore]);
 
   // Lazy-load lessons when the tab becomes active
   useEffect(() => {
@@ -464,13 +644,6 @@ export default function EducatorProfile({ userId }: { userId: string }) {
               </Link>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <SummaryStatCard label="Posts" value={contentSummary?.posts} />
-              <SummaryStatCard label="Resources" value={contentSummary?.resources} />
-              <SummaryStatCard label="Lessons" value={contentSummary?.lessons} />
-              <SummaryStatCard label="Discussions" value={contentSummary?.discussions} />
-            </div>
-
             {/* Bio */}
             {profile.bio && (
               <p className="mt-4 whitespace-pre-line text-sm text-secondary-600">{profile.bio}</p>
@@ -510,30 +683,168 @@ export default function EducatorProfile({ userId }: { userId: string }) {
         </div>
       </Card>
 
-      {/* Badges Section */}
-      {profile.badges.length > 0 && (
-        <Card className="mt-6">
-          <h2 className="mb-4 text-lg font-semibold text-foreground">Achievements</h2>
-          {(["verification", "contribution", "milestone", "expertise"] as const).map((cat) => {
-            const catBadges = profile.badges.filter(
-              (id) => BADGE_LIST.find((b) => b.id === id)?.category === cat
-            );
-            if (catBadges.length === 0) return null;
-            const catLabel = { verification: "Verification", contribution: "Contribution", milestone: "Milestones", expertise: "Expertise" }[cat];
-            return (
-              <div key={cat} className="mb-4 last:mb-0">
-                <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">{catLabel}</p>
-                <BadgeList badgeIds={catBadges} />
+      {/* Achievements Section */}
+      <Card className="mt-6 p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Achievements</h2>
+            <p className="mt-1 text-sm text-muted">
+              {earnedBadgeCount} earned of {BADGE_LIST.length} total
+            </p>
+          </div>
+          <div className="rounded-lg border border-border bg-secondary-50 px-3 py-2 text-sm sm:text-right">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Reputation</p>
+            <p className="text-base font-bold text-foreground">{reputationScore.toLocaleString()}</p>
+            <p className="text-xs text-muted">{reputationLabel}</p>
+          </div>
+        </div>
+
+        {featuredEarnedBadges.length > 0 ? (
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Earned</p>
+            <BadgeList badgeIds={featuredEarnedBadges} />
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-muted">No achievements yet. Your first one unlocks as soon as you contribute.</p>
+        )}
+
+        {nextAchievement?.progress && (
+          <div className="mt-5 rounded-lg border border-border bg-background px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Next up</p>
+                <p className="text-sm font-medium text-foreground">{nextAchievement.label}</p>
+                <p className="mt-0.5 text-xs text-muted">
+                  {Math.min(nextAchievement.progress.current, nextAchievement.progress.target)} / {nextAchievement.progress.target} {nextAchievement.progress.label}
+                </p>
               </div>
-            );
-          })}
-        </Card>
-      )}
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TIER_CLASS_MAP[nextAchievement.tier]}`}>
+                {nextAchievement.tier}
+              </span>
+            </div>
+            <div className="mt-2 h-2 w-full rounded-full bg-secondary-100">
+              <div
+                className="h-2 rounded-full bg-primary-900 transition-all"
+                style={{ width: `${nextAchievement.progressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4">
+          <Button variant="outline" size="sm" onClick={() => setAchievementsOpen(true)}>
+            View all achievements
+          </Button>
+        </div>
+      </Card>
+
+      <Modal
+        open={achievementsOpen}
+        onClose={() => setAchievementsOpen(false)}
+        title="All Achievements"
+        className="max-w-3xl"
+      >
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+            <input
+              type="text"
+              value={achievementSearch}
+              onChange={(e) => setAchievementSearch(e.target.value)}
+              placeholder="Search achievements"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-300"
+            />
+
+            <div className="flex rounded-lg border border-border bg-background p-1">
+              {(["all", "earned", "locked"] as const).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setAchievementStatusFilter(status)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                    achievementStatusFilter === status
+                      ? "bg-primary-900 text-white"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex rounded-lg border border-border bg-background p-1">
+              {(["all", "contribution", "milestone", "expertise", "verification"] as const).map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setAchievementCategoryFilter(cat)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    achievementCategoryFilter === cat
+                      ? "bg-primary-900 text-white"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  {cat === "all" ? "All" : CATEGORY_LABEL_MAP[cat]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredAchievementItems.length === 0 ? (
+            <p className="rounded-lg border border-border bg-background px-4 py-8 text-center text-sm text-muted">
+              No achievements match your filters.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {filteredAchievementItems.map((item) => (
+                <div
+                  key={item.id}
+                  className={`rounded-lg border px-4 py-3 ${
+                    item.earned
+                      ? "border-success-200 bg-success-50/40"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{item.icon} {item.label}</p>
+                      <p className="mt-1 text-xs text-muted">{item.description}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${TIER_CLASS_MAP[item.tier]}`}>
+                      {item.tier}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between text-xs">
+                    <span className="text-muted">{CATEGORY_LABEL_MAP[item.category]}</span>
+                    <span className={item.earned ? "font-semibold text-success-700" : "text-muted"}>
+                      {item.earned ? "Earned" : "Locked"}
+                    </span>
+                  </div>
+
+                  {!item.earned && item.progress && (
+                    <div className="mt-2">
+                      <p className="text-[11px] text-muted">
+                        {Math.min(item.progress.current, item.progress.target)} / {item.progress.target} {item.progress.label}
+                      </p>
+                      <div className="mt-1 h-1.5 w-full rounded-full bg-secondary-100">
+                        <div
+                          className="h-1.5 rounded-full bg-primary-900"
+                          style={{ width: `${item.progressPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
 
       {/* Content Tabs */}
       <div className="mt-6" ref={tabsSectionRef}>
         <Tabs
-          tabs={PROFILE_TABS}
+          tabs={profileTabs}
           defaultValue="posts"
           onChange={handleTabChange}
         />
@@ -594,6 +905,21 @@ export default function EducatorProfile({ userId }: { userId: string }) {
           )}
         </Card>
       </div>
+
+      {unlockToastBadges.length > 0 && (
+        <div
+          className="fixed right-4 bottom-4 z-40 w-full max-w-sm rounded-xl border border-success-200 bg-success-50 p-4 shadow-lg"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="text-sm font-semibold text-success-800">Achievement unlocked</p>
+          <p className="mt-1 text-sm text-success-700">
+            {unlockToastBadges
+              .map((id) => BADGE_LIST.find((badge) => badge.id === id)?.label ?? id)
+              .join(" • ")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1051,19 +1377,3 @@ function EmptyTabContent({
   );
 }
 
-function SummaryStatCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: number | undefined;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-secondary-50 px-3 py-3 text-center sm:text-left">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-1 text-lg font-bold text-foreground">
-        {typeof value === "number" ? value.toLocaleString() : "-"}
-      </p>
-    </div>
-  );
-}
