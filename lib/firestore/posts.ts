@@ -22,6 +22,7 @@ import { byCreatedAtDesc } from "@/lib/utils";
 import {
   deleteCommentWithReplies,
   type DeleteCommentResult,
+  migrateLegacyCommentFields,
 } from "@/lib/firestore/commentThreads";
 
 // --- Post types ---
@@ -47,7 +48,7 @@ export interface Post {
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
   likesCount: number;
-  commentsCount: number;
+  commentCount: number;
 }
 
 export interface PostInput {
@@ -110,7 +111,7 @@ export async function createPost(data: PostInput): Promise<string> {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     likesCount: 0,
-    commentsCount: 0,
+    commentCount: 0,
   });
 
   return ref.id;
@@ -143,7 +144,7 @@ export async function getPosts(
   const q = query(collection(db, "posts"), ...constraints);
   const snapshot = await getDocs(q);
 
-  const posts = snapshot.docs.map((d) => d.data() as Post);
+  const posts = snapshot.docs.map((d) => normalizePost(d.id, d.data() as Partial<Post>));
   const lastDoc =
     snapshot.docs.length === PAGE_SIZE
       ? snapshot.docs[snapshot.docs.length - 1]
@@ -166,7 +167,7 @@ export async function getPostsByAuthor(
   const snapshot = await getDocs(q);
 
   const posts = snapshot.docs
-    .map((d) => d.data() as Post)
+    .map((d) => normalizePost(d.id, d.data() as Partial<Post>))
     .sort(byCreatedAtDesc);
 
   return { posts, lastDoc: null };
@@ -177,7 +178,34 @@ export async function getPost(postId: string): Promise<Post | null> {
 
   const snap = await getDoc(doc(db, "posts", postId));
   if (!snap.exists()) return null;
-  return snap.data() as Post;
+  return normalizePost(snap.id, snap.data() as Partial<Post>);
+}
+
+function normalizePost(postId: string, data: Partial<Post>): Post {
+  const commentCount = data.commentCount ?? 0;
+
+  if (data.commentCount === undefined && db) {
+    updateDoc(doc(db, "posts", postId), {
+      commentCount,
+    }).catch(() => {});
+  }
+
+  return {
+    id: data.id ?? postId,
+    authorId: data.authorId ?? "",
+    authorName: data.authorName ?? "",
+    authorPhotoURL: data.authorPhotoURL ?? null,
+    content: data.content ?? "",
+    type: data.type ?? "general",
+    tags: data.tags ?? [],
+    gradeLevel: data.gradeLevel ?? "",
+    links: data.links ?? [],
+    mentionedUsers: data.mentionedUsers ?? [],
+    createdAt: data.createdAt ?? null,
+    updatedAt: data.updatedAt ?? null,
+    likesCount: data.likesCount ?? 0,
+    commentCount,
+  };
 }
 
 // --- Like system ---
@@ -239,7 +267,7 @@ export async function commentOnPost(
   });
 
   await updateDoc(doc(db, "posts", postId), {
-    commentsCount: increment(1),
+    commentCount: increment(1),
   });
 
   return ref.id;
@@ -256,7 +284,12 @@ export async function getPostComments(
   );
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((d) => d.data() as PostComment);
+  return snapshot.docs.map((d) =>
+    migrateLegacyCommentFields(
+      doc(db, "posts", postId, "comments", d.id),
+      d.data() as PostComment
+    )
+  );
 }
 
 export async function likeComment(
@@ -331,6 +364,6 @@ export async function deletePostComment(
     collectionPath: ["posts", postId, "comments"],
     commentId,
     countTargetPath: ["posts", postId],
-    countField: "commentsCount",
+    countField: "commentCount",
   });
 }

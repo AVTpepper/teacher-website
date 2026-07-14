@@ -10,11 +10,10 @@ import {
   updatePassword,
   deleteUser,
 } from "firebase/auth";
-import { doc, deleteDoc, collection, getDocs } from "firebase/firestore";
 
 import { useAuth } from "@/lib/auth-context";
-import { db } from "@/lib/firebase";
 import { getUser, updateUser } from "@/lib/firestore/users";
+import { cleanupUserAccountData } from "@/lib/firestore/accountCleanup";
 import { Button, Input, Card, Badge, ConfirmDialog } from "@/components/ui";
 
 interface Toast {
@@ -183,20 +182,8 @@ export default function AccountManagementPage() {
     if (!user) return;
     setDeleting(true);
     try {
-      // Delete Firebase Auth account first (most likely to require recent login).
-      // If this throws, Firestore data is untouched and the user can retry.
+      await cleanupUserAccountData(user.uid);
       await deleteUser(user);
-
-      // Auth deletion succeeded — now clean up Firestore data.
-      if (db) {
-        const uid = user.uid;
-        const SUBCOLLECTIONS = ["aiUsage", "aiRefineUsage", "followers", "following", "notifications"];
-        for (const sub of SUBCOLLECTIONS) {
-          const snap = await getDocs(collection(db, "users", uid, sub));
-          await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
-        }
-        await deleteDoc(doc(db, "users", uid));
-      }
 
       // Clear session cookie and redirect to landing page.
       document.cookie = "__session=; path=/; max-age=0";

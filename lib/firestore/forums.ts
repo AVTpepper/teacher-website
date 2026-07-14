@@ -23,6 +23,7 @@ import { makeSlug, parseSlug, byCreatedAtDesc } from "@/lib/utils";
 import {
   deleteCommentWithReplies,
   type DeleteCommentResult,
+  migrateLegacyCommentFields,
 } from "@/lib/firestore/commentThreads";
 
 // --- Slug helper ---
@@ -467,7 +468,12 @@ export async function getThreadComments(
   );
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((d) => d.data() as ThreadComment);
+  return snapshot.docs.map((d) =>
+    migrateLegacyCommentFields(
+      doc(db, "forums", categoryId, "threads", threadId, "comments", d.id),
+      d.data() as ThreadComment
+    )
+  );
 }
 
 export async function updateThreadComment(

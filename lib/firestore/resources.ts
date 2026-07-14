@@ -22,6 +22,7 @@ import { makeSlug, parseSlug, byCreatedAtDesc } from "@/lib/utils";
 import {
   deleteCommentWithReplies,
   type DeleteCommentResult,
+  migrateLegacyCommentFields,
 } from "@/lib/firestore/commentThreads";
 
 // --- URL slug helpers ---
@@ -95,6 +96,7 @@ export interface Resource {
   downloadCount: number;
   ratingSum: number;
   ratingCount: number;
+  ratingAverage: number;
   savedByCount: number;
   createdAt: Timestamp | null;
   tags: string[];
@@ -151,6 +153,7 @@ export async function createResource(data: ResourceInput): Promise<string> {
     downloadCount: 0,
     ratingSum: 0,
     ratingCount: 0,
+    ratingAverage: 0,
     savedByCount: 0,
   });
 
@@ -170,7 +173,7 @@ export interface GetResourcesResult {
   lastDoc: DocumentSnapshot | null;
 }
 
-export type ResourceSortBy = "newest" | "popular";
+export type ResourceSortBy = "newest" | "oldest" | "downloads" | "bookmarks" | "rating";
 
 export interface ResourceFilters {
   gradeLevel?: string;
@@ -181,7 +184,8 @@ export interface ResourceFilters {
 
 export async function getResources(
   filters?: ResourceFilters,
-  cursor?: DocumentSnapshot | null
+  cursor?: DocumentSnapshot | null,
+  pageSize = PAGE_SIZE
 ): Promise<GetResourcesResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
@@ -197,13 +201,19 @@ export async function getResources(
     constraints.push(where("type", "==", filters.type));
   }
 
-  if (filters?.sortBy === "popular") {
+  if (filters?.sortBy === "oldest") {
+    constraints.push(orderBy("createdAt", "asc"));
+  } else if (filters?.sortBy === "downloads") {
     constraints.push(orderBy("downloadCount", "desc"));
+  } else if (filters?.sortBy === "bookmarks") {
+    constraints.push(orderBy("savedByCount", "desc"));
+  } else if (filters?.sortBy === "rating") {
+    constraints.push(orderBy("ratingAverage", "desc"));
   } else {
     constraints.push(orderBy("createdAt", "desc"));
   }
 
-  constraints.push(limit(PAGE_SIZE));
+  constraints.push(limit(pageSize));
 
   if (cursor) {
     constraints.push(startAfter(cursor));
@@ -214,7 +224,7 @@ export async function getResources(
 
   const resources = snapshot.docs.map((d) => d.data() as Resource);
   const lastDoc =
-    snapshot.docs.length === PAGE_SIZE
+    snapshot.docs.length === pageSize
       ? snapshot.docs[snapshot.docs.length - 1]
       : null;
 
@@ -311,22 +321,33 @@ export async function rateResource(
   const resourceRef = doc(db, "resources", resourceId);
 
   const existing = await getDoc(ratingRef);
+  const resourceSnap = await getDoc(resourceRef);
+  const currentSum = (resourceSnap.data()?.ratingSum as number) ?? 0;
+  const currentCount = (resourceSnap.data()?.ratingCount as number) ?? 0;
 
   if (existing.exists()) {
     // Update: adjust the sum by the difference
     const prevRating = existing.data().rating as number;
     const diff = rating - prevRating;
+    const nextSum = currentSum + diff;
+    const ratingAverage = currentCount > 0 ? Math.round((nextSum / currentCount) * 10) / 10 : 0;
 
     await setDoc(ratingRef, { rating, ratedAt: serverTimestamp() });
     await updateDoc(resourceRef, {
       ratingSum: increment(diff),
+      ratingAverage,
     });
   } else {
     // New rating
+    const nextSum = currentSum + rating;
+    const nextCount = currentCount + 1;
+    const ratingAverage = Math.round((nextSum / nextCount) * 10) / 10;
+
     await setDoc(ratingRef, { rating, ratedAt: serverTimestamp() });
     await updateDoc(resourceRef, {
       ratingSum: increment(rating),
       ratingCount: increment(1),
+      ratingAverage,
     });
   }
 }
@@ -344,6 +365,7 @@ export async function getUserRating(
 
 /** Returns average rating (0 if no ratings). */
 export function getAverageRating(resource: Resource): number {
+  if (typeof resource.ratingAverage === "number") return resource.ratingAverage;
   if (resource.ratingCount === 0) return 0;
   return resource.ratingSum / resource.ratingCount;
 }
@@ -406,7 +428,12 @@ export async function getResourceComments(
   );
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((d) => d.data() as ResourceComment);
+  return snapshot.docs.map((d) =>
+    migrateLegacyCommentFields(
+      doc(db, "resources", resourceId, "comments", d.id),
+      d.data() as ResourceComment
+    )
+  );
 }
 
 export async function updateResourceComment(

@@ -1,6 +1,7 @@
 import {
   collection,
   deleteDoc,
+  type DocumentReference,
   doc,
   getDocs,
   increment,
@@ -61,4 +62,31 @@ export async function deleteCommentWithReplies(
   }
 
   return { removed: true, tombstoned: false };
+}
+
+export function migrateLegacyCommentFields<
+  T extends { likesCount?: number; deleted?: boolean }
+>(
+  commentRef: DocumentReference,
+  data: T
+): T & { likesCount: number; deleted: boolean } {
+  const updates: Record<string, number | boolean> = {};
+
+  if (typeof data.likesCount !== "number") {
+    updates.likesCount = 0;
+  }
+
+  if (typeof data.deleted !== "boolean") {
+    updates.deleted = false;
+  }
+
+  if (Object.keys(updates).length > 0) {
+    updateDoc(commentRef, updates).catch(() => {});
+  }
+
+  return {
+    ...data,
+    likesCount: data.likesCount ?? 0,
+    deleted: data.deleted ?? false,
+  };
 }

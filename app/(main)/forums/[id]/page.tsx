@@ -54,7 +54,6 @@ export default function ForumThreadPage({
   const [loadingComments, setLoadingComments] = useState(false);
   const [replySort, setReplySort] = useState<"newest" | "top">("newest");
   const [copied, setCopied] = useState(false);
-  const [commentCount, setCommentCount] = useState(0);
 
   const loadComments = useCallback(
     async (catId: string) => {
@@ -82,7 +81,6 @@ export default function ForumThreadPage({
         setThread(result.thread);
         setCategoryId(result.categoryId);
         setUpvotes(result.thread.upvotes);
-        setCommentCount(result.thread.commentCount);
         loadComments(result.categoryId);
       } catch {
         setNotFound(true);
@@ -211,6 +209,8 @@ export default function ForumThreadPage({
           ...commentData.filter((c) => !!c.parentId),
         ]
       : commentData;
+
+  const commentCount = comments.length > 0 ? comments.length : thread.commentCount;
 
   return (
     <div className="space-y-6">
@@ -397,8 +397,6 @@ export default function ForumThreadPage({
               if (!categoryId) return;
               await loadComments(categoryId);
             }}
-            onCommentAdded={() => setCommentCount((count) => count + 1)}
-            onCommentRemoved={() => setCommentCount((count) => Math.max(0, count - 1))}
             onLikeComment={async (commentId) => {
               if (!categoryId || !user) return;
               const alreadyLiked = await hasLikedThreadComment(categoryId, threadId, commentId, user.uid);

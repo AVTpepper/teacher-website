@@ -80,7 +80,6 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
   const { user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likesCount);
-  const [commentsCount, setCommentsCount] = useState(post.commentsCount);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -100,6 +99,8 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
       hasLikedPost(post.id, user.uid).then(setLiked).catch(() => {});
     }
   }, [post.id, user]);
+
+  const commentCount = showComments ? comments.length : post.commentCount;
 
   async function handleLike() {
     if (!user || likeLoading) return;
@@ -331,13 +332,13 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
             {likesCount} {likesCount === 1 ? "like" : "likes"}
           </span>
         )}
-        {commentsCount > 0 && (
+        {commentCount > 0 && (
           <button
             type="button"
             onClick={toggleComments}
             className="hover:underline cursor-pointer"
           >
-            {commentsCount} {commentsCount === 1 ? "comment" : "comments"}
+            {commentCount} {commentCount === 1 ? "comment" : "comments"}
           </button>
         )}
       </div>
@@ -473,8 +474,6 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
               const result = await getPostComments(post.id);
               setComments(result);
             }}
-            onCommentAdded={() => setCommentsCount((c) => c + 1)}
-            onCommentRemoved={() => setCommentsCount((c) => Math.max(0, c - 1))}
           />
         </div>
       )}

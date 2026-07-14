@@ -30,7 +30,7 @@ import {
   threadSlug,
   type ForumThread,
 } from "@/lib/firestore/forums";
-import { Avatar, Badge, Button, Card, Tabs, Tag } from "@/components/ui";
+import { Avatar, Badge, Button, Card, Tabs } from "@/components/ui";
 import { BadgeList } from "@/components/badges/BadgeIcon";
 import { BADGE_LIST } from "@/lib/badges";
 import { notifyNewFollower } from "@/lib/notifications";
@@ -41,6 +41,8 @@ const PROFILE_TABS = [
   { label: "Lessons Created", value: "lessons" },
   { label: "Discussions", value: "discussions" },
 ];
+
+const PROFILE_TAB_PAGE_SIZE = 6;
 
 export default function EducatorProfile({ userId }: { userId: string }) {
   const { user, loading: authLoading } = useAuth();
@@ -551,6 +553,10 @@ function PostsTabContent({
   isOwnProfile: boolean;
   displayName: string;
 }) {
+  const [visibleCount, setVisibleCount] = useState(PROFILE_TAB_PAGE_SIZE);
+  const visiblePosts = posts.slice(0, visibleCount);
+  const hasMore = visibleCount < posts.length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -579,10 +585,6 @@ function PostsTabContent({
       />
     );
   }
-  const POSTS_PER_PAGE = 5;
-  const [visibleCount, setVisibleCount] = useState(POSTS_PER_PAGE);
-  const visiblePosts = posts.slice(0, visibleCount);
-  const hasMore = visibleCount < posts.length;
 
   return (
     <div className="space-y-3">
@@ -610,7 +612,7 @@ function PostsTabContent({
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
               </svg>
-              {post.commentsCount}
+              {post.commentCount}
             </span>
             {post.tags.slice(0, 3).map((t) => (
               <span key={t} className="rounded-full bg-secondary-100 px-2 py-0.5 text-xs">
@@ -623,7 +625,7 @@ function PostsTabContent({
       {hasMore && (
         <button
           className="w-full rounded-lg py-2 text-sm font-medium text-primary-900 hover:bg-surface-hover transition-colors"
-          onClick={() => setVisibleCount((c) => c + POSTS_PER_PAGE)}
+          onClick={() => setVisibleCount((c) => c + PROFILE_TAB_PAGE_SIZE)}
         >
           Show more ({posts.length - visibleCount} remaining)
         </button>
@@ -645,6 +647,10 @@ function ResourcesTabContent({
   isOwnProfile: boolean;
   displayName: string;
 }) {
+  const [visibleCount, setVisibleCount] = useState(PROFILE_TAB_PAGE_SIZE);
+  const visibleResources = resources.slice(0, visibleCount);
+  const hasMore = visibleCount < resources.length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -674,8 +680,9 @@ function ResourcesTabContent({
     );
   }
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {resources.map((resource) => {
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+      {visibleResources.map((resource) => {
         const typeLabel =
           RESOURCE_TYPES.find((t) => t.value === resource.type)?.label ??
           resource.type;
@@ -711,6 +718,15 @@ function ResourcesTabContent({
           </Link>
         );
       })}
+      </div>
+      {hasMore && (
+        <button
+          className="w-full rounded-lg py-2 text-sm font-medium text-primary-900 hover:bg-surface-hover transition-colors"
+          onClick={() => setVisibleCount((count) => count + PROFILE_TAB_PAGE_SIZE)}
+        >
+          Show more ({resources.length - visibleCount} remaining)
+        </button>
+      )}
     </div>
   );
 }
@@ -728,6 +744,10 @@ function DiscussionsTabContent({
   isOwnProfile: boolean;
   displayName: string;
 }) {
+  const [visibleCount, setVisibleCount] = useState(PROFILE_TAB_PAGE_SIZE);
+  const visibleThreads = threads.slice(0, visibleCount);
+  const hasMore = visibleCount < threads.length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -758,7 +778,7 @@ function DiscussionsTabContent({
   }
   return (
     <div className="space-y-3">
-      {threads.map((thread) => (
+      {visibleThreads.map((thread) => (
         <Link
           key={thread.id}
           href={`/forums/${threadSlug(thread.title, thread.id)}`}
@@ -789,6 +809,14 @@ function DiscussionsTabContent({
           </div>
         </Link>
       ))}
+      {hasMore && (
+        <button
+          className="w-full rounded-lg py-2 text-sm font-medium text-primary-900 hover:bg-surface-hover transition-colors"
+          onClick={() => setVisibleCount((count) => count + PROFILE_TAB_PAGE_SIZE)}
+        >
+          Show more ({threads.length - visibleCount} remaining)
+        </button>
+      )}
     </div>
   );
 }

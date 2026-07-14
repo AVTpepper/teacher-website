@@ -10,16 +10,19 @@ import {
   query,
   where,
   orderBy,
+  limit,
+  startAfter,
   getDocs,
   type DocumentSnapshot,
   type Timestamp,
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { byCreatedAtDesc, byUpdatedAtDesc } from "@/lib/utils";
+import { byUpdatedAtDesc } from "@/lib/utils";
 import {
   deleteCommentWithReplies,
   type DeleteCommentResult,
+  migrateLegacyCommentFields,
 } from "@/lib/firestore/commentThreads";
 
 // --- Lesson types ---
@@ -135,15 +138,15 @@ export interface GetLessonsResult {
   lastDoc: DocumentSnapshot | null;
 }
 
+export type LessonLibrarySortBy = "newest" | "oldest" | "rating" | "downloads" | "bookmarks";
+
 export async function getPublicLessons(
-  filters?: { gradeLevel?: string; subject?: string },
-  // cursor param kept for API compatibility but pagination is handled client-side
-  _cursor?: DocumentSnapshot | null
+  filters?: { gradeLevel?: string; subject?: string; sortBy?: LessonLibrarySortBy },
+  cursor?: DocumentSnapshot | null,
+  pageSize = PAGE_SIZE
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  // Only equality where() filters - no composite index required.
-  // orderBy is done client-side to avoid needing a composite index.
   const constraints: QueryConstraint[] = [
     where("isPublic", "==", true),
   ];
@@ -155,24 +158,45 @@ export async function getPublicLessons(
     constraints.push(where("subject", "==", filters.subject));
   }
 
+  if (filters?.sortBy === "oldest") {
+    constraints.push(orderBy("createdAt", "asc"));
+  } else if (filters?.sortBy === "rating") {
+    constraints.push(orderBy("ratingAverage", "desc"));
+  } else if (filters?.sortBy === "downloads") {
+    constraints.push(orderBy("downloadCount", "desc"));
+  } else if (filters?.sortBy === "bookmarks") {
+    constraints.push(orderBy("bookmarkCount", "desc"));
+  } else {
+    constraints.push(orderBy("createdAt", "desc"));
+  }
+
+  constraints.push(limit(pageSize));
+
+  if (cursor) {
+    constraints.push(startAfter(cursor));
+  }
+
   const q = query(collection(db, "lessons"), ...constraints);
   const snapshot = await getDocs(q);
 
-  const lessons = snapshot.docs
-    .map((d) => d.data() as Lesson)
-    .sort(byCreatedAtDesc);
+  const lessons = snapshot.docs.map((d) => d.data() as Lesson);
 
-  return { lessons, lastDoc: null };
+  const lastDoc =
+    snapshot.docs.length === pageSize
+      ? snapshot.docs[snapshot.docs.length - 1]
+      : null;
+
+  return { lessons, lastDoc };
 }
 
 export async function getLessonsByAuthor(
   authorId: string,
   includePrivate = false,
   // cursor + pageSize params kept for API compatibility
-  _cursor?: DocumentSnapshot | null,
-  _pageSize = PAGE_SIZE
+  _cursor?: DocumentSnapshot | null
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
+  void _cursor;
 
   // Single equality where() - no composite index required.
   // Filtering by isPublic and sorting are done client-side.
@@ -269,7 +293,12 @@ export async function getLessonComments(
   );
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((d) => d.data() as LessonComment);
+  return snapshot.docs.map((d) =>
+    migrateLegacyCommentFields(
+      doc(db, "lessons", lessonId, "comments", d.id),
+      d.data() as LessonComment
+    )
+  );
 }
 
 export async function updateLessonComment(
