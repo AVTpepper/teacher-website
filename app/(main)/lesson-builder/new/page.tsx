@@ -119,16 +119,25 @@ function LessonBuilderNewEntry() {
 
   useEffect(() => {
     if (!isCompleteFlow || !draftParam) return;
+    if (!user) {
+      setCompleteLoadError("Sign in to continue a draft.");
+      setCompleteLoading(false);
+      return;
+    }
     setCompleteLoading(true);
     getLesson(draftParam)
       .then((lesson) => {
         if (!lesson) { setCompleteLoadError("Draft not found."); return; }
+        if (lesson.authorId !== user.uid) {
+          setCompleteLoadError("You can only continue drafts you created.");
+          return;
+        }
         setCompleteLoadedState(lessonToWizardState(lesson));
       })
       .catch(() => setCompleteLoadError("Failed to load draft. Please try again."))
       .finally(() => setCompleteLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isCompleteFlow, draftParam, user]);
 
   useEffect(() => {
     if (!isEditOrRemix || !user) return;
@@ -138,6 +147,17 @@ function LessonBuilderNewEntry() {
     getLesson(lessonId)
       .then((lesson) => {
         if (!lesson) { setEditLoadError("Lesson not found."); return; }
+        if (lesson.authorId !== user.uid) {
+          if (editingLessonId) {
+            setEditLoadError("You can only edit lessons you created.");
+            return;
+          }
+          // Remix is allowed for public lessons only.
+          if (!lesson.isPublic) {
+            setEditLoadError("You can only remix public lessons.");
+            return;
+          }
+        }
         setEditLoadedState(lessonToWizardState(lesson));
       })
       .catch(() => setEditLoadError("Failed to load lesson. Please try again."))

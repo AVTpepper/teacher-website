@@ -242,7 +242,8 @@ service cloud.firestore {
     // -----------------------------------------------------------------------
     match /inspiration/{itemId} {
       allow read: if true;
-      allow create: if isAuth();
+      allow create: if isAuth()
+                    && request.resource.data.submittedBy == request.auth.uid;
       allow update, delete: if isAuth()
                             && resource.data.submittedBy == request.auth.uid;
     }
@@ -253,9 +254,15 @@ service cloud.firestore {
     match /jobs/{jobId} {
       allow read: if true;
       allow create: if isAuth()
-                    && request.resource.data.postedById == request.auth.uid;
+                    && (
+                      request.resource.data.postedBy == request.auth.uid
+                      || request.resource.data.postedById == request.auth.uid
+                    );
       allow update, delete: if isAuth()
-                            && resource.data.postedById == request.auth.uid;
+                            && (
+                              resource.data.postedBy == request.auth.uid
+                              || resource.data.postedById == request.auth.uid
+                            );
     }
 
     // -----------------------------------------------------------------------

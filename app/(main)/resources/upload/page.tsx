@@ -62,6 +62,10 @@ function UploadResourceForm() {
       try {
         const resource = await getResource(editId!);
         if (cancelled || !resource) return;
+        if (user && resource.authorId !== user.uid) {
+          setError("You can only edit resources you created.");
+          return;
+        }
         setTitle(resource.title ?? "");
         setDescription(resource.description ?? "");
         setGradeLevel(resource.gradeLevel ?? "");
@@ -77,7 +81,7 @@ function UploadResourceForm() {
     }
     load();
     return () => { cancelled = true; };
-  }, [editId]);
+  }, [editId, user]);
 
   if (!user) {
     return (
