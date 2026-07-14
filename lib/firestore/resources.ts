@@ -207,6 +207,33 @@ export interface ResourceFilters {
   sortBy?: ResourceSortBy;
 }
 
+function isIndexBuildingError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = (error as { code?: string }).code;
+  return code === "failed-precondition" && error.message.includes("currently building");
+}
+
+function toTimestampMillis(value: Timestamp | null | undefined): number {
+  if (!value) return 0;
+  return value.toMillis();
+}
+
+function compareResources(a: Resource, b: Resource, sortBy: ResourceSortBy): number {
+  if (sortBy === "oldest") {
+    return toTimestampMillis(a.createdAt) - toTimestampMillis(b.createdAt);
+  }
+  if (sortBy === "downloads") {
+    return b.downloadCount - a.downloadCount;
+  }
+  if (sortBy === "bookmarks") {
+    return b.savedByCount - a.savedByCount;
+  }
+  if (sortBy === "rating") {
+    return b.ratingAverage - a.ratingAverage;
+  }
+  return toTimestampMillis(b.createdAt) - toTimestampMillis(a.createdAt);
+}
+
 export async function getResources(
   filters?: ResourceFilters,
   cursor?: DocumentSnapshot | null,
@@ -246,16 +273,51 @@ export async function getResources(
     constraints.push(startAfter(cursor));
   }
 
-  const q = query(collection(db, "resources"), ...constraints);
-  const snapshot = await getDocs(q);
+  try {
+    const q = query(collection(db, "resources"), ...constraints);
+    const snapshot = await getDocs(q);
 
-  const resources = snapshot.docs.map((d) => d.data() as Resource);
-  const lastDoc =
-    snapshot.docs.length === pageSize
-      ? snapshot.docs[snapshot.docs.length - 1]
-      : null;
+    const resources = snapshot.docs.map((d) => d.data() as Resource);
+    const lastDoc =
+      snapshot.docs.length === pageSize
+        ? snapshot.docs[snapshot.docs.length - 1]
+        : null;
 
-  return { resources, lastDoc };
+    return { resources, lastDoc };
+  } catch (error) {
+    // During index creation, Firestore can return failed-precondition for this query.
+    // Fall back to a broader query + client-side sorting so the page remains usable.
+    if (!isIndexBuildingError(error)) {
+      throw error;
+    }
+
+    const fallbackConstraints: QueryConstraint[] = [];
+    fallbackConstraints.push(where("isPublic", "==", true));
+
+    if (filters?.gradeLevel) {
+      fallbackConstraints.push(where("gradeLevel", "==", filters.gradeLevel));
+    }
+    if (filters?.subject) {
+      fallbackConstraints.push(where("subject", "==", filters.subject));
+    }
+    if (filters?.type) {
+      fallbackConstraints.push(where("type", "==", filters.type));
+    }
+
+    // No cursor support in fallback mode; return a single sorted page.
+    fallbackConstraints.push(limit(Math.max(pageSize * 5, 100)));
+
+    const fallbackQuery = query(collection(db, "resources"), ...fallbackConstraints);
+    const fallbackSnapshot = await getDocs(fallbackQuery);
+
+    const sortBy = filters?.sortBy ?? "newest";
+    const resources = fallbackSnapshot.docs
+      .map((d) => d.data() as Resource)
+      .sort((a, b) => compareResources(a, b, sortBy))
+      .slice(0, pageSize);
+
+    return { resources, lastDoc: null };
+  }
 }
 
 export async function getResourcesByAuthor(

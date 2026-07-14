@@ -6,6 +6,7 @@ import { createPost, type PostType, type MentionedUserRef } from "@/lib/firestor
 import { notifyMention } from "@/lib/notifications";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
+import { TextButton } from "@/components/ui";
 import Tag from "@/components/ui/Tag";
 import MentionInput, { type MentionedUser, type MentionInputHandle } from "@/components/ui/MentionInput";
 import LinkAttacher, { type AttachedLink } from "@/components/ui/LinkAttacher";
@@ -139,15 +140,15 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
         <div className="mt-3 space-y-3">
           {/* Toolbar: @Mention + attach link - immediately below textarea */}
           <div className="flex flex-wrap items-start gap-4 border-b border-border pb-3">
-            <button
+            <TextButton
               type="button"
               onClick={() => mentionInputRef.current?.insertText("@")}
-              className="flex items-center gap-1 text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer"
+              className="gap-1 px-0 py-0 text-xs"
               title="Mention someone"
             >
               <span className="text-base leading-none">@</span>
               <span>Mention</span>
-            </button>
+            </TextButton>
             <LinkAttacher links={links} onChange={setLinks} />
           </div>
 

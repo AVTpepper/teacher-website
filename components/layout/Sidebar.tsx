@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { TextButton } from "@/components/ui";
 import Card from "@/components/ui/Card";
 import { getPosts, type Post } from "@/lib/firestore/posts";
 import { getResources, type Resource } from "@/lib/firestore/resources";
@@ -313,16 +314,16 @@ export function SidebarDrawerButton() {
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <span className="text-sm font-semibold text-foreground">Explore</span>
-          <button
+          <TextButton
             type="button"
             onClick={handleClose}
             aria-label="Close sidebar"
-            className="text-muted hover:text-foreground transition-colors cursor-pointer"
+            className="p-0 text-muted hover:text-foreground"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
-          </button>
+          </TextButton>
         </div>
         <div className="p-4">
           <SidebarContents onClose={handleClose} />

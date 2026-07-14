@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import TextButton from "./TextButton";
 
 export interface AttachedLink {
   url: string;
@@ -96,16 +97,16 @@ export default function LinkAttacher({ links, onChange, max = 5 }: LinkAttacherP
 
       {/* Add link button */}
       {!open && links.length < max && (
-        <button
+        <TextButton
           type="button"
           onClick={() => { setOpen(true); setError(""); }}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer"
+          className="gap-1.5 px-0 py-0 text-xs"
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
           </svg>
           Attach link
-        </button>
+        </TextButton>
       )}
 
       {/* Inline form */}
@@ -132,20 +133,20 @@ export default function LinkAttacher({ links, onChange, max = 5 }: LinkAttacherP
           </div>
           {error && <p className="text-xs text-error-500">{error}</p>}
           <div className="flex gap-2">
-            <button
+            <TextButton
               type="button"
               onClick={handleAdd}
-              className="px-3 py-1 rounded-md bg-primary-900 text-white text-xs font-medium hover:bg-primary-800 transition-colors cursor-pointer"
+              className="rounded-md bg-primary-900 px-3 py-1 text-xs text-white hover:bg-primary-800"
             >
               Add
-            </button>
-            <button
+            </TextButton>
+            <TextButton
               type="button"
               onClick={() => { setOpen(false); setUrlInput(""); setLabelInput(""); setError(""); }}
-              className="px-3 py-1 rounded-md text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer"
+              className="rounded-md px-3 py-1 text-xs text-muted hover:text-foreground"
             >
               Cancel
-            </button>
+            </TextButton>
           </div>
         </div>
       )}

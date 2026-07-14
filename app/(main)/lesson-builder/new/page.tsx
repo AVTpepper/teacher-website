@@ -27,7 +27,7 @@ import {
   type LessonStep,
   type LessonAttachment,
 } from "@/lib/firestore/lessons";
-import { Badge, Button, Card, Input, Select, Spinner, Textarea } from "@/components/ui";
+import { Badge, Button, Card, Input, Select, Spinner, Textarea, TextButton } from "@/components/ui";
 import AIAssistantPanel, { type LessonFormState, type ApplySuggestionPayload } from "@/components/lessons/AIAssistantPanel";
 import WizardShell from "@/components/lessons/wizard/WizardShell";
 import AIGenerateScreen from "@/components/lessons/wizard/AIGenerateScreen";
@@ -398,8 +398,23 @@ function LessonBuilderNewEntry() {
 
   // Entry screen
   return (
-    <main className="space-y-6 py-8 px-4 sm:px-6">
+    <main className="space-y-5">
+      <section className="-mx-4 -mt-4 rounded-t-2xl border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 px-5 py-4 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:px-6">
+        <div className="mx-auto w-full max-w-4xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent-300">
+            Lesson Builder
+          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">
+            How would you like to create your lesson?
+          </h1>
+          <p className="mt-2 text-base text-primary-100/90">
+            Choose the path that fits your workflow, then build from there.
+          </p>
+        </div>
+      </section>
+
       <div className="mx-auto w-full max-w-4xl space-y-5">
+
         {/* AC-5: Draft resume banner */}
         {!bannerDismissed && draft && (
           <div
@@ -430,18 +445,6 @@ function LessonBuilderNewEntry() {
             </div>
           </div>
         )}
-
-        <section className="rounded-xl border border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 px-5 py-4 text-primary-50 shadow-md sm:px-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent-300">
-            Lesson Builder
-          </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">
-            How would you like to create your lesson?
-          </h1>
-          <p className="mt-2 text-base text-primary-100/90">
-            Choose the path that fits your workflow, then build from there.
-          </p>
-        </section>
 
         {/* AC-1: Two path cards */}
         <div className="grid w-full gap-4 sm:grid-cols-2">
@@ -1227,13 +1230,12 @@ export function LessonBuilderNewInner() {
         </div>
         <div className="flex items-center gap-2">
           {/* AI Assistant toggle */}
-          <button
+          <TextButton
             ref={aiToggleButtonRef}
-            type="button"
             onClick={() => setAiPanelOpen((prev) => !prev)}
             aria-expanded={aiPanelOpen}
             aria-controls="ai-assistant-panel"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-800 hover:bg-primary-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer"
+            className="gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-primary-800 hover:bg-primary-100 focus-visible:ring-primary-500"
           >
             <svg
               className="h-4 w-4"
@@ -1250,7 +1252,7 @@ export function LessonBuilderNewInner() {
               />
             </svg>
             AI Assistant
-          </button>
+          </TextButton>
           <Link href="/lesson-builder/drafts">
             <Button variant="outline" size="sm" type="button">
               View Drafts

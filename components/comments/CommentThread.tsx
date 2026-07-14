@@ -7,6 +7,7 @@ import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import BadgeIcon from "@/components/badges/BadgeIcon";
 import MentionInput, { type MentionedUser } from "@/components/ui/MentionInput";
+import { TextButton } from "@/components/ui";
 import Dropdown from "@/components/ui/Dropdown";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { timeAgo, parseMentions, type MentionRef } from "@/lib/utils";
@@ -518,13 +519,13 @@ function CommentItem({
               </button>
             )}
             {user && canNest && localReplies.length === 0 && (
-              <button
+              <TextButton
                 type="button"
                 onClick={() => setShowReply(!showReply)}
-                className="text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer"
+                className="p-0 text-xs text-muted hover:text-foreground"
               >
                 Reply
-              </button>
+              </TextButton>
             )}
           </div>
 
@@ -614,13 +615,13 @@ function CommentItem({
           {user && canNest && (
             <div className="ml-6 sm:ml-10 border-l-2 border-border pl-4 py-1">
               {!showReply ? (
-                <button
+                <TextButton
                   type="button"
                   onClick={() => setShowReply(true)}
-                  className="text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer"
+                  className="p-0 text-xs text-muted hover:text-foreground"
                 >
                   Reply
-                </button>
+                </TextButton>
               ) : (
                 <div className="flex gap-2">
                   <MentionInput

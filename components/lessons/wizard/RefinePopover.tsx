@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Button from "@/components/ui/Button";
+import { TextButton } from "@/components/ui";
 
 export interface RefinePopoverProps {
   sectionTitle: string;
@@ -60,17 +61,17 @@ export default function RefinePopover({
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-muted">{instruction.length} / 300</p>
         <div className="flex items-center gap-1.5">
-          <button
+          <TextButton
             type="button"
             onClick={onClose}
             disabled={isRefining}
             aria-label="Close refine popover"
-            className="rounded p-1 text-muted hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer disabled:opacity-50"
+            className="rounded p-1 text-muted hover:text-foreground"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>
-          </button>
+          </TextButton>
           <Button
             type="button"
             variant="primary"
