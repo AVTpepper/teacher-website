@@ -121,7 +121,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
         )}
         <Link
           href="/resources"
-          className="text-xs text-primary-900 hover:underline mt-2 inline-block"
+          className="text-xs text-primary-800 hover:text-primary-900 hover:underline mt-2 inline-block"
         >
           Browse all resources →
         </Link>
@@ -157,7 +157,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
         )}
         <Link
           href="/lesson-builder"
-          className="text-xs text-primary-900 hover:underline mt-2 inline-block"
+          className="text-xs text-primary-800 hover:text-primary-900 hover:underline mt-2 inline-block"
         >
           Create a lesson →
         </Link>
@@ -195,7 +195,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
         )}
         <Link
           href="/inspiration"
-          className="text-xs text-primary-900 hover:underline mt-2 inline-block"
+          className="text-xs text-primary-800 hover:text-primary-900 hover:underline mt-2 inline-block"
         >
           Explore inspiration →
         </Link>
@@ -266,7 +266,7 @@ export function SidebarDrawerButton() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open sidebar"
-        className="lg:hidden fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary-900 text-white shadow-lg hover:bg-primary-800 transition-colors"
+        className="lg:hidden fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary-900 text-accent-100 shadow-lg hover:bg-primary-800 transition-colors"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
@@ -287,7 +287,7 @@ export function SidebarDrawerButton() {
         role="dialog"
         aria-modal="true"
         aria-label="Sidebar"
-        className={`fixed inset-y-0 right-0 z-50 w-80 max-w-full overflow-y-auto bg-background shadow-xl transition-transform duration-300 lg:hidden ${open ? "translate-x-0" : "translate-x-full"}`}
+        className={`fixed inset-y-0 right-0 z-50 w-80 max-w-full overflow-y-auto border-l border-primary-300 bg-linear-to-b from-secondary-100 to-background shadow-xl transition-transform duration-300 lg:hidden ${open ? "translate-x-0" : "translate-x-full"}`}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <span className="text-sm font-semibold text-foreground">Explore</span>
@@ -316,7 +316,7 @@ export function SidebarDrawerButton() {
 
 export default function Sidebar() {
   return (
-    <aside className="hidden lg:block w-72 shrink-0">
+    <aside className="hidden lg:block w-72 shrink-0 rounded-2xl border border-primary-100/70 bg-linear-to-b from-secondary-100/60 to-transparent p-3">
       <SidebarContents />
     </aside>
   );

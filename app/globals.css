@@ -5,44 +5,44 @@
    ======================================== */
 
 :root {
-  /* --- Primary: Dark Maroon --- */
-  --primary-50: #fdf2f2;
-  --primary-100: #fce4e4;
-  --primary-200: #facbcb;
-  --primary-300: #f5a3a3;
-  --primary-400: #ec6b6b;
-  --primary-500: #d94444;
-  --primary-600: #b52e2e;
-  --primary-700: #8b2020;
-  --primary-800: #6b1c1c;
-  --primary-900: #5c1a1b;
-  --primary-950: #3a0a0b;
+  /* --- Primary: Brand Red --- */
+  --primary-50: #fff0f0;
+  --primary-100: #ffdede;
+  --primary-200: #ffbcbc;
+  --primary-300: #ff9595;
+  --primary-400: #f56666;
+  --primary-500: #e23f3f;
+  --primary-600: #c32a2a;
+  --primary-700: #9f1e1e;
+  --primary-800: #7f1a1a;
+  --primary-900: #661717;
+  --primary-950: #3f0b0b;
 
-  /* --- Secondary: Grey --- */
-  --secondary-50: #f9fafb;
-  --secondary-100: #f3f4f6;
-  --secondary-200: #e5e7eb;
-  --secondary-300: #d1d5db;
-  --secondary-400: #9ca3af;
-  --secondary-500: #6b7280;
-  --secondary-600: #4b5563;
-  --secondary-700: #374151;
-  --secondary-800: #1f2937;
-  --secondary-900: #111827;
-  --secondary-950: #030712;
+  /* --- Secondary: Warm Neutral --- */
+  --secondary-50: #fffaf7;
+  --secondary-100: #fdf2ed;
+  --secondary-200: #f7e3d8;
+  --secondary-300: #eecfbc;
+  --secondary-400: #d5ab93;
+  --secondary-500: #b5846d;
+  --secondary-600: #936857;
+  --secondary-700: #765246;
+  --secondary-800: #5a3d34;
+  --secondary-900: #3f2a25;
+  --secondary-950: #241714;
 
-  /* --- Accent: Warm Off-White --- */
-  --accent-50: #fefdfb;
-  --accent-100: #fdf9f0;
-  --accent-200: #faf0db;
-  --accent-300: #f5e3bf;
-  --accent-400: #edcf96;
-  --accent-500: #e4b86c;
-  --accent-600: #d4993e;
-  --accent-700: #b57a2e;
-  --accent-800: #926128;
-  --accent-900: #775024;
-  --accent-950: #402a11;
+  /* --- Accent: Brand Yellow --- */
+  --accent-50: #fffef0;
+  --accent-100: #fff9d6;
+  --accent-200: #fff2ad;
+  --accent-300: #ffe679;
+  --accent-400: #ffd646;
+  --accent-500: #f2bf1b;
+  --accent-600: #d39f10;
+  --accent-700: #b1800f;
+  --accent-800: #906410;
+  --accent-900: #734f11;
+  --accent-950: #432d08;
 
   /* --- Semantic Colors --- */
   --success-50: #f0fdf4;
@@ -62,14 +62,14 @@
   --info-700: #1d4ed8;
 
   /* --- Surface & Layout --- */
-  --background: #f9fafb;
-  --foreground: #1a1a2e;
-  --surface: #ffffff;
-  --surface-hover: #f3f4f6;
-  --border: #e5e7eb;
-  --border-strong: #d1d5db;
-  --muted: #6b7280;
-  --muted-foreground: #9ca3af;
+  --background: #fff7f3;
+  --foreground: #2c1311;
+  --surface: #fffdfa;
+  --surface-hover: #fff3e9;
+  --border: #efd9cb;
+  --border-strong: #dfc1ad;
+  --muted: #7f6357;
+  --muted-foreground: #a28374;
 }
 
 @theme inline {
@@ -186,7 +186,11 @@
    ======================================== */
 
 body {
-  background: var(--background);
+  background-color: var(--background);
+  background-image:
+    radial-gradient(circle at 8% -12%, rgb(195 42 42 / 0.14), transparent 38%),
+    radial-gradient(circle at 92% -18%, rgb(242 191 27 / 0.2), transparent 42%);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }

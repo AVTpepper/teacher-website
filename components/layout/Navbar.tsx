@@ -49,14 +49,14 @@ export default function Navbar() {
       confirmLabel="Sign out"
       isDestructive={false}
     />
-    <header className="sticky top-0 z-50 border-b border-border bg-surface/95 backdrop-blur supports-backdrop-filter:bg-surface/80">
+    <header className="sticky top-0 z-50 border-b border-primary-700/60 bg-primary-950/95 text-primary-50 backdrop-blur supports-backdrop-filter:bg-primary-950/90 shadow-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* Top row: Logo + Search + Actions */}
         <div className="flex h-14 items-center justify-between gap-4">
           {/* Logo */}
           <Link
             href={mounted && user ? "/home" : "/"}
-            className="shrink-0 text-lg font-bold text-primary-900"
+            className="shrink-0 text-lg font-bold text-accent-300"
           >
             EduConnect
           </Link>
@@ -107,7 +107,7 @@ export default function Navbar() {
                 ) : (
                   <Link
                     href="/auth/login"
-                    className="rounded-lg bg-primary-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-primary-800 transition-colors"
+                    className="rounded-lg bg-accent-400 px-3.5 py-1.5 text-sm font-semibold text-primary-950 hover:bg-accent-300 transition-colors"
                   >
                     Sign in
                   </Link>
@@ -119,7 +119,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden rounded-lg p-2 text-muted hover:bg-surface-hover hover:text-foreground transition-colors cursor-pointer"
+              className="lg:hidden rounded-lg p-2 text-primary-100 hover:bg-primary-800 hover:text-white transition-colors cursor-pointer"
               aria-label="Toggle menu"
               aria-expanded={mobileMenuOpen}
             >
@@ -164,8 +164,8 @@ export default function Navbar() {
               href={link.href}
               className={`px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 isActive(link.href)
-                  ? "border-primary-900 text-primary-900"
-                  : "border-transparent text-muted hover:text-foreground hover:border-secondary-300"
+                  ? "border-accent-400 text-accent-200"
+                  : "border-transparent text-primary-100 hover:text-accent-100 hover:border-primary-600"
               }`}
             >
               {link.label}
@@ -180,13 +180,13 @@ export default function Navbar() {
       <div className="fixed inset-0 top-14 z-40 lg:hidden">
         {/* Backdrop overlay - below header */}
         <div
-          className="absolute inset-0 bg-black/40"
+          className="absolute inset-0 bg-primary-950/65"
           onClick={() => setMobileMenuOpen(false)}
           aria-hidden="true"
         />
 
         {/* Menu panel */}
-        <div className="absolute left-0 right-0 top-0 border-t border-border bg-surface shadow-lg">
+        <div className="absolute left-0 right-0 top-0 border-t border-primary-700 bg-primary-900 shadow-lg">
           {/* Mobile search */}
           <div className="px-4 py-3 md:hidden">
             <NavSearchBar
@@ -203,8 +203,8 @@ export default function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   isActive(link.href)
-                    ? "bg-primary-50 text-primary-900"
-                    : "text-muted hover:bg-surface-hover hover:text-foreground"
+                      ? "bg-accent-300 text-primary-950"
+                      : "text-primary-100 hover:bg-primary-800 hover:text-accent-100"
                 }`}
               >
                 {link.label}

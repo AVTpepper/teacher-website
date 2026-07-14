@@ -174,7 +174,7 @@ export default function NotificationDropdown() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative rounded-lg p-2 transition-colors cursor-pointer hover:bg-surface-hover text-foreground"
+        className="relative rounded-lg p-2 transition-colors cursor-pointer text-primary-100 hover:bg-primary-800 hover:text-white"
         aria-label="Notifications"
         aria-expanded={open}
         aria-haspopup="true"
@@ -207,7 +207,7 @@ export default function NotificationDropdown() {
                     type="button"
                     onClick={handleMarkAllRead}
                     disabled={markingAll}
-                    className="text-xs text-primary hover:underline disabled:opacity-50 cursor-pointer"
+                    className="text-xs text-primary-700 hover:underline disabled:opacity-50 cursor-pointer"
                   >
                     {markingAll ? "Marking..." : "Mark all as read"}
                   </button>
@@ -311,7 +311,7 @@ export default function NotificationDropdown() {
             <Link
               href="/notifications"
               onClick={() => setOpen(false)}
-              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs text-primary-700 hover:underline"
             >
               View all notifications
               {extraUnread > 0 && (

@@ -24,7 +24,7 @@ export default function Card({
 }: CardProps) {
   return (
     <div
-      className={`rounded-xl border border-border bg-surface shadow-card ${
+      className={`rounded-xl border border-border-strong bg-surface/95 shadow-card ${
         hoverable
           ? "transition-shadow hover:shadow-card-hover cursor-pointer"
           : ""
