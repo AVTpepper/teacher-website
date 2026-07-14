@@ -20,7 +20,7 @@ export default function NewInspirationPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<string>("");
+  const [category, setCategory] = useState<string>("general");
   const [creator, setCreator] = useState("");
   const [sourceURL, setSourceURL] = useState("");
   const [videoURL, setVideoURL] = useState("");
@@ -85,6 +85,10 @@ export default function NewInspirationPage() {
     if (!title.trim()) errors.title = true;
     if (!description.trim()) errors.description = true;
 
+    if (category === "video" && !videoURL.trim()) {
+      errors.videoURL = true;
+    }
+
     if (Object.keys(errors).length > 0) {
       showError("Please fill in all required fields.", errors);
       return;
@@ -110,6 +114,9 @@ export default function NewInspirationPage() {
         showError("Video link must be a valid http/https URL.", { videoURL: true });
         return;
       }
+    } else if (category === "video") {
+      showError("Video URL is required when category is Video.", { videoURL: true });
+      return;
     }
 
     // Validate thumbnail URL if provided
@@ -160,7 +167,7 @@ export default function NewInspirationPage() {
       await createInspirationItem({
         title: title.trim(),
         description: description.trim(),
-        category: (category as InspirationCategory) || "general",
+        category: category as InspirationCategory,
         creator: creator.trim() || null,
         sourceURL: normalizedSourceURL,
         videoURL: normalizedVideoURL,
@@ -217,7 +224,6 @@ export default function NewInspirationPage() {
             value={category}
             onChange={(e) => { setCategory(e.target.value); setFieldErrors((p) => ({ ...p, category: false })); }}
             options={[
-              { value: "", label: "General (default)" },
               ...INSPIRATION_CATEGORIES.map((c) => ({ value: c.value, label: `${c.icon} ${c.label}` })),
             ]}
           />
@@ -240,14 +246,58 @@ export default function NewInspirationPage() {
 
           {category === "video" && (
             <Input
-              label="Video URL"
+              label="Video URL *"
               value={videoURL}
               onChange={(e) => { setVideoURL(e.target.value); setFieldErrors((p) => ({ ...p, videoURL: false })); }}
               placeholder="https://youtube.com/... or https://vimeo.com/..."
               type="url"
-              error={fieldErrors.videoURL ? "Must be a valid https:// URL" : undefined}
+              error={fieldErrors.videoURL ? "Required for video and must be a valid https:// URL" : undefined}
             />
           )}
+
+          {/* Live preview */}
+          <div className="space-y-2 border-t border-border pt-4">
+            <p className="text-sm font-medium text-foreground">Live Preview</p>
+            <Card className="overflow-hidden border-border">
+              <div className="flex flex-col sm:flex-row">
+                <div
+                  className="h-36 sm:h-auto sm:w-48 shrink-0 flex items-center justify-center text-4xl"
+                  style={{ background: "var(--color-secondary-50, #f3f4f6)" }}
+                >
+                  {thumbnailPreview || thumbnailURL.trim() ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={thumbnailPreview || thumbnailURL.trim()}
+                      alt="Preview thumbnail"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span role="img" aria-label="preview">✨</span>
+                  )}
+                </div>
+                <div className="p-4 flex-1 space-y-2">
+                  <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-secondary-100 text-secondary-800">
+                    {INSPIRATION_CATEGORIES.find((c) => c.value === category)?.label || "General"}
+                  </span>
+                  <h3 className="text-sm font-semibold text-foreground line-clamp-2">
+                    {title.trim() || "Your inspiration title"}
+                  </h3>
+                  <p className="text-xs text-muted line-clamp-3">
+                    {description.trim() || "A short description will appear here."}
+                  </p>
+                  <div className="pt-2 border-t border-border text-xs text-muted flex flex-wrap items-center gap-2">
+                    <span>{creator.trim() || "Community"}</span>
+                    {(videoURL.trim() || sourceURL.trim()) && <span>•</span>}
+                    {(videoURL.trim() || sourceURL.trim()) && (
+                      <span className="text-primary-800">
+                        {videoURL.trim() ? "Video link" : "Source link"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
 
           {/* Thumbnail section */}
           <div className="space-y-3">
