@@ -30,6 +30,78 @@ export type ReviewPageProps = {
 
 type ValidationError = { field: string; message: string };
 
+type ReviewCheck = {
+  label: string;
+  status: "pass" | "warn";
+  detail: string;
+};
+
+function extractMinutes(value: string | undefined): number | null {
+  if (!value) return null;
+  const match = value.match(/(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
+function buildReviewChecks(lesson: WizardLessonState): ReviewCheck[] {
+  const filledObjectives = lesson.objectives.filter((item) => item.trim() !== "");
+  const filledMaterials = lesson.materials.filter((item) => item.trim() !== "");
+  const filledSteps = lesson.steps.filter((step) => step.title.trim() !== "");
+  const filledCFU = lesson.checkForUnderstanding.filter((item) => item.trim() !== "");
+  const filledAssessments = lesson.assessments.filter((item) => item.trim() !== "");
+  const totalDuration = extractMinutes(lesson.duration);
+  const stepDurationTotal = filledSteps.reduce<number | null>((sum, step) => {
+    const value = extractMinutes(step.duration);
+    if (sum === null || value === null) return null;
+    return sum + value;
+  }, 0);
+
+  return [
+    {
+      label: "Objectives",
+      status: filledObjectives.length > 0 ? "pass" : "warn",
+      detail:
+        filledObjectives.length > 0
+          ? `${filledObjectives.length} learning objectives included`
+          : "Add at least one objective before publishing.",
+    },
+    {
+      label: "Lesson steps",
+      status: filledSteps.length >= 3 ? "pass" : "warn",
+      detail:
+        filledSteps.length >= 3
+          ? `${filledSteps.length} instructional steps drafted`
+          : "The lesson flow is short. Consider expanding or refining it.",
+    },
+    {
+      label: "Timing",
+      status:
+        totalDuration !== null && stepDurationTotal !== null && totalDuration === stepDurationTotal
+          ? "pass"
+          : "warn",
+      detail:
+        totalDuration !== null && stepDurationTotal !== null
+          ? `${lesson.duration} total vs ${stepDurationTotal} minutes across lesson steps`
+          : "One or more step durations are missing or do not match the total.",
+    },
+    {
+      label: "Checks and assessment",
+      status: filledCFU.length > 0 && filledAssessments.length > 0 ? "pass" : "warn",
+      detail:
+        filledCFU.length > 0 && filledAssessments.length > 0
+          ? `${filledCFU.length} check-for-understanding items and ${filledAssessments.length} assessments included`
+          : "Add a quick check for understanding and an assessment plan.",
+    },
+    {
+      label: "Materials",
+      status: filledMaterials.length > 0 ? "pass" : "warn",
+      detail:
+        filledMaterials.length > 0
+          ? `${filledMaterials.length} materials listed`
+          : "No materials are listed yet.",
+    },
+  ];
+}
+
 // ─── Pencil icon ──────────────────────────────────────────────────────────────
 
 function PencilIcon() {
@@ -421,6 +493,8 @@ export default function ReviewPage({
 
   // The lesson to display in forms (edit draft while editing; live lesson otherwise)
   const displayLesson = editDraft ?? lesson;
+  const reviewChecks = buildReviewChecks(lesson);
+  const reviewWarnings = reviewChecks.filter((check) => check.status === "warn");
 
   // Helper to render the refine popover for a given section
   function renderRefinePopover(key: SectionKey) {
@@ -497,6 +571,50 @@ export default function ReviewPage({
             : "Monthly refine limit reached. Upgrade to Plus for unlimited refines."}
         </p>
       )}
+
+      <section className="rounded-xl border border-border bg-surface px-5 py-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Quality Review</h2>
+            <p className="mt-1 text-sm text-muted">
+              Check this draft for timing, clarity, and student fit before you publish it.
+            </p>
+          </div>
+          <span
+            className={[
+              "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+              reviewWarnings.length === 0
+                ? "bg-green-100 text-green-700"
+                : "bg-amber-100 text-amber-700",
+            ].join(" ")}
+          >
+            {reviewWarnings.length === 0
+              ? "Ready for teacher review"
+              : `${reviewWarnings.length} items to check`}
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {reviewChecks.map((check) => (
+            <div key={check.label} className="rounded-lg border border-border px-3 py-3 text-sm">
+              <div className="flex items-center gap-2">
+                <span
+                  className={[
+                    "inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold",
+                    check.status === "pass"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-amber-100 text-amber-700",
+                  ].join(" ")}
+                >
+                  {check.status === "pass" ? "✓" : "!"}
+                </span>
+                <span className="font-medium text-foreground">{check.label}</span>
+              </div>
+              <p className="mt-1.5 text-muted">{check.detail}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ── Section 1: Basic Info ─────────────────────────────────────────────── */}
       <ReviewSection

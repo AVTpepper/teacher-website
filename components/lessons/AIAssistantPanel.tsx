@@ -62,6 +62,15 @@ type AIAssistantPanelProps = {
   userTier: "free" | "plus";
 };
 
+const ACTIVITY_STYLE_OPTIONS = [
+  "Hands-on exploration",
+  "Discussion-based learning",
+  "Direct instruction with practice",
+  "Collaborative group work",
+  "Inquiry-based learning",
+  "Project-based learning",
+] as const;
+
 // ---------- Component ----------
 
 // Returns true when every form field is blank (no content to overwrite)
@@ -105,6 +114,9 @@ export default function AIAssistantPanel({
 
   // Generate Full Lesson state
   const [topic, setTopic] = useState("");
+  const [learningGoal, setLearningGoal] = useState("");
+  const [studentSupports, setStudentSupports] = useState("");
+  const [activityStyle, setActivityStyle] = useState("");
   const [gradeLevelOverride, setGradeLevelOverride] = useState("");
   const [description, setDescription] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -144,6 +156,13 @@ export default function AIAssistantPanel({
           topic: topic.trim(),
           gradeLevel: lessonFormState.gradeLevel,
           subject: lessonFormState.subject,
+          ...(learningGoal.trim()
+            ? { learningGoal: learningGoal.trim() }
+            : {}),
+          ...(studentSupports.trim()
+            ? { studentSupports: studentSupports.trim() }
+            : {}),
+          ...(activityStyle ? { activityStyle } : {}),
           ...(userTier === "plus" && gradeLevelOverride
             ? { gradeLevelOverride }
             : {}),
@@ -397,6 +416,77 @@ export default function AIAssistantPanel({
                       Enter a topic to generate a lesson.
                     </p>
                   )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="ai-learning-goal"
+                    className="block text-xs font-medium text-foreground mb-1"
+                  >
+                    Learning Goal
+                  </label>
+                  <textarea
+                    id="ai-learning-goal"
+                    value={learningGoal}
+                    onChange={(e) =>
+                      setLearningGoal(e.target.value.slice(0, 200))
+                    }
+                    disabled={isGenerating}
+                    placeholder="e.g. Students explain the water cycle using a labeled diagram."
+                    maxLength={200}
+                    rows={2}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50 resize-none"
+                  />
+                  <p className="text-xs text-muted mt-0.5 text-right" aria-live="polite">
+                    {learningGoal.length} / 200
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="ai-student-supports"
+                    className="block text-xs font-medium text-foreground mb-1"
+                  >
+                    Student Support Needs
+                  </label>
+                  <textarea
+                    id="ai-student-supports"
+                    value={studentSupports}
+                    onChange={(e) =>
+                      setStudentSupports(e.target.value.slice(0, 300))
+                    }
+                    disabled={isGenerating}
+                    placeholder="e.g. Include sentence stems, a visual model, and an extension for early finishers."
+                    maxLength={300}
+                    rows={2}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50 resize-none"
+                  />
+                  <p className="text-xs text-muted mt-0.5 text-right" aria-live="polite">
+                    {studentSupports.length} / 300
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="ai-activity-style"
+                    className="block text-xs font-medium text-foreground mb-1"
+                  >
+                    Preferred Activity Style
+                  </label>
+                  <select
+                    id="ai-activity-style"
+                    value={activityStyle}
+                    onChange={(e) => setActivityStyle(e.target.value)}
+                    disabled={isGenerating}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50"
+                  >
+                    <option value="">No preference</option>
+                    {ACTIVITY_STYLE_OPTIONS.map((style) => (
+                      <option key={style} value={style}>
+                        {style}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* US-08: Plus tier controls / Free upgrade notice */}

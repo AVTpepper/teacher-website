@@ -145,6 +145,28 @@ export function useAIRefine(
           instruction,
           gradeLevel: lesson.gradeLevel || "General",
           subject: lesson.subject || "General",
+          lessonContext: {
+            title: lesson.title || undefined,
+            duration: lesson.duration || undefined,
+            objectives: lesson.objectives.filter((item) => item.trim() !== ""),
+            materials: lesson.materials.filter((item) => item.trim() !== ""),
+            steps: lesson.steps
+              .filter(
+                (step) =>
+                  step.title.trim() !== "" || step.description.trim() !== ""
+              )
+              .map((step) => ({
+                title: step.title,
+                description: step.description,
+                duration: step.duration,
+              })),
+            checkForUnderstanding: lesson.checkForUnderstanding.filter(
+              (item) => item.trim() !== ""
+            ),
+            assessments: lesson.assessments.filter(
+              (item) => item.trim() !== ""
+            ),
+          },
         }),
         signal: controller.signal,
       });

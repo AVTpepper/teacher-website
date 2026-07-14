@@ -104,7 +104,6 @@ function LessonBuilderNewEntry() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   // US-12: AI creation path state
   const [aiGeneratedState, setAiGeneratedState] = useState<WizardLessonState | null>(null);
-  const [aiDraftId, setAiDraftId] = useState<string | null>(null);
   const [userTier, setUserTier] = useState<"free" | "plus">("free");
 
   // Edit / Remix path: load lesson into wizard state
@@ -370,7 +369,6 @@ function LessonBuilderNewEntry() {
       return (
         <WizardShell
           user={user}
-          initialDraftId={aiDraftId}
           initialState={aiGeneratedState}
           initialCompletedSteps={new Set([1, 2, 3, 4, 5, 6, 7])}
           startAtStep={7}
@@ -378,7 +376,6 @@ function LessonBuilderNewEntry() {
           onExit={() => {
             setWizardPath(null);
             setAiGeneratedState(null);
-            setAiDraftId(null);
           }}
         />
       );
@@ -387,9 +384,8 @@ function LessonBuilderNewEntry() {
       <AIGenerateScreen
         user={user}
         userTier={userTier}
-        onGenerated={(state, draftId) => {
+        onGenerated={(state) => {
           setAiGeneratedState(state);
-          setAiDraftId(draftId);
         }}
         onBack={() => setWizardPath(null)}
       />
@@ -682,10 +678,14 @@ export function LessonBuilderNewInner() {
           existingContent,
           lessonContext: {
             title: title.trim() || undefined,
+            duration: duration.trim() || undefined,
             objectives: objectives.filter((o) => o.trim()),
+            materials: materials.filter((m) => m.trim()),
             steps: steps
-              .filter((s) => s.title.trim())
+              .filter((s) => s.title.trim() || s.description.trim())
               .map((s) => ({ title: s.title, description: s.description })),
+            checkForUnderstanding: checkForUnderstanding.filter((c) => c.trim()),
+            assessments: assessments.filter((a) => a.trim()),
           },
         }),
         signal: controller.signal,

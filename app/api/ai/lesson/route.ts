@@ -167,6 +167,9 @@ interface GenerateBody {
   topic: string;
   gradeLevel: string;
   subject: string;
+  learningGoal?: string;
+  studentSupports?: string;
+  activityStyle?: string;
   gradeLevelOverride?: string;
   description?: string;
 }
@@ -179,8 +182,12 @@ interface SuggestBody {
   existingContent?: string[];
   lessonContext?: {
     title?: string;
+    duration?: string;
     objectives?: string[];
+    materials?: string[];
     steps?: Array<{ title: string; description: string }>;
+    checkForUnderstanding?: string[];
+    assessments?: string[];
   };
 }
 
@@ -191,6 +198,15 @@ interface RefineBody {
   instruction: string;
   gradeLevel: string;
   subject: string;
+  lessonContext?: {
+    title?: string;
+    duration?: string;
+    objectives?: string[];
+    materials?: string[];
+    steps?: Array<{ title: string; description: string; duration?: string }>;
+    checkForUnderstanding?: string[];
+    assessments?: string[];
+  };
 }
 
 type RequestBody = GenerateBody | SuggestBody | RefineBody;
@@ -342,21 +358,60 @@ export async function POST(request: NextRequest): Promise<Response> {
     const contentJson = JSON.stringify(raw.content);
     const gradeLevel = raw.gradeLevel as string;
     const subject = raw.subject as string;
+    const lessonContext =
+      raw.lessonContext && typeof raw.lessonContext === "object"
+        ? (raw.lessonContext as RefineBody["lessonContext"])
+        : undefined;
 
     const isStepsField = field === "steps";
     const stepStructureHint = isStepsField
       ? ' Return a JSON array of objects with shape {"title":"...","description":"...","duration":"..."}. '
       : " Return a JSON array of strings. ";
 
-    const refineSystemPrompt = `You are an expert educator. You will be given the current content of a lesson plan section and an instruction describing how to change it. Apply the instruction and return only the revised content as a JSON object: {"refined": <array>}.${stepStructureHint}No markdown, no code fences, no explanation.`;
+    const refineSystemPrompt = `You are an expert educator. You will be given the current content of a lesson plan section, the surrounding lesson context, and an instruction describing how to change it. Apply the instruction while keeping the revised section aligned with the lesson's title, objectives, pacing, and assessment approach. Return only the revised content as a JSON object: {"refined": <array>}.${stepStructureHint}No markdown, no code fences, no explanation.`;
     const refineUserMessage = `Grade Level: ${gradeLevel}\nSubject: ${subject}\nSection: ${field}\nCurrent content: ${contentJson}\nInstruction: ${instruction}`;
+
+    let contextualRefineMessage = refineUserMessage;
+    if (lessonContext) {
+      if (lessonContext.title?.trim()) {
+        contextualRefineMessage += `\nLesson title: ${lessonContext.title.trim()}`;
+      }
+      if (lessonContext.duration?.trim()) {
+        contextualRefineMessage += `\nLesson duration: ${lessonContext.duration.trim()}`;
+      }
+      if (lessonContext.objectives && lessonContext.objectives.length > 0) {
+        contextualRefineMessage += `\nLearning objectives: ${lessonContext.objectives.join("; ")}`;
+      }
+      if (lessonContext.materials && lessonContext.materials.length > 0) {
+        contextualRefineMessage += `\nMaterials: ${lessonContext.materials.join("; ")}`;
+      }
+      if (lessonContext.steps && lessonContext.steps.length > 0) {
+        const stepList = lessonContext.steps
+          .map((step, index) => {
+            const duration = step.duration ? ` (${step.duration})` : "";
+            const description = step.description ? ` — ${step.description}` : "";
+            return `Step ${index + 1}: ${step.title}${duration}${description}`;
+          })
+          .join("; ");
+        contextualRefineMessage += `\nLesson steps: ${stepList}`;
+      }
+      if (
+        lessonContext.checkForUnderstanding &&
+        lessonContext.checkForUnderstanding.length > 0
+      ) {
+        contextualRefineMessage += `\nChecks for understanding: ${lessonContext.checkForUnderstanding.join("; ")}`;
+      }
+      if (lessonContext.assessments && lessonContext.assessments.length > 0) {
+        contextualRefineMessage += `\nAssessments: ${lessonContext.assessments.join("; ")}`;
+      }
+    }
 
     try {
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: refineSystemPrompt },
-          { role: "user", content: refineUserMessage },
+          { role: "user", content: contextualRefineMessage },
         ],
         temperature: 0.7,
         response_format: { type: "json_object" },
@@ -496,6 +551,48 @@ export async function POST(request: NextRequest): Promise<Response> {
         );
       }
     }
+    if (raw.learningGoal !== undefined) {
+      if (typeof raw.learningGoal !== "string") {
+        return Response.json(
+          { error: 'Field "learningGoal" must be a string when provided.' },
+          { status: 400 },
+        );
+      }
+      if (raw.learningGoal.length > 200) {
+        return Response.json(
+          { error: 'Field "learningGoal" must be 200 characters or fewer.' },
+          { status: 400 },
+        );
+      }
+    }
+    if (raw.studentSupports !== undefined) {
+      if (typeof raw.studentSupports !== "string") {
+        return Response.json(
+          { error: 'Field "studentSupports" must be a string when provided.' },
+          { status: 400 },
+        );
+      }
+      if (raw.studentSupports.length > 300) {
+        return Response.json(
+          { error: 'Field "studentSupports" must be 300 characters or fewer.' },
+          { status: 400 },
+        );
+      }
+    }
+    if (raw.activityStyle !== undefined) {
+      if (typeof raw.activityStyle !== "string") {
+        return Response.json(
+          { error: 'Field "activityStyle" must be a string when provided.' },
+          { status: 400 },
+        );
+      }
+      if (raw.activityStyle.length > 100) {
+        return Response.json(
+          { error: 'Field "activityStyle" must be 100 characters or fewer.' },
+          { status: 400 },
+        );
+      }
+    }
   } else {
     const VALID_SECTIONS: ValidSection[] = [
       "objectives",
@@ -580,6 +677,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   "assessments": ["<assessment method or task>"]
 }
 IMPORTANT: The top-level "duration" field MUST equal the sum of all individual step duration values. If your steps total 45 minutes, "duration" must be "45 minutes". Do not invent a different number of class periods.
+Write a classroom-ready plan with 3-5 concrete objectives, age-appropriate activities, realistic timing, and materials that clearly support the lesson steps.
+When support needs or activity preferences are provided, incorporate them throughout the plan instead of mentioning them once.
 Return only the raw JSON object - no markdown, no code fences, no explanation.`;
 
     // Use gradeLevelOverride (plus-tier only) if provided, otherwise fall back to gradeLevel
@@ -592,6 +691,16 @@ Return only the raw JSON object - no markdown, no code fences, no explanation.`;
 Topic: ${body.topic}
 Grade Level: ${effectiveGradeLevel}
 Subject: ${body.subject}`;
+
+    if (body.learningGoal?.trim()) {
+      userMessage += `\nLearning goal: ${body.learningGoal.trim()}`;
+    }
+    if (body.studentSupports?.trim()) {
+      userMessage += `\nStudent support needs: ${body.studentSupports.trim()}`;
+    }
+    if (body.activityStyle?.trim()) {
+      userMessage += `\nPreferred activity style: ${body.activityStyle.trim()}`;
+    }
 
     if (userTier === "plus" && body.description?.trim()) {
       userMessage += `\nAdditional context: ${body.description.trim()}`;
@@ -634,17 +743,26 @@ Grade Level: ${sb.gradeLevel}
 Subject: ${sb.subject}
 Current content: ${existing}`;
 
-    // Append lesson context if provided — gives the AI the topic and objectives
-    // so suggestions are relevant to the actual lesson being built
+    // Append lesson context if provided so suggestions stay aligned with the full lesson.
     if (sb.lessonContext) {
       const ctx = sb.lessonContext;
       if (ctx.title) userMessage += `\nLesson title: ${ctx.title}`;
+      if (ctx.duration) userMessage += `\nLesson duration: ${ctx.duration}`;
       if (ctx.objectives && ctx.objectives.length > 0) {
         userMessage += `\nLearning objectives: ${ctx.objectives.join("; ")}`;
+      }
+      if (ctx.materials && ctx.materials.length > 0) {
+        userMessage += `\nMaterials: ${ctx.materials.join("; ")}`;
       }
       if (ctx.steps && ctx.steps.length > 0) {
         const stepList = ctx.steps.map((s, i) => `Step ${i + 1}: ${s.title}${s.description ? ` — ${s.description}` : ""}`).join("; ");
         userMessage += `\nLesson steps so far: ${stepList}`;
+      }
+      if (ctx.checkForUnderstanding && ctx.checkForUnderstanding.length > 0) {
+        userMessage += `\nChecks for understanding: ${ctx.checkForUnderstanding.join("; ")}`;
+      }
+      if (ctx.assessments && ctx.assessments.length > 0) {
+        userMessage += `\nAssessments: ${ctx.assessments.join("; ")}`;
       }
     }
   }
