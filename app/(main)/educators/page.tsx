@@ -141,13 +141,14 @@ export default function EducatorsPage() {
   }
 
   return (
-    <div className="py-8">
+    <div className="pb-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">
+      <div className="-mx-4 -mt-4 mb-6 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Directory</p>
+        <h1 className="text-2xl font-bold">
           Discover Educators
         </h1>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-sm text-primary-100/90">
           Find and connect with educators by grade level, subject, and more.
         </p>
       </div>
@@ -240,6 +241,16 @@ export default function EducatorsPage() {
               ? "Try adjusting your search or filters."
               : "Be the first to create a profile!"}
           </p>
+          {!user && (
+            <div className="mt-4 flex justify-center gap-2">
+              <Link href="/auth/signup">
+                <Button variant="secondary" size="sm">Create Account</Button>
+              </Link>
+              <Link href="/auth/login">
+                <Button variant="outline" size="sm">Sign In</Button>
+              </Link>
+            </div>
+          )}
         </div>
       ) : (
         <>

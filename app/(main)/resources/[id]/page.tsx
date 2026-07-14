@@ -404,10 +404,10 @@ export default function ResourceDetailPage({
                   </p>
                   <div className="flex gap-2">
                     <Link href="/auth/login">
-                      <Button size="sm">Sign In</Button>
+                      <Button variant="outline" size="sm">Sign In</Button>
                     </Link>
                     <Link href="/auth/signup">
-                      <Button variant="outline" size="sm">Create Account</Button>
+                      <Button variant="secondary" size="sm">Create Account</Button>
                     </Link>
                   </div>
                 </div>

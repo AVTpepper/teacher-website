@@ -307,23 +307,25 @@ export default function InspirationPage() {
   const rest = items.slice(1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="-mx-4 -mt-4 flex flex-col gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Inspiration Hub</h1>
-          <p className="mt-1 text-sm text-muted">
+          <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Discover</p>
+          <h1 className="text-2xl font-bold">Inspiration Hub</h1>
+          <p className="mt-1 text-sm text-primary-100/90">
             Curated podcasts, articles, videos, and stories to inspire your teaching.
           </p>
         </div>
         {user ? (
           <Link href="/inspiration/new">
-            <Button variant="primary">+ Submit Content</Button>
+            <Button variant="secondary">+ Submit Content</Button>
           </Link>
         ) : (
-          <Button variant="outline" onClick={() => router.push("/auth/login?redirect=/inspiration/new")}>
-            Sign In to Submit
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => router.push("/auth/signup?redirect=/inspiration/new")}>Create Account</Button>
+            <Button variant="outline" onClick={() => router.push("/auth/login?redirect=/inspiration/new")}>Sign In</Button>
+          </div>
         )}
       </div>
 
@@ -375,6 +377,12 @@ export default function InspirationPage() {
               ? "No items in this category yet."
               : "Be the first to submit inspiring content!"}
           </p>
+          {!user && (
+            <div className="mt-4 flex justify-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => router.push("/auth/signup?redirect=/inspiration/new")}>Create Account</Button>
+              <Button variant="outline" size="sm" onClick={() => router.push("/auth/login?redirect=/inspiration/new")}>Sign In</Button>
+            </div>
+          )}
         </div>
       )}
 

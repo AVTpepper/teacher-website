@@ -1,11 +1,14 @@
 export default function PrivacyPage() {
   const lastUpdated = "May 12, 2026";
   return (
-    <div className="max-w-3xl mx-auto py-12 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Privacy Policy</h1>
-        <p className="mt-2 text-xs text-muted">Last updated: {lastUpdated}</p>
+    <div className="pb-12 space-y-8">
+      <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Legal</p>
+        <h1 className="mt-1 text-3xl font-bold">Privacy Policy</h1>
+        <p className="mt-2 text-xs text-primary-200/90">Last updated: {lastUpdated}</p>
       </div>
+
+      <div className="max-w-3xl mx-auto space-y-8">
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">1. Information We Collect</h2>
@@ -41,6 +44,7 @@ export default function PrivacyPage() {
         <h2 className="text-lg font-semibold text-foreground">7. Contact</h2>
         <p className="text-muted leading-relaxed">If you have any questions about this Privacy Policy, please <a href="/contact" className="text-primary-900 hover:underline">contact us</a>.</p>
       </section>
+      </div>
     </div>
   );
 }

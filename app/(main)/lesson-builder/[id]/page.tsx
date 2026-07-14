@@ -421,7 +421,7 @@ export default function LessonDetailPage({
                 <p className="text-xs text-muted mb-3">Create a free account to view the full lesson plan.</p>
                 <div className="flex justify-center gap-2">
                   <Link href="/auth/signup">
-                    <Button variant="primary" size="sm">Create Account</Button>
+                    <Button variant="secondary" size="sm">Create Account</Button>
                   </Link>
                   <Link href="/auth/login">
                     <Button variant="outline" size="sm">Sign In</Button>
@@ -545,10 +545,10 @@ export default function LessonDetailPage({
                 </p>
                 <div className="flex justify-center gap-2">
                   <Link href="/auth/login">
-                    <Button size="sm">Sign In</Button>
+                    <Button variant="outline" size="sm">Sign In</Button>
                   </Link>
                   <Link href="/auth/signup">
-                    <Button variant="outline" size="sm">Create Account</Button>
+                    <Button variant="secondary" size="sm">Create Account</Button>
                   </Link>
                 </div>
               </div>

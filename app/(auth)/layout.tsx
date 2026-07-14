@@ -13,7 +13,7 @@ export default function AuthLayout({
       >
         EduConnect
       </Link>
-      <div className="w-full max-w-md">{children}</div>
+      <div className="w-full max-w-md rounded-2xl border border-primary-300/60 bg-surface/90 p-1 shadow-xl shadow-primary-900/10">{children}</div>
     </div>
   );
 }

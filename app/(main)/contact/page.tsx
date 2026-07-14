@@ -17,14 +17,16 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto py-12 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Contact Us</h1>
-        <p className="mt-3 text-muted text-base leading-relaxed">
+    <div className="pb-12 space-y-8">
+      <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Support</p>
+        <h1 className="mt-1 text-3xl font-bold">Contact Us</h1>
+        <p className="mt-2 text-primary-100/90 text-base leading-relaxed max-w-xl">
           Have a question, feedback, or just want to say hello? We read every message.
         </p>
       </div>
 
+      <div className="max-w-xl mx-auto space-y-8">
       {submitted ? (
         <div className="rounded-xl border border-success-200 bg-success-50 p-8 text-center">
           <p className="text-3xl mb-3">✅</p>
@@ -61,6 +63,7 @@ export default function ContactPage() {
           </Button>
         </form>
       )}
+      </div>
     </div>
   );
 }

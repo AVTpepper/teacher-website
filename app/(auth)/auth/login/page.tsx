@@ -127,7 +127,7 @@ function LoginForm() {
   }
 
   return (
-    <Card padding="lg">
+    <Card padding="lg" className="border-primary-300/60 bg-surface/95">
       {showForgot ? (
         /* ===== Forgot Password View ===== */
         <>
@@ -159,7 +159,7 @@ function LoginForm() {
                   autoComplete="email"
                   required
                 />
-                <Button type="submit" className="w-full" isLoading={forgotLoading}>
+                <Button type="submit" variant="secondary" className="w-full" isLoading={forgotLoading}>
                   Send Reset Link
                 </Button>
               </form>
@@ -169,7 +169,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => { setShowForgot(false); setForgotSent(false); setForgotError(""); }}
-            className="mt-5 w-full text-center text-sm text-primary-900 hover:text-primary-700 font-medium"
+            className="mt-5 w-full text-center text-sm text-primary-900 hover:text-primary-700 font-semibold"
           >
             ← Back to Sign In
           </button>
@@ -233,7 +233,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => { setShowForgot(true); setForgotEmail(email); }}
-            className="text-xs text-primary-900 hover:text-primary-700 font-medium cursor-pointer"
+            className="text-xs text-primary-900 hover:text-primary-700 font-semibold cursor-pointer"
           >
             Forgot password?
           </button>
@@ -241,6 +241,7 @@ function LoginForm() {
 
         <Button
           type="submit"
+          variant="secondary"
           className="w-full"
           isLoading={loading}
         >
@@ -286,7 +287,7 @@ function LoginForm() {
         Don&apos;t have an account?{" "}
         <Link
           href="/auth/signup"
-          className="font-medium text-primary-900 hover:text-primary-700"
+          className="font-semibold text-primary-900 hover:text-primary-700"
         >
           Create one
         </Link>

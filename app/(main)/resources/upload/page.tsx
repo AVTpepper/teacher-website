@@ -88,6 +88,10 @@ function UploadResourceForm() {
         <p className="mt-1 text-sm text-muted">
           You need to be logged in to share resources with the community.
         </p>
+        <div className="mt-4 flex justify-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => router.push("/auth/signup?redirect=/resources/upload")}>Create Account</Button>
+          <Button variant="outline" size="sm" onClick={() => router.push("/auth/login?redirect=/resources/upload")}>Sign In</Button>
+        </div>
       </div>
     );
   }
@@ -244,12 +248,13 @@ function UploadResourceForm() {
   );
 
   return (
-    <div className="mx-auto max-w-2xl py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">
+    <div className="mx-auto max-w-2xl pb-8">
+      <div className="-mx-4 -mt-4 mb-6 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Creator Studio</p>
+        <h1 className="text-2xl font-bold">
           {isEditMode ? "Edit Resource" : "Upload Resource"}
         </h1>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-sm text-primary-100/90">
           {isEditMode
             ? "Update your resource details below."
             : "Share a teaching resource with the EduConnect community."}

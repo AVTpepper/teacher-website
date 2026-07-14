@@ -94,7 +94,7 @@ export default function SignupPage() {
   }
 
   return (
-    <Card padding="lg">
+    <Card padding="lg" className="border-primary-300/60 bg-surface/95">
       <h1 className="text-2xl font-bold text-foreground text-center">
         Create Account
       </h1>
@@ -184,7 +184,7 @@ export default function SignupPage() {
           </button>
         </div>
 
-        <Button type="submit" className="w-full" isLoading={loading}>
+        <Button type="submit" variant="secondary" className="w-full" isLoading={loading}>
           Create Account
         </Button>
       </form>
@@ -227,7 +227,7 @@ export default function SignupPage() {
         Already have an account?{" "}
         <Link
           href="/auth/login"
-          className="font-medium text-primary-900 hover:text-primary-700"
+          className="font-semibold text-primary-900 hover:text-primary-700"
         >
           Sign in
         </Link>

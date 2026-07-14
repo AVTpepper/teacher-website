@@ -102,16 +102,18 @@ export default function ForumsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="-mx-4 -mt-4 flex items-center justify-between flex-wrap gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl sm:p-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Forums</h1>
-          <p className="mt-1 text-sm text-muted">
+          <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Community Voice</p>
+          <h1 className="mt-1 text-2xl font-bold">Forums</h1>
+          <p className="mt-2 text-sm text-primary-100/90">
             Browse discussion categories and join conversations with fellow
             educators.
           </p>
         </div>
         {user && (
           <Button
+            variant="secondary"
             onClick={() => {
               if (selectedCategory) {
                 openNewThread();
@@ -147,7 +149,7 @@ export default function ForumsPage() {
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="rounded-xl border border-border bg-surface shadow-card p-5 animate-pulse"
+                className="rounded-xl border border-primary-100 bg-secondary-50 shadow-card p-5 animate-pulse"
               >
                 <div className="h-10 w-10 rounded-lg bg-secondary-100 mb-3" />
                 <div className="h-4 w-2/3 bg-secondary-100 rounded mb-2" />
@@ -163,6 +165,7 @@ export default function ForumsPage() {
                 key={cat.id}
                 padding="lg"
                 hoverable
+                className="border-primary-100 bg-secondary-50/70"
                 onClick={() => selectCategory(cat.id)}
               >
                 <div className="text-3xl mb-3">{cat.icon}</div>
@@ -195,7 +198,7 @@ export default function ForumsPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={backToCategories}
-              className="flex items-center gap-1 text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
+              className="flex items-center gap-1 text-sm text-primary-800 hover:text-primary-950 transition-colors cursor-pointer"
             >
               <svg
                 className="h-4 w-4"
@@ -215,7 +218,7 @@ export default function ForumsPage() {
           </div>
 
           {selectedCategoryData && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 rounded-xl border border-primary-100 bg-secondary-50/70 p-4">
               <span className="text-3xl">{selectedCategoryData.icon}</span>
               <div>
                 <h2 className="text-xl font-bold text-foreground">

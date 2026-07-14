@@ -311,10 +311,11 @@ function SearchInner() {
   const showJobs = activeTab === "all" || activeTab === "jobs";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       {/* Search box */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground mb-3">Search</h1>
+      <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Explore</p>
+        <h1 className="text-2xl font-bold mb-3">Search</h1>
         <form onSubmit={handleSubmit} className="flex gap-2">
           <div className="flex-1">
             <Input
@@ -337,6 +338,14 @@ function SearchInner() {
           <p className="text-sm text-muted mt-1">
             Search across educators, resources, forum discussions, lesson plans, and jobs.
           </p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Link href="/auth/signup">
+              <Button variant="secondary" size="sm">Create Account</Button>
+            </Link>
+            <Link href="/auth/login">
+              <Button variant="outline" size="sm">Sign In</Button>
+            </Link>
+          </div>
         </div>
       )}
 
@@ -381,6 +390,14 @@ function SearchInner() {
               <p className="text-sm text-muted mt-1">
                 No matches for <span className="font-semibold">&ldquo;{initialQuery}&rdquo;</span>. Try a different search term.
               </p>
+              <div className="mt-4 flex justify-center gap-2">
+                <Link href="/auth/signup">
+                  <Button variant="secondary" size="sm">Create Account</Button>
+                </Link>
+                <Link href="/auth/login">
+                  <Button variant="outline" size="sm">Sign In</Button>
+                </Link>
+              </div>
             </div>
           )}
 

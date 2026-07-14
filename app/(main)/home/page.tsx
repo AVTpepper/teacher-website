@@ -118,9 +118,10 @@ function HomePageInner() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Home Feed</h1>
-        <p className="mt-1 text-sm text-muted">
+      <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl sm:p-6">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Daily Hub</p>
+        <h1 className="mt-1 text-2xl font-bold">Home Feed</h1>
+        <p className="mt-2 text-sm text-primary-100/90">
           Your personalized educator feed with posts, trending discussions, and
           more.
         </p>
@@ -169,8 +170,8 @@ function HomePageInner() {
             onClick={() => handleTypeChange(f.value)}
             className={`shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
               typeFilter === f.value
-                ? "bg-primary-900 text-white border-primary-900"
-                : "bg-surface border-border text-muted hover:border-primary-900 hover:text-primary-900"
+                ? "bg-accent-300 text-primary-950 border-accent-400"
+                : "bg-surface/90 border-primary-200 text-primary-800 hover:border-primary-500 hover:text-primary-900 hover:bg-primary-50"
             }`}
           >
             {f.label}
@@ -233,7 +234,7 @@ function HomePageInner() {
                 Create a free account to view the full educator feed and join the conversation.
               </p>
               <div className="mt-4 flex justify-center gap-3">
-                <Button variant="primary" onClick={() => router.push("/auth/signup")}>
+                <Button variant="secondary" onClick={() => router.push("/auth/signup")}>
                   Create Account
                 </Button>
                 <Button variant="outline" onClick={() => router.push("/auth/login")}>

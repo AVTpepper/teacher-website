@@ -109,9 +109,14 @@ export default function NotificationsPage() {
     return (
       <div className="py-20 text-center">
         <h2 className="text-lg font-semibold text-foreground">Sign in to view notifications</h2>
-        <Button variant="primary" className="mt-4" onClick={() => router.push("/auth/login?redirect=/notifications")}>
-          Sign In
-        </Button>
+        <div className="mt-4 flex justify-center gap-2">
+          <Button variant="secondary" onClick={() => router.push("/auth/signup?redirect=/notifications")}>
+            Create Account
+          </Button>
+          <Button variant="primary" onClick={() => router.push("/auth/login?redirect=/notifications")}>
+            Sign In
+          </Button>
+        </div>
       </div>
     );
   }
@@ -119,18 +124,19 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="mx-auto max-w-2xl py-8">
+    <div className="mx-auto max-w-2xl pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="-mx-4 -mt-4 mb-6 flex items-center justify-between border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Notifications</h1>
+          <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Inbox</p>
+          <h1 className="text-2xl font-bold">Notifications</h1>
           {unreadCount > 0 && (
-            <p className="text-sm text-muted mt-0.5">{unreadCount} unread</p>
+            <p className="text-sm text-primary-100/90 mt-0.5">{unreadCount} unread</p>
           )}
         </div>
         {unreadCount > 0 && (
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={handleMarkAllRead}
             isLoading={markingAll}
@@ -153,6 +159,10 @@ export default function NotificationsPage() {
           <p className="text-4xl mb-3">🔔</p>
           <p className="text-base font-medium text-foreground">No notifications yet</p>
           <p className="text-sm text-muted mt-1">You&apos;ll see activity here when others interact with your content.</p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => router.push("/resources")}>Explore Resources</Button>
+            <Button variant="outline" size="sm" onClick={() => router.push("/forums")}>Browse Forums</Button>
+          </div>
         </div>
       )}
 

@@ -26,9 +26,10 @@ export default function PostJobPage() {
     return (
       <div className="py-16 text-center">
         <p className="text-foreground font-medium">You must be signed in to post a job.</p>
-        <Button variant="primary" className="mt-4" onClick={() => router.push("/auth/login")}>
-          Sign In
-        </Button>
+        <div className="mt-4 flex justify-center gap-2">
+          <Button variant="secondary" onClick={() => router.push("/auth/signup?redirect=/jobs/new")}>Create Account</Button>
+          <Button variant="primary" onClick={() => router.push("/auth/login?redirect=/jobs/new")}>Sign In</Button>
+        </div>
       </div>
     );
   }
@@ -66,10 +67,11 @@ export default function PostJobPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Post a Job</h1>
-        <p className="mt-1 text-sm text-muted">
+    <div className="max-w-2xl mx-auto space-y-6 pb-8">
+      <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Hiring</p>
+        <h1 className="text-2xl font-bold">Post a Job</h1>
+        <p className="mt-1 text-sm text-primary-100/90">
           Share a teaching or education-related position with the community.
         </p>
       </div>

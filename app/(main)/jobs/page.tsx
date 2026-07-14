@@ -116,23 +116,25 @@ export default function JobsPage() {
   const hasFilters = !!(gradeLevel || subject || jobType || locationQuery);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="-mx-4 -mt-4 flex flex-col gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Job Board</h1>
-          <p className="mt-1 text-sm text-muted">
+          <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Opportunities</p>
+          <h1 className="text-2xl font-bold">Job Board</h1>
+          <p className="mt-1 text-sm text-primary-100/90">
             Find education job opportunities for full time, part time, contract, and substitute positions.
           </p>
         </div>
         {user ? (
           <Link href="/jobs/new">
-            <Button variant="primary">+ Post Job</Button>
+            <Button variant="secondary">+ Post Job</Button>
           </Link>
         ) : (
-          <p className="text-sm text-muted">
-            <a href="/auth/login" className="text-primary underline">Sign in</a> to post a job.
-          </p>
+          <div className="flex items-center gap-2 text-sm text-primary-100/90">
+            <Link href="/auth/signup"><Button variant="secondary" size="sm">Create Account</Button></Link>
+            <Link href="/auth/login"><Button variant="outline" size="sm">Sign In</Button></Link>
+          </div>
         )}
       </div>
 
@@ -190,6 +192,12 @@ export default function JobsPage() {
             <Button variant="ghost" size="sm" onClick={clearFilters} className="mt-3">
               Clear Filters
             </Button>
+          )}
+          {!hasFilters && (
+            <div className="mt-4 flex justify-center gap-2">
+              <Link href="/auth/signup"><Button variant="secondary" size="sm">Create Account</Button></Link>
+              <Link href="/auth/login"><Button variant="outline" size="sm">Sign In</Button></Link>
+            </div>
           )}
         </div>
       )}

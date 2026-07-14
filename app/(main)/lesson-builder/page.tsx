@@ -484,11 +484,12 @@ export default function LessonBuilderPage() {
   const latestDraft = drafts[0] ?? null;
 
   return (
-    <div className="py-8">
+    <div className="pb-8">
       {/* Page header */}
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Lesson Builder</h1>
-        <p className="mt-2 text-base text-muted">How would you like to create your lesson?</p>
+      <div className="-mx-4 -mt-4 mb-8 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-center text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:rounded-t-2xl">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Lesson Studio</p>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight">Lesson Builder</h1>
+        <p className="mt-2 text-base text-primary-100/90">How would you like to create your lesson?</p>
       </div>
 
       {/* Draft resume banner */}
@@ -516,7 +517,7 @@ export default function LessonBuilderPage() {
         {/* Create My Own */}
         <Link
           href="/lesson-builder/new?path=manual"
-          className="group flex flex-col items-center gap-3 rounded-xl border-2 border-border bg-surface p-8 text-center transition-colors hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+          className="group flex flex-col items-center gap-3 rounded-xl border-2 border-primary-200 bg-secondary-50/70 p-8 text-center transition-colors hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
         >
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-primary-700 group-hover:bg-primary-200 transition-colors" aria-hidden="true">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -531,7 +532,7 @@ export default function LessonBuilderPage() {
         {isAvailable ? (
           <Link
             href="/lesson-builder/new?path=ai"
-            className="group flex flex-col items-center gap-3 rounded-xl border-2 border-border bg-surface p-8 text-center transition-colors hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            className="group flex flex-col items-center gap-3 rounded-xl border-2 border-primary-200 bg-secondary-50/70 p-8 text-center transition-colors hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-primary-700 group-hover:bg-primary-200 transition-colors" aria-hidden="true">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -545,7 +546,7 @@ export default function LessonBuilderPage() {
           <div
             aria-disabled="true"
             title="AI features are not available in this environment"
-            className="flex flex-col items-center gap-3 rounded-xl border-2 border-border bg-surface p-8 text-center opacity-50 cursor-not-allowed"
+            className="flex flex-col items-center gap-3 rounded-xl border-2 border-primary-200 bg-secondary-50/70 p-8 text-center opacity-50 cursor-not-allowed"
           >
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-primary-700" aria-hidden="true">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -560,7 +561,7 @@ export default function LessonBuilderPage() {
 
       {/* My Lessons tabbed section */}
       {user && (
-        <Card padding="lg" className="mb-8">
+        <Card padding="lg" className="mb-8 border-primary-200 bg-secondary-50/70">
           {/* Tab bar */}
           <div className="flex items-center gap-1 border-b border-border mb-4 -mx-6 px-6" role="tablist" aria-label="My lessons">
             <button
