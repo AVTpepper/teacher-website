@@ -14,6 +14,7 @@ import type { DocumentSnapshot } from "firebase/firestore";
 import CreatePost from "@/components/posts/CreatePost";
 import PostCard from "@/components/posts/PostCard";
 import Button from "@/components/ui/Button";
+import HorizontalScrollHint from "@/components/ui/HorizontalScrollHint";
 
 const TYPE_FILTERS: { label: string; value: PostType | "" }[] = [
   { label: "All", value: "" },
@@ -162,7 +163,10 @@ function HomePageInner() {
       )}
 
       {/* Type filters */}
-      <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5">
+      <HorizontalScrollHint
+        innerClassName="flex gap-2 pb-0.5"
+        nudgeKey="home-feed-type-filters"
+      >
         {TYPE_FILTERS.map((f) => (
           <button
             key={f.value}
@@ -177,7 +181,7 @@ function HomePageInner() {
             {f.label}
           </button>
         ))}
-      </div>
+      </HorizontalScrollHint>
 
       {/* Feed */}
       {loading ? (

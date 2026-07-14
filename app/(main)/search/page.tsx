@@ -19,6 +19,7 @@ import { threadSlug, type ForumThread } from "@/lib/firestore/forums";
 import { type Lesson } from "@/lib/firestore/lessons";
 import { type UserProfile } from "@/lib/firestore/users";
 import { Avatar, Badge, Button, Card, Input, SearchResultCard } from "@/components/ui";
+import HorizontalScrollHint from "@/components/ui/HorizontalScrollHint";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -358,7 +359,11 @@ function SearchInner() {
       {!loading && results !== null && (
         <>
           {/* Tab bar */}
-          <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-border" role="tablist">
+          <HorizontalScrollHint
+            innerClassName="flex gap-1 border-b border-border"
+            role="tablist"
+            nudgeKey="search-tabs"
+          >
             {TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -380,7 +385,7 @@ function SearchInner() {
                 )}
               </button>
             ))}
-          </div>
+          </HorizontalScrollHint>
 
           {/* Zero results */}
           {totalCount === 0 && (

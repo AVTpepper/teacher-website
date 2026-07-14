@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import HorizontalScrollHint from "@/components/ui/HorizontalScrollHint";
 
 interface Tab {
   label: string;
@@ -56,9 +57,11 @@ export default function Tabs({
   }
 
   return (
-    <div
-      className={`flex gap-1 border-b border-border overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
+    <HorizontalScrollHint
+      className={className}
+      innerClassName="flex gap-1 border-b border-border"
       role="tablist"
+      nudgeKey="tabs-underline"
     >
       {tabs.map((tab) => (
         <button
@@ -76,6 +79,6 @@ export default function Tabs({
           {tab.label}
         </button>
       ))}
-    </div>
+    </HorizontalScrollHint>
   );
 }

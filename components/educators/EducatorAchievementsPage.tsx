@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Button, Card } from "@/components/ui";
+import HorizontalScrollHint from "@/components/ui/HorizontalScrollHint";
 import { BADGE_LIST, checkAndAwardBadges } from "@/lib/badges";
 import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { getPostCountByAuthor } from "@/lib/firestore/posts";
@@ -255,7 +256,7 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
       <Card className="mt-5 p-5">
         <div className="flex flex-col gap-3">
 
-          <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <HorizontalScrollHint nudgeKey="achievements-status-filter">
             <div className="inline-flex min-w-max rounded-lg border border-border bg-background p-1">
             {(["all", "earned", "locked"] as const).map((status) => (
               <button
@@ -272,9 +273,9 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
               </button>
             ))}
             </div>
-          </div>
+          </HorizontalScrollHint>
 
-          <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <HorizontalScrollHint nudgeKey="achievements-category-filter">
             <div className="inline-flex min-w-max rounded-lg border border-border bg-background p-1">
             {(["all", "contribution", "milestone", "expertise", "verification"] as const).map((cat) => (
               <button
@@ -291,7 +292,7 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
               </button>
             ))}
             </div>
-          </div>
+          </HorizontalScrollHint>
         </div>
 
         {filteredAchievementItems.length === 0 ? (
