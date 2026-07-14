@@ -199,7 +199,7 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`inline-flex rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                className={`block w-max rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   isActive(link.href)
                       ? "bg-accent-300 text-primary-950"
                       : "text-primary-100 hover:bg-primary-800 hover:text-accent-100"
