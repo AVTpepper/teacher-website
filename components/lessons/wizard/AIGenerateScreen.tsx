@@ -474,26 +474,6 @@ export default function AIGenerateScreen({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-            <div>
-              <label htmlFor="ai-topic" className="block text-sm font-medium text-foreground mb-1.5">
-                Topic <span aria-hidden="true" className="text-red-500">*</span>
-              </label>
-              <textarea
-                id="ai-topic"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                maxLength={300}
-                required
-                aria-required="true"
-                placeholder="e.g. Introduction to fractions using real-world examples"
-                rows={3}
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-              />
-              <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
-                {topic.length} / 300
-              </p>
-            </div>
-
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="ai-grade-level" className="block text-sm font-medium text-foreground mb-1.5">
@@ -530,6 +510,26 @@ export default function AIGenerateScreen({
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="ai-topic" className="block text-sm font-medium text-foreground mb-1.5">
+                Topic <span aria-hidden="true" className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="ai-topic"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                maxLength={300}
+                required
+                aria-required="true"
+                placeholder="e.g. Introduction to fractions using real-world examples"
+                rows={3}
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              />
+              <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
+                {topic.length} / 300
+              </p>
             </div>
 
             <div>
