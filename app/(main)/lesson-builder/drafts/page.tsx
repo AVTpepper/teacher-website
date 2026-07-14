@@ -26,7 +26,7 @@ export default function LessonDraftsPage() {
       setLoading(true);
       setError("");
       try {
-        const result = await getLessonsByAuthor(user.uid, true, null, 100);
+        const result = await getLessonsByAuthor(user.uid, true, null);
         setDrafts(result.lessons.filter((lesson) => !lesson.isPublic));
       } catch {
         setError("Failed to load drafts.");

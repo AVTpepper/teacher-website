@@ -481,7 +481,7 @@ export async function getThreadComments(
 
   return snapshot.docs.map((d) =>
     migrateLegacyCommentFields(
-      doc(db, "forums", categoryId, "threads", threadId, "comments", d.id),
+      doc(db!, "forums", categoryId, "threads", threadId, "comments", d.id),
       d.data() as ThreadComment
     )
   );

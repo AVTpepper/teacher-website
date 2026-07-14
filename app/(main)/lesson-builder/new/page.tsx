@@ -130,6 +130,14 @@ function LessonBuilderNewEntry() {
         return;
       }
 
+      if (!draftParam) {
+        if (!cancelled) {
+          setCompleteLoadError("Draft not found.");
+          setCompleteLoading(false);
+        }
+        return;
+      }
+
       if (!cancelled) {
         setCompleteLoading(true);
         setCompleteLoadError(null);
@@ -172,6 +180,22 @@ function LessonBuilderNewEntry() {
     let cancelled = false;
 
     async function loadEditOrRemixLesson() {
+      if (!user) {
+        if (!cancelled) {
+          setEditLoadError("Sign in to edit or remix lessons.");
+          setEditLoading(false);
+        }
+        return;
+      }
+
+      if (!lessonId) {
+        if (!cancelled) {
+          setEditLoadError("Lesson not found.");
+          setEditLoading(false);
+        }
+        return;
+      }
+
       if (!cancelled) {
         setEditLoading(true);
         setEditLoadError(null);

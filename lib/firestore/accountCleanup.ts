@@ -21,13 +21,17 @@ function requireCleanupDb() {
 
 async function deleteSubcollectionDocs(path: string[]) {
   const firestore = requireCleanupDb();
-  const snapshot = await getDocs(collection(firestore, ...path));
+  const [firstSegment, ...restSegments] = path;
+  if (!firstSegment) return;
+  const snapshot = await getDocs(collection(firestore, firstSegment, ...restSegments));
   await Promise.all(snapshot.docs.map((entry) => deleteDoc(entry.ref)));
 }
 
 async function deleteCommentCollection(path: string[], nestedSubcollections: string[]) {
   const firestore = requireCleanupDb();
-  const snapshot = await getDocs(collection(firestore, ...path));
+  const [firstSegment, ...restSegments] = path;
+  if (!firstSegment) return;
+  const snapshot = await getDocs(collection(firestore, firstSegment, ...restSegments));
 
   for (const commentDoc of snapshot.docs) {
     for (const subcollectionName of nestedSubcollections) {

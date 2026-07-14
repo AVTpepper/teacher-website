@@ -297,7 +297,7 @@ export async function getPostComments(
 
   return snapshot.docs.map((d) =>
     migrateLegacyCommentFields(
-      doc(db, "posts", postId, "comments", d.id),
+      doc(db!, "posts", postId, "comments", d.id),
       d.data() as PostComment
     )
   );

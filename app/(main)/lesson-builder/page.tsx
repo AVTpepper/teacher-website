@@ -446,7 +446,7 @@ export default function LessonBuilderPage() {
       setBookmarkedLoading(true);
       try {
         const [lessonsResult, bookmarks] = await Promise.all([
-          getLessonsByAuthor(user.uid, true, null, 200),
+          getLessonsByAuthor(user.uid, true, null),
           getUserBookmarks(user.uid),
         ]);
         setDrafts(lessonsResult.lessons.filter((l) => !l.isPublic));

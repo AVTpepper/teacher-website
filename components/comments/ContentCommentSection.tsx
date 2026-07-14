@@ -139,7 +139,6 @@ export default function ContentCommentSection({
     if (refreshComments) {
       await refreshComments();
     }
-    return result;
   }
 
   return (

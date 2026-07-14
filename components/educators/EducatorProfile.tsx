@@ -166,11 +166,11 @@ export default function EducatorProfile({ userId }: { userId: string }) {
       try {
         if (isOwnProfile) {
           // Own profile: show all lessons (published + drafts)
-          const result = await getLessonsByAuthor(userId, true, null, 100);
+          const result = await getLessonsByAuthor(userId, true, null);
           setLessons(result.lessons);
         } else {
           // Other profiles: only published
-          const result = await getLessonsByAuthor(userId, false, null, 100);
+          const result = await getLessonsByAuthor(userId, false, null);
           setLessons(result.lessons);
         }
       } catch {

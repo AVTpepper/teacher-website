@@ -201,7 +201,6 @@ function CommentItem({
           authorId: user.uid,
           authorName: user.displayName || "Anonymous",
           authorPhotoURL: user.photoURL,
-          mentionedUsers: replyMentions,
           content: replyText.trim(),
           mentionedUsers: [...replyMentions],
           createdAt: { seconds: Date.now() / 1000 },
@@ -290,6 +289,7 @@ function CommentItem({
                 hasLikedComment={hasLikedComment}
                 onUpdateComment={onUpdateComment}
                 onDeleteComment={onDeleteComment}
+                replyPlaceholder={replyPlaceholder}
                 onSelfDeleted={(replyId, hasSubReplies) => {
                   if (hasSubReplies) {
                     setLocalReplies((prev) =>

@@ -315,7 +315,7 @@ export async function getLessonComments(
 
   return snapshot.docs.map((d) =>
     migrateLegacyCommentFields(
-      doc(db, "lessons", lessonId, "comments", d.id),
+      doc(db!, "lessons", lessonId, "comments", d.id),
       d.data() as LessonComment
     )
   );

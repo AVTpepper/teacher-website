@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import LandingPage from "@/components/landing/LandingPage";
 import Spinner from "@/components/ui/Spinner";
 
-export default function RootPage() {
+function RootPageContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -35,4 +35,18 @@ export default function RootPage() {
   }
 
   return <LandingPage />;
+}
+
+export default function RootPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <Spinner size="lg" />
+        </div>
+      }
+    >
+      <RootPageContent />
+    </Suspense>
+  );
 }

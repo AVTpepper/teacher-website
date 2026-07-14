@@ -390,7 +390,7 @@ export default function ForumThreadPage({
               await updateThreadComment(categoryId, threadId, commentId, text);
             }}
             deleteComment={async (commentId) => {
-              if (!categoryId) return;
+              if (!categoryId) return { removed: false, tombstoned: false };
               return deleteThreadComment(categoryId, threadId, commentId);
             }}
             refreshComments={async () => {

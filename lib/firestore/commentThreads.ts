@@ -30,8 +30,13 @@ export async function deleteCommentWithReplies(
   options: DeleteCommentOptions
 ): Promise<DeleteCommentResult> {
   const db = requireDb();
-  const commentsRef = collection(db, ...options.collectionPath);
-  const commentRef = doc(db, ...options.collectionPath, options.commentId);
+  const [commentsRoot, ...commentPathRest] = options.collectionPath;
+  if (!commentsRoot) {
+    throw new Error("Comment collection path is required");
+  }
+
+  const commentsRef = collection(db, commentsRoot, ...commentPathRest);
+  const commentRef = doc(db, commentsRoot, ...commentPathRest, options.commentId);
 
   const childSnapshot = await getDocs(
     query(commentsRef, where("parentId", "==", options.commentId), limit(1))
@@ -50,13 +55,23 @@ export async function deleteCommentWithReplies(
   await deleteDoc(commentRef);
 
   if (options.countTargetPath && options.countField) {
-    await updateDoc(doc(db, ...options.countTargetPath), {
+    const [countRoot, ...countPathRest] = options.countTargetPath;
+    if (!countRoot) {
+      throw new Error("Count target path is required");
+    }
+
+    await updateDoc(doc(db, countRoot, ...countPathRest), {
       [options.countField]: increment(-1),
     });
   }
 
   if (options.touchTargetPath) {
-    await updateDoc(doc(db, ...options.touchTargetPath), {
+    const [touchRoot, ...touchPathRest] = options.touchTargetPath;
+    if (!touchRoot) {
+      throw new Error("Touch target path is required");
+    }
+
+    await updateDoc(doc(db, touchRoot, ...touchPathRest), {
       updatedAt: serverTimestamp(),
     });
   }

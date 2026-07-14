@@ -441,7 +441,7 @@ export async function getResourceComments(
 
   return snapshot.docs.map((d) =>
     migrateLegacyCommentFields(
-      doc(db, "resources", resourceId, "comments", d.id),
+      doc(db!, "resources", resourceId, "comments", d.id),
       d.data() as ResourceComment
     )
   );
