@@ -10,10 +10,11 @@ import {
   getUserVote,
   getThreadComments,
   addThreadComment,
+  likeThreadComment,
+  unlikeThreadComment,
+  hasLikedThreadComment,
   updateThreadComment,
   deleteThreadComment,
-  upvoteComment,
-  getUserCommentVote,
   FORUM_CATEGORIES,
   type ForumThread,
   type ThreadComment,
@@ -22,9 +23,10 @@ import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Tag from "@/components/ui/Tag";
-import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
+import ContentCommentSection from "@/components/comments/ContentCommentSection";
+import { type CommentData } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
-import { notifyUpvote, notifyComment, notifyCommentReplied, notifyMention } from "@/lib/notifications";
+import { notifyUpvote } from "@/lib/notifications";
 
 // ─── Main page component ───
 
@@ -52,6 +54,7 @@ export default function ForumThreadPage({
   const [loadingComments, setLoadingComments] = useState(false);
   const [replySort, setReplySort] = useState<"newest" | "top">("newest");
   const [copied, setCopied] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
 
   const loadComments = useCallback(
     async (catId: string) => {
@@ -79,6 +82,7 @@ export default function ForumThreadPage({
         setThread(result.thread);
         setCategoryId(result.categoryId);
         setUpvotes(result.thread.upvotes);
+        setCommentCount(result.thread.commentCount);
         loadComments(result.categoryId);
       } catch {
         setNotFound(true);
@@ -193,8 +197,9 @@ export default function ForumThreadPage({
     content: c.content,
     mentionedUsers: c.mentionedUsers,
     createdAt: c.createdAt as { seconds: number } | null,
-    upvotes: c.upvotes,
-    downvotes: c.downvotes,
+    editedAt: c.editedAt as { seconds: number } | null,
+    deleted: c.deleted,
+    likesCount: c.likesCount ?? 0,
   }));
 
   const sortedCommentData =
@@ -202,7 +207,7 @@ export default function ForumThreadPage({
       ? [
           ...commentData
             .filter((c) => !c.parentId)
-            .sort((a, b) => (b.upvotes ?? 0) - (b.downvotes ?? 0) - ((a.upvotes ?? 0) - (a.downvotes ?? 0))),
+            .sort((a, b) => (b.likesCount ?? 0) - (a.likesCount ?? 0)),
           ...commentData.filter((c) => !!c.parentId),
         ]
       : commentData;
@@ -315,7 +320,7 @@ export default function ForumThreadPage({
           </div>
 
           <span className="text-sm text-muted">
-            {thread.commentCount} {thread.commentCount === 1 ? "reply" : "replies"}
+            {commentCount} {commentCount === 1 ? "comment" : "comments"}
           </span>
 
           <button
@@ -335,7 +340,7 @@ export default function ForumThreadPage({
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">
-            Replies ({comments.length})
+            Comments ({commentCount})
           </h2>
           {comments.length > 1 && (
             <div className="flex items-center gap-1 text-sm">
@@ -359,76 +364,53 @@ export default function ForumThreadPage({
         </div>
 
         <div className="rounded-xl border border-border bg-surface p-4">
-          <CommentThread
+          <ContentCommentSection
             comments={sortedCommentData}
             loading={loadingComments}
-            maxDepth={2}
-            mode="upvote"
-            onAddComment={async (content, parentId, mentionedUsers) => {
+            title=""
+            ownerId={thread.authorId}
+            contentLabel={`your discussion "${thread.title}"`}
+            linkURL={typeof window !== "undefined" ? window.location.href : `/forums/${rawId}`}
+            maxDepth={1}
+            mode="like"
+            composerPlaceholder="Add a comment..."
+            addComment={async ({ parentId, authorId, authorName, authorPhotoURL, content, mentionedUsers }) => {
               if (!categoryId) throw new Error("No category");
-              const newId = await addThreadComment(categoryId, threadId, {
+              return addThreadComment(categoryId, threadId, {
                 parentId,
-                authorId: user!.uid,
-                authorName: user!.displayName || "Anonymous",
-                authorPhotoURL: user!.photoURL,
+                authorId,
+                authorName,
+                authorPhotoURL,
                 content,
-                mentionedUsers: mentionedUsers ?? [],
+                mentionedUsers,
               });
-              // Notify thread author when someone comments (fire-and-forget)
-              if (thread && thread.authorId !== user!.uid && !parentId) {
-                notifyComment({
-                  recipientId: thread.authorId,
-                  actorId: user!.uid,
-                  actorName: user!.displayName || "Someone",
-                  actorPhotoURL: user!.photoURL,
-                  contentLabel: `your discussion "${thread.title}"`,
-                  linkURL: window.location.href,
-                }).catch(() => {});
-              }
-              // Notify parent comment author on reply (fire-and-forget)
-              if (parentId) {
-                const parentComment = comments.find((c) => c.id === parentId);
-                if (parentComment && parentComment.authorId !== user!.uid) {
-                  notifyCommentReplied({
-                    recipientId: parentComment.authorId,
-                    actorId: user!.uid,
-                    actorName: user!.displayName || "Someone",
-                    actorPhotoURL: user!.photoURL,
-                    linkURL: window.location.href,
-                  }).catch(() => {});
-                }
-              }
-              // Fire mention notifications (fire-and-forget)
-              if (mentionedUsers?.length) {
-                mentionedUsers.forEach(({ uid }) => {
-                  if (uid !== user!.uid) {
-                    notifyMention({
-                      recipientId: uid,
-                      actorId: user!.uid,
-                      actorName: user!.displayName || "Anonymous",
-                      actorPhotoURL: user!.photoURL,
-                      linkURL: window.location.href,
-                    }).catch(() => {});
-                  }
-                });
-              }
-              return newId;
             }}
-            onUpvote={async (commentId) => {
-              if (!categoryId || !user) return;
-              await upvoteComment(categoryId, threadId, commentId, user.uid);
-            }}
-            onUpdateComment={async (commentId, text) => {
+            updateComment={async (commentId, text) => {
               if (!categoryId) return;
               await updateThreadComment(categoryId, threadId, commentId, text);
             }}
-            onDeleteComment={async (commentId) => {
+            deleteComment={async (commentId) => {
               if (!categoryId) return;
-              await deleteThreadComment(categoryId, threadId, commentId);
+              return deleteThreadComment(categoryId, threadId, commentId);
             }}
-            getUserVote={async (commentId) => {
-              if (!categoryId || !user) return null;
-              return getUserCommentVote(categoryId, threadId, commentId, user.uid);
+            refreshComments={async () => {
+              if (!categoryId) return;
+              await loadComments(categoryId);
+            }}
+            onCommentAdded={() => setCommentCount((count) => count + 1)}
+            onCommentRemoved={() => setCommentCount((count) => Math.max(0, count - 1))}
+            onLikeComment={async (commentId) => {
+              if (!categoryId || !user) return;
+              const alreadyLiked = await hasLikedThreadComment(categoryId, threadId, commentId, user.uid);
+              if (alreadyLiked) {
+                await unlikeThreadComment(categoryId, threadId, commentId, user.uid);
+              } else {
+                await likeThreadComment(categoryId, threadId, commentId, user.uid);
+              }
+            }}
+            hasLikedComment={async (commentId) => {
+              if (!categoryId || !user) return false;
+              return hasLikedThreadComment(categoryId, threadId, commentId, user.uid);
             }}
           />
         </div>

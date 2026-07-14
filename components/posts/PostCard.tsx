@@ -24,8 +24,8 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Dropdown from "@/components/ui/Dropdown";
-import CommentThread, { type CommentData } from "@/components/comments/CommentThread";
-import { notifyMention, notifyComment, notifyCommentReplied } from "@/lib/notifications";
+import ContentCommentSection from "@/components/comments/ContentCommentSection";
+import { type CommentData } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
 import Tag from "@/components/ui/Tag";
 import type { MentionedUserRef } from "@/lib/firestore/posts";
@@ -416,7 +416,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
       {/* Comments section */}
       {showComments && (
         <div className="mt-3 pt-3 border-t border-border">
-          <CommentThread
+          <ContentCommentSection
             comments={comments.map(
               (c): CommentData => ({
                 id: c.id,
@@ -427,12 +427,19 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
                 content: c.content,
                 mentionedUsers: c.mentionedUsers,
                 createdAt: c.createdAt as { seconds: number } | null,
+                editedAt: c.editedAt as { seconds: number } | null,
+                deleted: c.deleted,
                 likesCount: c.likesCount ?? 0,
               })
             )}
             loading={loadingComments}
+            title="Comments"
+            ownerId={post.authorId}
+            contentLabel="your post"
+            linkURL={`/?post=${post.id}`}
             maxDepth={1}
             mode="like"
+            composerPlaceholder="Add a comment..."
             onLikeComment={async (commentId) => {
               if (!user) return;
               const alreadyLiked = await hasLikedComment(post.id, commentId, user.uid);
@@ -446,64 +453,28 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
               if (!user) return false;
               return hasLikedComment(post.id, commentId, user.uid);
             }}
-            onAddComment={async (content, parentId, mentionedUsers) => {
-              if (!user) throw new Error("Not authenticated");
-              const newId = await commentOnPost(post.id, {
-                parentId: parentId ?? null,
-                authorId: user.uid,
-                authorName: user.displayName || "Anonymous",
-                authorPhotoURL: user.photoURL,
+            addComment={async ({ parentId, authorId, authorName, authorPhotoURL, content, mentionedUsers }) => {
+              return commentOnPost(post.id, {
+                parentId,
+                authorId,
+                authorName,
+                authorPhotoURL,
                 content,
-                mentionedUsers: mentionedUsers ?? [],
+                mentionedUsers,
               });
-              if (!parentId) setCommentsCount((c) => c + 1);
-              // Notify post author on top-level comments (skip replies + self)
-              if (!parentId && post.authorId !== user.uid) {
-                notifyComment({
-                  recipientId: post.authorId,
-                  actorId: user.uid,
-                  actorName: user.displayName || "Someone",
-                  actorPhotoURL: user.photoURL,
-                  contentLabel: "your post",
-                  linkURL: `/?post=${post.id}`,
-                }).catch(() => {});
-              }
-              // Notify parent comment author on replies (skip self)
-              if (parentId) {
-                const parentComment = comments.find((c) => c.id === parentId);
-                if (parentComment && parentComment.authorId !== user.uid) {
-                  notifyCommentReplied({
-                    recipientId: parentComment.authorId,
-                    actorId: user.uid,
-                    actorName: user.displayName || "Someone",
-                    actorPhotoURL: user.photoURL,
-                    linkURL: `/?post=${post.id}`,
-                  }).catch(() => {});
-                }
-              }
-              // Send mention notifications (fire-and-forget)
-              if (mentionedUsers?.length) {
-                mentionedUsers.forEach(({ uid }) => {
-                  notifyMention({
-                    recipientId: uid,
-                    actorId: user.uid,
-                    actorName: user.displayName || "Anonymous",
-                    actorPhotoURL: user.photoURL,
-                    linkURL: `/`,
-                  }).catch(() => {});
-                });
-              }
-              const result = await getPostComments(post.id);
-              setComments(result);
-              return newId;
             }}
-            onUpdateComment={async (commentId, text) => {
+            updateComment={async (commentId, text) => {
               await updatePostComment(post.id, commentId, text);
             }}
-            onDeleteComment={async (commentId) => {
-              await deletePostComment(post.id, commentId);
-              setCommentsCount((c) => Math.max(0, c - 1));
+            deleteComment={async (commentId) => {
+              return deletePostComment(post.id, commentId);
             }}
+            refreshComments={async () => {
+              const result = await getPostComments(post.id);
+              setComments(result);
+            }}
+            onCommentAdded={() => setCommentsCount((c) => c + 1)}
+            onCommentRemoved={() => setCommentsCount((c) => Math.max(0, c - 1))}
           />
         </div>
       )}

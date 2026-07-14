@@ -19,6 +19,10 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { byCreatedAtDesc } from "@/lib/utils";
+import {
+  deleteCommentWithReplies,
+  type DeleteCommentResult,
+} from "@/lib/firestore/commentThreads";
 
 // --- Post types ---
 
@@ -75,6 +79,8 @@ export interface PostComment {
   content: string;
   mentionedUsers?: MentionedUserRef[];
   createdAt: Timestamp | null;
+  editedAt?: Timestamp | null;
+  deleted?: boolean;
   likesCount: number;
 }
 
@@ -320,10 +326,11 @@ export async function updatePostComment(
 export async function deletePostComment(
   postId: string,
   commentId: string
-): Promise<void> {
-  if (!db) throw new Error("Firestore is not initialized");
-  await deleteDoc(doc(db, "posts", postId, "comments", commentId));
-  await updateDoc(doc(db, "posts", postId), {
-    commentsCount: increment(-1),
+): Promise<DeleteCommentResult> {
+  return deleteCommentWithReplies({
+    collectionPath: ["posts", postId, "comments"],
+    commentId,
+    countTargetPath: ["posts", postId],
+    countField: "commentsCount",
   });
 }

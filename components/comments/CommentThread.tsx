@@ -9,6 +9,7 @@ import BadgeIcon from "@/components/badges/BadgeIcon";
 import MentionInput, { type MentionedUser } from "@/components/ui/MentionInput";
 import Dropdown from "@/components/ui/Dropdown";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { timeAgo, parseMentions, type MentionRef } from "@/lib/utils";
 
 // ─── Generic comment type ───
 
@@ -21,7 +22,6 @@ export interface CommentData {
   /** Optional badges to show next to the author's name. */
   authorBadges?: string[];
   content: string;
-  mentionedUsers?: { uid: string; displayName: string }[];
   createdAt: { seconds: number } | null;
   editedAt?: { seconds: number } | null;
   deleted?: boolean;
@@ -45,6 +45,10 @@ export interface CommentThreadProps {
   maxDepth?: number;
   /** Interaction mode: "like" shows a heart; "upvote" shows arrows. */
   mode?: "like" | "upvote";
+  composerPlaceholder?: string;
+  replyPlaceholder?: string;
+  emptyStateMessage?: string;
+  emptyStateGuestMessage?: string;
 
   // --- Callbacks ---
 
@@ -63,10 +67,6 @@ export interface CommentThreadProps {
   /** Called to delete a comment the current user owns. */
   onDeleteComment?: (commentId: string) => Promise<void>;
 }
-
-// ─── Helper ───
-
-import { timeAgo, parseMentions, type MentionRef } from "@/lib/utils";
 
 const MAX_COMMENT_LENGTH = 2000;
 
@@ -89,6 +89,7 @@ interface CommentItemProps {
   onSelfDeleted?: (commentId: string, hasReplies: boolean) => void;
   onSelfUpdated?: (commentId: string, newText: string) => void;
   onAnyDeleted?: () => void;
+  replyPlaceholder: string;
 }
 
 function CommentItem({
@@ -108,6 +109,7 @@ function CommentItem({
   onSelfDeleted,
   onSelfUpdated,
   onAnyDeleted,
+  replyPlaceholder,
 }: CommentItemProps) {
   const { user } = useAuth();
   const [vote, setVote] = useState<"up" | "down" | null>(null);
@@ -533,7 +535,7 @@ function CommentItem({
                 value={replyText}
                 onChange={setReplyText}
                 onMentionsChange={setReplyMentions}
-                placeholder="Write a reply..."
+                placeholder={replyPlaceholder}
                 className="w-full rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -586,6 +588,7 @@ function CommentItem({
               hasLikedComment={hasLikedComment}
               onUpdateComment={onUpdateComment}
               onDeleteComment={onDeleteComment}
+                replyPlaceholder={replyPlaceholder}
               onSelfDeleted={(replyId, hasSubReplies) => {
                 if (hasSubReplies) {
                   setLocalReplies((prev) =>
@@ -624,7 +627,7 @@ function CommentItem({
                     value={replyText}
                     onChange={setReplyText}
                     onMentionsChange={setReplyMentions}
-                    placeholder="Write a reply..."
+                    placeholder={replyPlaceholder}
                     className="w-full rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
@@ -658,6 +661,10 @@ export default function CommentThread({
   loading = false,
   maxDepth = 2,
   mode = "like",
+  composerPlaceholder = "Add a comment...",
+  replyPlaceholder = "Write a reply...",
+  emptyStateMessage = "No comments yet. Be the first to join the conversation.",
+  emptyStateGuestMessage = "No comments yet.",
   onAddComment,
   onUpvote,
   getUserVote,
@@ -744,7 +751,7 @@ export default function CommentThread({
               value={replyText}
               onChange={setReplyText}
               onMentionsChange={setTopLevelMentions}
-              placeholder="Write a comment..."
+              placeholder={composerPlaceholder}
               className="w-full rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -770,7 +777,7 @@ export default function CommentThread({
         <p className="text-xs text-muted">Loading comments...</p>
       ) : topLevel.length === 0 ? (
         <p className="text-xs text-muted">
-          {user ? "No comments yet. Be the first!" : "No comments yet."}
+          {user ? emptyStateMessage : emptyStateGuestMessage}
         </p>
       ) : (
         <div>
@@ -790,6 +797,7 @@ export default function CommentThread({
               hasLikedComment={hasLikedComment}
               onUpdateComment={onUpdateComment}
               onDeleteComment={onDeleteComment}
+              replyPlaceholder={replyPlaceholder}
               onSelfDeleted={(commentId, hasReplies) => {
                 if (hasReplies) {
                   setLocalComments((prev) =>

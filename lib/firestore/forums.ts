@@ -20,6 +20,10 @@
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { makeSlug, parseSlug, byCreatedAtDesc } from "@/lib/utils";
+import {
+  deleteCommentWithReplies,
+  type DeleteCommentResult,
+} from "@/lib/firestore/commentThreads";
 
 // --- Slug helper ---
 
@@ -144,6 +148,9 @@ export interface ThreadComment {
   content: string;
   mentionedUsers?: { uid: string; displayName: string }[];
   createdAt: Timestamp | null;
+  editedAt?: Timestamp | null;
+  deleted?: boolean;
+  likesCount: number;
   upvotes: number;
   downvotes: number;
 }
@@ -429,6 +436,7 @@ export async function addThreadComment(
     parentId: data.parentId ?? null,
     mentionedUsers: data.mentionedUsers ?? [],
     createdAt: serverTimestamp(),
+    likesCount: 0,
     upvotes: 0,
     downvotes: 0,
   });
@@ -482,14 +490,63 @@ export async function deleteThreadComment(
   categoryId: string,
   threadId: string,
   commentId: string
+): Promise<DeleteCommentResult> {
+  return deleteCommentWithReplies({
+    collectionPath: ["forums", categoryId, "threads", threadId, "comments"],
+    commentId,
+    countTargetPath: ["forums", categoryId, "threads", threadId],
+    countField: "commentCount",
+    touchTargetPath: ["forums", categoryId, "threads", threadId],
+  });
+}
+
+export async function likeThreadComment(
+  categoryId: string,
+  threadId: string,
+  commentId: string,
+  userId: string
 ): Promise<void> {
   if (!db) throw new Error("Firestore is not initialized");
-  await deleteDoc(
-    doc(db, "forums", categoryId, "threads", threadId, "comments", commentId)
+
+  await setDoc(
+    doc(db, "forums", categoryId, "threads", threadId, "comments", commentId, "likes", userId),
+    { likedAt: serverTimestamp() }
   );
-  await updateDoc(doc(db, "forums", categoryId, "threads", threadId), {
-    commentCount: increment(-1),
-  });
+  await updateDoc(
+    doc(db, "forums", categoryId, "threads", threadId, "comments", commentId),
+    { likesCount: increment(1) }
+  );
+}
+
+export async function unlikeThreadComment(
+  categoryId: string,
+  threadId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  await deleteDoc(
+    doc(db, "forums", categoryId, "threads", threadId, "comments", commentId, "likes", userId)
+  );
+  await updateDoc(
+    doc(db, "forums", categoryId, "threads", threadId, "comments", commentId),
+    { likesCount: increment(-1) }
+  );
+}
+
+export async function hasLikedThreadComment(
+  categoryId: string,
+  threadId: string,
+  commentId: string,
+  userId: string
+): Promise<boolean> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const snap = await getDoc(
+    doc(db, "forums", categoryId, "threads", threadId, "comments", commentId, "likes", userId)
+  );
+  return snap.exists();
 }
 
 // --- Comment voting ---

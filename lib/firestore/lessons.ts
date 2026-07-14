@@ -17,6 +17,10 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { byCreatedAtDesc, byUpdatedAtDesc } from "@/lib/utils";
+import {
+  deleteCommentWithReplies,
+  type DeleteCommentResult,
+} from "@/lib/firestore/commentThreads";
 
 // --- Lesson types ---
 
@@ -219,6 +223,9 @@ export interface LessonComment {
   content: string;
   mentionedUsers?: { uid: string; displayName: string }[];
   createdAt: Timestamp | null;
+  editedAt?: Timestamp | null;
+  deleted?: boolean;
+  likesCount: number;
 }
 
 export interface LessonCommentInput {
@@ -244,6 +251,7 @@ export async function addLessonComment(
     lessonId,
     parentId: data.parentId ?? null,
     mentionedUsers: data.mentionedUsers ?? [],
+    likesCount: 0,
     createdAt: serverTimestamp(),
   });
 
@@ -276,10 +284,51 @@ export async function updateLessonComment(
   });
 }
 
+export async function likeLessonComment(
+  lessonId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  await setDoc(doc(db, "lessons", lessonId, "comments", commentId, "likes", userId), {
+    likedAt: serverTimestamp(),
+  });
+  await updateDoc(doc(db, "lessons", lessonId, "comments", commentId), {
+    likesCount: increment(1),
+  });
+}
+
+export async function unlikeLessonComment(
+  lessonId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  await deleteDoc(doc(db, "lessons", lessonId, "comments", commentId, "likes", userId));
+  await updateDoc(doc(db, "lessons", lessonId, "comments", commentId), {
+    likesCount: increment(-1),
+  });
+}
+
+export async function hasLikedLessonComment(
+  lessonId: string,
+  commentId: string,
+  userId: string
+): Promise<boolean> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const snap = await getDoc(doc(db, "lessons", lessonId, "comments", commentId, "likes", userId));
+  return snap.exists();
+}
+
 export async function deleteLessonComment(
   lessonId: string,
   commentId: string
-): Promise<void> {
-  if (!db) throw new Error("Firestore is not initialized");
-  await deleteDoc(doc(db, "lessons", lessonId, "comments", commentId));
+): Promise<DeleteCommentResult> {
+  return deleteCommentWithReplies({
+    collectionPath: ["lessons", lessonId, "comments"],
+    commentId,
+  });
 }

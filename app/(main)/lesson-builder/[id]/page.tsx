@@ -10,6 +10,9 @@ import {
   trackLessonDownload,
   getLessonComments,
   addLessonComment,
+  likeLessonComment,
+  unlikeLessonComment,
+  hasLikedLessonComment,
   updateLessonComment,
   deleteLessonComment,
   type Lesson,
@@ -18,11 +21,10 @@ import {
 import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { getUserRating, submitRating } from "@/lib/firestore/ratings";
 import { Avatar, Badge, Button, Card, ConfirmDialog, IPNotice } from "@/components/ui";
-import CommentThread, {
-  type CommentData,
-} from "@/components/comments/CommentThread";
+import ContentCommentSection from "@/components/comments/ContentCommentSection";
+import { type CommentData } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
-import { notifyComment, notifyLessonRated, notifyLessonDownloaded, notifyLessonShared, notifyCommentReplied, notifyMention } from "@/lib/notifications";
+import { notifyLessonRated, notifyLessonDownloaded, notifyLessonShared } from "@/lib/notifications";
 import { pdf } from "@react-pdf/renderer";
 import LessonPDFDocument from "@/components/lessons/LessonPDFDocument";
 import LessonPreviewModal from "@/components/lessons/LessonPreviewModal";
@@ -105,7 +107,7 @@ export default function LessonDetailPage({
       }
     }
     load();
-  }, [id, loadComments]);
+  }, [id, loadComments, user]);
 
   async function handleDeleteLesson() {
     if (!lesson || deleting) return;
@@ -217,6 +219,9 @@ export default function LessonDetailPage({
     content: c.content,
     mentionedUsers: c.mentionedUsers,
     createdAt: c.createdAt as { seconds: number } | null,
+    editedAt: c.editedAt as { seconds: number } | null,
+    deleted: c.deleted,
+    likesCount: c.likesCount ?? 0,
   }));
 
   // ─── Loading ───
@@ -665,70 +670,46 @@ export default function LessonDetailPage({
 
           {/* Comments */}
           <Card padding="lg">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Discussion, Feedback & Suggestions
-            </h2>
-            <CommentThread
+            <ContentCommentSection
               comments={commentData}
               loading={commentsLoading}
+              title="Comments"
+              description="Ask a question, share how you'd use it, or suggest an improvement."
+              ownerId={lesson.authorId}
+              contentLabel={`your lesson "${lesson.title}"`}
+              linkURL={typeof window !== "undefined" ? window.location.href : `/lesson-builder/${lesson.id}`}
               mode="like"
-              maxDepth={2}
-              onAddComment={async (content, parentId, mentionedUsers) => {
-                if (!user) throw new Error("Must be logged in");
-                const newId = await addLessonComment(lesson.id, {
+              maxDepth={1}
+              composerPlaceholder="Add a comment..."
+              addComment={async ({ parentId, authorId, authorName, authorPhotoURL, content, mentionedUsers }) => {
+                return addLessonComment(lesson.id, {
                   parentId,
-                  authorId: user.uid,
-                  authorName: user.displayName || "Anonymous",
-                  authorPhotoURL: user.photoURL,
+                  authorId,
+                  authorName,
+                  authorPhotoURL,
                   content,
-                  mentionedUsers: mentionedUsers ?? [],
+                  mentionedUsers,
                 });
-                // Notify lesson author on top-level comment (fire-and-forget)
-                if (lesson.authorId !== user.uid && !parentId) {
-                  notifyComment({
-                    recipientId: lesson.authorId,
-                    actorId: user.uid,
-                    actorName: user.displayName || "Someone",
-                    actorPhotoURL: user.photoURL,
-                    contentLabel: `your lesson "${lesson.title}"`,
-                    linkURL: window.location.href,
-                  }).catch(() => {});
-                }
-                // Notify parent comment author on reply (fire-and-forget)
-                if (parentId) {
-                  const parentComment = comments.find((c) => c.id === parentId);
-                  if (parentComment && parentComment.authorId !== user.uid) {
-                    notifyCommentReplied({
-                      recipientId: parentComment.authorId,
-                      actorId: user.uid,
-                      actorName: user.displayName || "Someone",
-                      actorPhotoURL: user.photoURL,
-                      linkURL: window.location.href,
-                    }).catch(() => {});
-                  }
-                }
-                // Fire mention notifications (fire-and-forget)
-                if (mentionedUsers?.length) {
-                  mentionedUsers.forEach(({ uid }) => {
-                    if (uid !== user.uid) {
-                      notifyMention({
-                        recipientId: uid,
-                        actorId: user.uid,
-                        actorName: user.displayName || "Anonymous",
-                        actorPhotoURL: user.photoURL,
-                        linkURL: window.location.href,
-                      }).catch(() => {});
-                    }
-                  });
-                }
-                await loadComments();
-                return newId;
               }}
-              onUpdateComment={async (commentId, text) => {
+              updateComment={async (commentId, text) => {
                 await updateLessonComment(lesson.id, commentId, text);
               }}
-              onDeleteComment={async (commentId) => {
-                await deleteLessonComment(lesson.id, commentId);
+              deleteComment={async (commentId) => {
+                return deleteLessonComment(lesson.id, commentId);
+              }}
+              refreshComments={loadComments}
+              onLikeComment={async (commentId) => {
+                if (!user) return;
+                const alreadyLiked = await hasLikedLessonComment(lesson.id, commentId, user.uid);
+                if (alreadyLiked) {
+                  await unlikeLessonComment(lesson.id, commentId, user.uid);
+                } else {
+                  await likeLessonComment(lesson.id, commentId, user.uid);
+                }
+              }}
+              hasLikedComment={async (commentId) => {
+                if (!user) return false;
+                return hasLikedLessonComment(lesson.id, commentId, user.uid);
               }}
             />
           </Card>

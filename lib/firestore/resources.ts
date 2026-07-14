@@ -19,6 +19,10 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { makeSlug, parseSlug, byCreatedAtDesc } from "@/lib/utils";
+import {
+  deleteCommentWithReplies,
+  type DeleteCommentResult,
+} from "@/lib/firestore/commentThreads";
 
 // --- URL slug helpers ---
 
@@ -354,7 +358,11 @@ export interface ResourceComment {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
   createdAt: Timestamp | null;
+  editedAt?: Timestamp | null;
+  deleted?: boolean;
+  likesCount: number;
 }
 
 export interface ResourceCommentInput {
@@ -363,6 +371,7 @@ export interface ResourceCommentInput {
   authorName: string;
   authorPhotoURL: string | null;
   content: string;
+  mentionedUsers?: { uid: string; displayName: string }[];
 }
 
 export async function addResourceComment(
@@ -378,6 +387,8 @@ export async function addResourceComment(
     id: ref.id,
     resourceId,
     parentId: data.parentId ?? null,
+    mentionedUsers: data.mentionedUsers ?? [],
+    likesCount: 0,
     createdAt: serverTimestamp(),
   });
 
@@ -410,12 +421,53 @@ export async function updateResourceComment(
   });
 }
 
+export async function likeResourceComment(
+  resourceId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  await setDoc(doc(db, "resources", resourceId, "comments", commentId, "likes", userId), {
+    likedAt: serverTimestamp(),
+  });
+  await updateDoc(doc(db, "resources", resourceId, "comments", commentId), {
+    likesCount: increment(1),
+  });
+}
+
+export async function unlikeResourceComment(
+  resourceId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  await deleteDoc(doc(db, "resources", resourceId, "comments", commentId, "likes", userId));
+  await updateDoc(doc(db, "resources", resourceId, "comments", commentId), {
+    likesCount: increment(-1),
+  });
+}
+
+export async function hasLikedResourceComment(
+  resourceId: string,
+  commentId: string,
+  userId: string
+): Promise<boolean> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const snap = await getDoc(doc(db, "resources", resourceId, "comments", commentId, "likes", userId));
+  return snap.exists();
+}
+
 export async function deleteResourceComment(
   resourceId: string,
   commentId: string
-): Promise<void> {
-  if (!db) throw new Error("Firestore is not initialized");
-  await deleteDoc(doc(db, "resources", resourceId, "comments", commentId));
+): Promise<DeleteCommentResult> {
+  return deleteCommentWithReplies({
+    collectionPath: ["resources", resourceId, "comments"],
+    commentId,
+  });
 }
 
 // --- Related resources ---

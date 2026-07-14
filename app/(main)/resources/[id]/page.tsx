@@ -17,11 +17,21 @@ import {
   parseResourceSlug,
   resourceSlug,
   deleteResource,
+  getResourceComments,
+  addResourceComment,
+  updateResourceComment,
+  deleteResourceComment,
+  likeResourceComment,
+  unlikeResourceComment,
+  hasLikedResourceComment,
   RESOURCE_TYPES,
   type Resource,
+  type ResourceComment,
 } from "@/lib/firestore/resources";
 import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { Avatar, Badge, Button, Card, ConfirmDialog, IPNotice } from "@/components/ui";
+import ContentCommentSection from "@/components/comments/ContentCommentSection";
+import { type CommentData } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
 import { notifyResourceLiked, notifyResourceDownloaded, notifyResourceShared } from "@/lib/notifications";
 
@@ -60,6 +70,22 @@ export default function ResourceDetailPage({
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Comments
+  const [comments, setComments] = useState<ResourceComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+
+  async function loadComments(resourceId: string) {
+    setCommentsLoading(true);
+    try {
+      const result = await getResourceComments(resourceId);
+      setComments(result);
+    } catch {
+      // ignore
+    } finally {
+      setCommentsLoading(false);
+    }
+  }
+
   useEffect(() => {
     async function load() {
       try {
@@ -76,6 +102,7 @@ export default function ResourceDetailPage({
         const [authorData] = await Promise.all([
           getUser(res.authorId).catch(() => null),
           getRelatedResources(res).then(setRelated).catch(() => {}),
+          loadComments(res.id),
         ]);
         setAuthor(authorData);
       } catch (err) {
@@ -204,6 +231,20 @@ export default function ResourceDetailPage({
       setRatingLoading(false);
     }
   }
+
+  const commentData: CommentData[] = comments.map((comment) => ({
+    id: comment.id,
+    parentId: comment.parentId,
+    authorId: comment.authorId,
+    authorName: comment.authorName,
+    authorPhotoURL: comment.authorPhotoURL,
+    content: comment.content,
+    mentionedUsers: comment.mentionedUsers,
+    createdAt: comment.createdAt as { seconds: number } | null,
+    editedAt: comment.editedAt as { seconds: number } | null,
+    deleted: comment.deleted,
+    likesCount: comment.likesCount ?? 0,
+  }));
 
   // ─── Loading ───
   if (loading) {
@@ -498,6 +539,53 @@ export default function ResourceDetailPage({
             </div>
             {/* IP Notice */}
             <IPNotice />          </Card>
+
+          <Card padding="lg">
+            <ContentCommentSection
+              comments={commentData}
+              loading={commentsLoading}
+              title="Comments"
+              description="Ask a question, share how you'd use it, or suggest an improvement."
+              ownerId={resource.authorId}
+              contentLabel={`your resource "${resource.title}"`}
+              linkURL={typeof window !== "undefined" ? window.location.href : `/resources/${rawId}`}
+              maxDepth={1}
+              mode="like"
+              composerPlaceholder="Add a comment..."
+              addComment={async ({ parentId, authorId, authorName, authorPhotoURL, content, mentionedUsers }) => {
+                return addResourceComment(resource.id, {
+                  parentId,
+                  authorId,
+                  authorName,
+                  authorPhotoURL,
+                  content,
+                  mentionedUsers,
+                });
+              }}
+              updateComment={async (commentId, text) => {
+                await updateResourceComment(resource.id, commentId, text);
+              }}
+              deleteComment={async (commentId) => {
+                return deleteResourceComment(resource.id, commentId);
+              }}
+              refreshComments={async () => {
+                await loadComments(resource.id);
+              }}
+              onLikeComment={async (commentId) => {
+                if (!user) return;
+                const alreadyLiked = await hasLikedResourceComment(resource.id, commentId, user.uid);
+                if (alreadyLiked) {
+                  await unlikeResourceComment(resource.id, commentId, user.uid);
+                } else {
+                  await likeResourceComment(resource.id, commentId, user.uid);
+                }
+              }}
+              hasLikedComment={async (commentId) => {
+                if (!user) return false;
+                return hasLikedResourceComment(resource.id, commentId, user.uid);
+              }}
+            />
+          </Card>
 
         </div>
 
