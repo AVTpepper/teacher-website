@@ -151,7 +151,7 @@ export async function getPostsByAuthor(
 ): Promise<GetPostsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  // Single equality where() — uses Firestore auto single-field index, no composite needed.
+  // Single equality where() - uses Firestore auto single-field index, no composite needed.
   // Sort client-side to avoid needing a composite index.
   const q = query(
     collection(db, "posts"),
@@ -303,4 +303,27 @@ export async function updatePost(
 export async function deletePost(postId: string): Promise<void> {
   if (!db) throw new Error("Firestore is not initialized");
   await deleteDoc(doc(db, "posts", postId));
+}
+
+export async function updatePostComment(
+  postId: string,
+  commentId: string,
+  text: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(doc(db, "posts", postId, "comments", commentId), {
+    content: text.trim().slice(0, 2000),
+    editedAt: serverTimestamp(),
+  });
+}
+
+export async function deletePostComment(
+  postId: string,
+  commentId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "posts", postId, "comments", commentId));
+  await updateDoc(doc(db, "posts", postId), {
+    commentsCount: increment(-1),
+  });
 }

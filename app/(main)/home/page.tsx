@@ -39,7 +39,7 @@ function HomePageInner() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Capture the linked post ID once at mount — stays stable even after we strip the URL param
+  // Capture the linked post ID once at mount - stays stable even after we strip the URL param
   const [pinnedPostId] = useState<string | null>(() => searchParams.get("post"));
 
   const [posts, setPosts] = useState<Post[]>([]);
@@ -96,7 +96,7 @@ function HomePageInner() {
   useEffect(() => {
     if (sharedPost && sharedPostRef.current) {
       sharedPostRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      router.replace("/");
+      router.replace("/home");
     }
   }, [sharedPost, router]);
 
@@ -121,7 +121,7 @@ function HomePageInner() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Home Feed</h1>
         <p className="mt-1 text-sm text-muted">
-          Your personalized educator feed — posts, trending discussions, and
+          Your personalized educator feed - posts, trending discussions, and
           more.
         </p>
       </div>
@@ -129,7 +129,7 @@ function HomePageInner() {
       {/* Create post (logged in only) */}
       {user && <CreatePost onPostCreated={() => loadPosts(true, typeFilter)} />}
 
-      {/* Shared / linked post — pinned below the create form */}
+      {/* Shared / linked post - pinned below the create form */}
       {pinnedPostId && (
         <div ref={sharedPostRef} className="scroll-mt-28">
           {sharedPostLoading ? (

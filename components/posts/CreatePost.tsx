@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -137,7 +137,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
 
       {expanded && (
         <div className="mt-3 space-y-3">
-          {/* Toolbar: @Mention + attach link — immediately below textarea */}
+          {/* Toolbar: @Mention + attach link - immediately below textarea */}
           <div className="flex flex-wrap items-start gap-4 border-b border-border pb-3">
             <button
               type="button"

@@ -1,4 +1,4 @@
-import {
+﻿import {
   doc,
   getDoc,
   setDoc,
@@ -82,7 +82,7 @@ export const FORUM_CATEGORIES: Omit<ForumCategory, "threadCount" | "lastActivity
   {
     id: "general-discussion",
     name: "General Discussion",
-    description: "Anything that doesn't fit elsewhere — open conversations for the educator community.",
+    description: "Anything that doesn't fit elsewhere - open conversations for the educator community.",
     icon: "💬",
   },
   {
@@ -287,7 +287,7 @@ export async function getThreadsByAuthor(
   if (!db) throw new Error("Firestore is not initialized");
 
   // collectionGroup queries all 'threads' subcollections across every category.
-  // Single equality where() uses the auto single-field index — no composite needed.
+  // Single equality where() uses the auto single-field index - no composite needed.
   // Sort client-side to avoid orderBy composite index requirement.
   const q = query(
     collectionGroup(db, "threads"),
@@ -460,6 +460,36 @@ export async function getThreadComments(
   const snapshot = await getDocs(q);
 
   return snapshot.docs.map((d) => d.data() as ThreadComment);
+}
+
+export async function updateThreadComment(
+  categoryId: string,
+  threadId: string,
+  commentId: string,
+  text: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(
+    doc(db, "forums", categoryId, "threads", threadId, "comments", commentId),
+    {
+      content: text.trim().slice(0, 2000),
+      editedAt: serverTimestamp(),
+    }
+  );
+}
+
+export async function deleteThreadComment(
+  categoryId: string,
+  threadId: string,
+  commentId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(
+    doc(db, "forums", categoryId, "threads", threadId, "comments", commentId)
+  );
+  await updateDoc(doc(db, "forums", categoryId, "threads", threadId), {
+    commentCount: increment(-1),
+  });
 }
 
 // --- Comment voting ---

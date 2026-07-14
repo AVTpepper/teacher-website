@@ -196,7 +196,7 @@ export const BADGE_DEFINITIONS: Record<BadgeId, BadgeDefinition> = {
 export const BADGE_LIST = Object.values(BADGE_DEFINITIONS);
 
 // ---------------------------------------------------------------------------
-// getBadge — safely look up a badge definition by string id
+// getBadge - safely look up a badge definition by string id
 // ---------------------------------------------------------------------------
 
 export function getBadge(id: string): BadgeDefinition | undefined {
@@ -311,7 +311,7 @@ export async function checkAndAwardBadges(uid: string): Promise<BadgeId[]> {
 }
 
 // ---------------------------------------------------------------------------
-// awardBadge — manually award a single badge (e.g. "verified", "community-helper")
+// awardBadge - manually award a single badge (e.g. "verified", "community-helper")
 // ---------------------------------------------------------------------------
 
 export async function awardBadge(uid: string, badge: BadgeId): Promise<void> {

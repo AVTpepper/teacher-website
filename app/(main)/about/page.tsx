@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Button } from "@/components/ui";
 
 export default function AboutPage() {
@@ -14,19 +14,19 @@ export default function AboutPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-foreground">Our Mission</h2>
         <p className="text-muted leading-relaxed">
-          We're on a mission to reduce professional isolation for teachers by giving them a dedicated space to share resources, discuss challenges, discover job opportunities, and find inspiration — all in one place.
+          We're on a mission to reduce professional isolation for teachers by giving them a dedicated space to share resources, discuss challenges, discover job opportunities, and find inspiration - all in one place.
         </p>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-foreground">What We Offer</h2>
         <ul className="space-y-2 text-muted">
-          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Community Feed</strong> — Share ideas, resources, and start discussions with other educators.</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Lesson Builder</strong> — Create, remix, and publish lesson plans for your community.</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Resource Library</strong> — Discover and upload teaching resources.</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Forums</strong> — Dive into topic-focused discussions organised by category.</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Job Board</strong> — Post and find teaching and education-adjacent positions.</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Inspiration Hub</strong> — Curated articles, podcasts, videos, and teacher stories.</span></li>
+          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Community Feed</strong>: Share ideas, resources, and start discussions with other educators.</span></li>
+          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Lesson Builder</strong>: Create, remix, and publish lesson plans for your community.</span></li>
+          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Resource Library</strong>: Discover and upload teaching resources.</span></li>
+          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Forums</strong>: Dive into topic-focused discussions organised by category.</span></li>
+          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Job Board</strong>: Post and find teaching and education-adjacent positions.</span></li>
+          <li className="flex items-start gap-2"><span className="text-primary-900 font-bold mt-0.5">•</span><span><strong className="text-foreground">Inspiration Hub</strong>: Curated articles, podcasts, videos, and teacher stories.</span></li>
         </ul>
       </section>
 

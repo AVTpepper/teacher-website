@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -33,7 +33,7 @@ interface SuggestionItem {
 }
 
 // ---------------------------------------------------------------------------
-// Firestore helpers (prefix range — same strategy as search page)
+// Firestore helpers (prefix range - same strategy as search page)
 // ---------------------------------------------------------------------------
 
 async function prefixCol<T>(
@@ -74,6 +74,21 @@ async function prefixGroup<T>(
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as T));
 }
 
+async function scanColByTitle<T extends { id: string; title: string }>(
+  col: string,
+  term: string,
+  max: number,
+  excludeIds = new Set<string>()
+): Promise<T[]> {
+  if (!db || max <= 0) return [];
+  const lower = term.toLowerCase();
+  const snap = await getDocs(collection(db, col));
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() } as T))
+    .filter((item) => !excludeIds.has(item.id) && item.title.toLowerCase().includes(lower))
+    .slice(0, max);
+}
+
 // ---------------------------------------------------------------------------
 // Build suggestion list from raw results
 // ---------------------------------------------------------------------------
@@ -83,11 +98,29 @@ const MAX_PER_TYPE = 3;
 async function fetchSuggestions(term: string): Promise<SuggestionItem[]> {
   const [educators, resources, threads, lessons, jobs] = await Promise.all([
     prefixCol<UserProfile>("users", "displayNameLower", term, MAX_PER_TYPE),
-    prefixCol<Resource>("resources", "title", term, MAX_PER_TYPE),
+    prefixCol<Resource>("resources", "titleLower", term, MAX_PER_TYPE),
     prefixGroup<ForumThread>("threads", "title", term, MAX_PER_TYPE),
-    prefixCol<Lesson>("lessons", "title", term, MAX_PER_TYPE),
+    prefixCol<Lesson>("lessons", "titleLower", term, MAX_PER_TYPE),
     prefixCol<Job>("jobs", "title", term, MAX_PER_TYPE),
   ]);
+
+  const [resourceFallback, lessonFallback] = await Promise.all([
+    scanColByTitle<Resource>(
+      "resources",
+      term,
+      MAX_PER_TYPE - resources.length,
+      new Set(resources.map((r) => r.id))
+    ),
+    scanColByTitle<Lesson>(
+      "lessons",
+      term,
+      MAX_PER_TYPE - lessons.length,
+      new Set(lessons.map((l) => l.id))
+    ),
+  ]);
+
+  const mergedResources = [...resources, ...resourceFallback];
+  const mergedLessons = [...lessons, ...lessonFallback];
 
   const items: SuggestionItem[] = [];
 
@@ -101,7 +134,7 @@ async function fetchSuggestions(term: string): Promise<SuggestionItem[]> {
     });
   });
 
-  resources.forEach((r) => {
+  mergedResources.forEach((r) => {
     items.push({
       key: `res-${r.id}`,
       icon: "📂",
@@ -121,7 +154,7 @@ async function fetchSuggestions(term: string): Promise<SuggestionItem[]> {
     });
   });
 
-  lessons.forEach((l) => {
+  mergedLessons.forEach((l) => {
     items.push({
       key: `les-${l.id}`,
       icon: "📝",
@@ -149,7 +182,7 @@ async function fetchSuggestions(term: string): Promise<SuggestionItem[]> {
 // ---------------------------------------------------------------------------
 
 interface NavSearchBarProps {
-  /** Called when user presses Enter or clicks "See all results" — navigate to /search */
+  /** Called when user presses Enter or clicks "See all results" - navigate to /search */
   onNavigate?: () => void;
   placeholder?: string;
 }
@@ -187,6 +220,7 @@ export default function NavSearchBar({
   useEffect(() => {
     const trimmed = value.trim();
     if (!trimmed) {
+      setLoading(false);
       setSuggestions([]);
       setOpen(false);
       setActiveIndex(-1);
@@ -295,7 +329,6 @@ export default function NavSearchBar({
           placeholder={placeholder}
           autoComplete="off"
           aria-autocomplete="list"
-          aria-expanded={open}
           aria-haspopup="listbox"
           className="w-full rounded-lg border border-border bg-surface pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-ring hover:border-border-strong"
         />
@@ -307,7 +340,7 @@ export default function NavSearchBar({
           role="listbox"
           className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border border-border bg-surface shadow-xl overflow-hidden"
         >
-          <ul className="max-h-[380px] overflow-y-auto [scrollbar-width:thin]">
+          <ul className="max-h-95 overflow-y-auto [scrollbar-width:thin]">
             {suggestions.map((item, idx) => (
               <li key={item.key} role="option" aria-selected={idx === activeIndex}>
                 <Link

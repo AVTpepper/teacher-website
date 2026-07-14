@@ -1,8 +1,7 @@
-﻿"use client";
+"use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { type DocumentSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import {
@@ -11,14 +10,13 @@ import {
   RESOURCE_TYPES,
   getAverageRating,
   type Resource,
-  type ResourceFilters,
   type ResourceType,
-  type ResourceSortBy,
 } from "@/lib/firestore/resources";
 import {
   getPublicLessons,
   type Lesson,
 } from "@/lib/firestore/lessons";
+import { getLessonRatingSummaries, type LessonRatingSummary } from "@/lib/firestore/ratings";
 import {
   Avatar,
   Badge,
@@ -33,6 +31,11 @@ type DisplayItem =
   | { kind: "resource"; data: Resource }
   | { kind: "lesson"; data: Lesson };
 
+type LibrarySortBy = "newest" | "oldest" | "rating" | "downloads" | "bookmarks";
+
+const RESULTS_PER_PAGE = 20;
+const MAX_PAGE_BUTTONS = 5;
+
 export default function ResourcesPage() {
   const { user } = useAuth();
 
@@ -40,69 +43,66 @@ export default function ResourcesPage() {
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
   const [resourceType, setResourceType] = useState("");
-  const [sortBy, setSortBy] = useState<ResourceSortBy>("newest");
+  const [sortBy, setSortBy] = useState<LibrarySortBy>("newest");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
 
   // Resources (uploaded files)
   const [resources, setResources] = useState<Resource[]>([]);
-  const cursorRef = useRef<DocumentSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
 
   // Lesson plans (from lessons collection)
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [lessonsLoading, setLessonsLoading] = useState(false);
+  const [lessonRatingSummaries, setLessonRatingSummaries] = useState<Record<string, LessonRatingSummary>>({});
 
   // Whether to include lesson plans: when no type selected, or "lessonPlan" selected
   const includeLessons = !resourceType || resourceType === "lessonPlan";
   // Whether to include uploaded resources: when no type selected, or a non-lesson type selected
   const includeResources = !resourceType || resourceType !== "lessonPlan";
 
-  const filters: ResourceFilters = {
-    gradeLevel: gradeLevel || undefined,
-    subject: subject || undefined,
-    type: (resourceType as ResourceType) || undefined,
-    sortBy,
-  };
+  const fetchResources = useCallback(async () => {
+    if (!includeResources) {
+      setResources([]);
+      setLoading(false);
+      return;
+    }
 
-  const fetchResources = useCallback(
-    async (reset: boolean) => {
-      if (!includeResources) {
-        cursorRef.current = null;
-        setResources([]);
-        setHasMore(false);
-        setLoading(false);
-        return;
-      }
-      if (reset) {
-        cursorRef.current = null;
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
-      try {
-        const result = await getResources(filters, reset ? null : cursorRef.current);
-        setResources((prev) =>
-          reset ? result.resources : [...prev, ...result.resources]
+    setLoading(true);
+    try {
+      const allResources: Resource[] = [];
+      let cursor: Parameters<typeof getResources>[1] = null;
+      let keepLoading = true;
+
+      while (keepLoading) {
+        const result = await getResources(
+          {
+            gradeLevel: gradeLevel || undefined,
+            subject: subject || undefined,
+            type: (resourceType as ResourceType) || undefined,
+            sortBy: "newest",
+          },
+          cursor
         );
-        cursorRef.current = result.lastDoc;
-        setHasMore(result.lastDoc !== null);
-      } catch (err) {
-        console.error("getResources error:", err);
-        setResources([]);
-        setHasMore(false);
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
+
+        allResources.push(...result.resources);
+        cursor = result.lastDoc;
+        keepLoading = Boolean(result.lastDoc);
       }
-    },
-    [gradeLevel, subject, resourceType, sortBy, includeResources]
-  );
+
+      setResources(allResources);
+    } catch (err) {
+      console.error("getResources error:", err);
+      setResources([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [gradeLevel, subject, resourceType, includeResources]);
 
   const fetchLessons = useCallback(async () => {
     if (!includeLessons) {
       setLessons([]);
+      setLessonRatingSummaries({});
       return;
     }
     setLessonsLoading(true);
@@ -112,17 +112,26 @@ export default function ResourcesPage() {
         subject: subject || undefined,
       });
       setLessons(result.lessons);
+
+      const lessonIds = result.lessons.map((l) => l.id);
+      const summaries = await getLessonRatingSummaries(lessonIds);
+      setLessonRatingSummaries(summaries);
     } catch {
       setLessons([]);
+      setLessonRatingSummaries({});
     } finally {
       setLessonsLoading(false);
     }
   }, [gradeLevel, subject, includeLessons]);
 
   useEffect(() => {
-    fetchResources(true);
+    fetchResources();
     fetchLessons();
   }, [fetchResources, fetchLessons]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [gradeLevel, subject, resourceType, sortBy, searchQuery]);
 
   // Build combined display list
   const resourceItems: DisplayItem[] = resources.map((r) => ({
@@ -134,34 +143,86 @@ export default function ResourcesPage() {
     data: l,
   }));
 
-  // Merge and sort by createdAt descending when showing both
+  function getCreatedAtSeconds(item: DisplayItem): number {
+    return item.data.createdAt?.seconds ?? 0;
+  }
+
+  function getRatingValue(item: DisplayItem): number {
+    return item.kind === "resource"
+      ? getAverageRating(item.data)
+      : getLessonRatingAverage(item.data);
+  }
+
+  function getRatingCount(item: DisplayItem): number {
+    return item.kind === "resource"
+      ? (item.data.ratingCount ?? 0)
+      : getLessonRatingCount(item.data);
+  }
+
+  function getLessonRatingAverage(lesson: Lesson): number {
+    const summary = lessonRatingSummaries[lesson.id];
+    if (summary?.ratingCount) return summary.ratingAverage;
+    return lesson.ratingAverage ?? 0;
+  }
+
+  function getLessonRatingCount(lesson: Lesson): number {
+    const summary = lessonRatingSummaries[lesson.id];
+    if (summary?.ratingCount) return summary.ratingCount;
+    return lesson.ratingCount ?? 0;
+  }
+
+  function getDownloadsValue(item: DisplayItem): number {
+    return item.data.downloadCount ?? 0;
+  }
+
+  function getBookmarksValue(item: DisplayItem): number {
+    return item.kind === "resource"
+      ? (item.data.savedByCount ?? 0)
+      : (item.data.bookmarkCount ?? 0);
+  }
+
   let combined: DisplayItem[];
   if (includeResources && includeLessons) {
-    combined = [...resourceItems, ...lessonItems].sort((a, b) => {
-      const aTs =
-        a.kind === "resource"
-          ? (a.data.createdAt?.seconds ?? 0)
-          : (a.data.createdAt?.seconds ?? 0);
-      const bTs =
-        b.kind === "resource"
-          ? (b.data.createdAt?.seconds ?? 0)
-          : (b.data.createdAt?.seconds ?? 0);
-      if (sortBy === "popular") {
-        const aCount = a.kind === "resource" ? a.data.downloadCount : a.data.downloadCount;
-        const bCount = b.kind === "resource" ? b.data.downloadCount : b.data.downloadCount;
-        return bCount - aCount;
-      }
-      return bTs - aTs;
-    });
+    combined = [...resourceItems, ...lessonItems];
   } else if (includeLessons) {
     combined = lessonItems;
   } else {
     combined = resourceItems;
   }
 
+  const sortedCombined = [...combined].sort((a, b) => {
+    if (sortBy === "oldest") {
+      return getCreatedAtSeconds(a) - getCreatedAtSeconds(b);
+    }
+
+    if (sortBy === "rating") {
+      const scoreA = getRatingCount(a) > 0 ? getRatingValue(a) : -1;
+      const scoreB = getRatingCount(b) > 0 ? getRatingValue(b) : -1;
+      const scoreDiff = scoreB - scoreA;
+      if (scoreDiff !== 0) return scoreDiff;
+
+      const countDiff = getRatingCount(b) - getRatingCount(a);
+      if (countDiff !== 0) return countDiff;
+
+      return getCreatedAtSeconds(b) - getCreatedAtSeconds(a);
+    }
+
+    if (sortBy === "downloads") {
+      const diff = getDownloadsValue(b) - getDownloadsValue(a);
+      return diff !== 0 ? diff : getCreatedAtSeconds(b) - getCreatedAtSeconds(a);
+    }
+
+    if (sortBy === "bookmarks") {
+      const diff = getBookmarksValue(b) - getBookmarksValue(a);
+      return diff !== 0 ? diff : getCreatedAtSeconds(b) - getCreatedAtSeconds(a);
+    }
+
+    return getCreatedAtSeconds(b) - getCreatedAtSeconds(a);
+  });
+
   // Client-side search
   const displayed = searchQuery.trim()
-    ? combined.filter((item) => {
+    ? sortedCombined.filter((item) => {
         const q = searchQuery.toLowerCase();
         if (item.kind === "lesson") {
           return (
@@ -176,7 +237,20 @@ export default function ResourcesPage() {
           item.data.tags.some((t) => t.toLowerCase().includes(q))
         );
       })
-    : combined;
+    : sortedCombined;
+
+  const totalPages = Math.max(1, Math.ceil(displayed.length / RESULTS_PER_PAGE));
+  const activePage = Math.min(page, totalPages);
+  const pageStart = Math.max(1, activePage - Math.floor(MAX_PAGE_BUTTONS / 2));
+  const pageEnd = Math.min(totalPages, pageStart + MAX_PAGE_BUTTONS - 1);
+  const visiblePageNumbers = Array.from(
+    { length: pageEnd - pageStart + 1 },
+    (_, idx) => pageStart + idx
+  );
+  const pagedDisplayed = useMemo(() => {
+    const start = (activePage - 1) * RESULTS_PER_PAGE;
+    return displayed.slice(start, start + RESULTS_PER_PAGE);
+  }, [displayed, activePage]);
 
   const isLoading = loading || lessonsLoading;
   const hasFilters = gradeLevel || subject || resourceType;
@@ -190,7 +264,7 @@ export default function ResourcesPage() {
             Resource Library
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Browse, share, and download teaching resources — lesson plans,
+            Browse, share, and download teaching resources - lesson plans,
             worksheets, strategies, and more.
           </p>
         </div>
@@ -220,7 +294,7 @@ export default function ResourcesPage() {
       <Card className="mb-8">
         <div className="flex flex-col gap-4">
           <Input
-            placeholder="Search resources by title, description, or tags…"
+            placeholder="Search resources and lesson plans..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             icon={
@@ -268,10 +342,13 @@ export default function ResourcesPage() {
               <Select
                 label="Sort By"
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as ResourceSortBy)}
+                onChange={(e) => setSortBy(e.target.value as LibrarySortBy)}
                 options={[
                   { value: "newest", label: "Newest" },
-                  { value: "popular", label: "Most Popular" },
+                  { value: "oldest", label: "Oldest" },
+                  { value: "rating", label: "Rating" },
+                  { value: "downloads", label: "Downloads" },
+                  { value: "bookmarks", label: "Bookmarks" },
                 ]}
               />
           </div>
@@ -325,23 +402,52 @@ export default function ResourcesPage() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {displayed.map((item) =>
+            {pagedDisplayed.map((item) =>
               item.kind === "lesson" ? (
-                <LessonPlanCard key={`lesson-${item.data.id}`} lesson={item.data} />
+                <LessonPlanCard
+                  key={`lesson-${item.data.id}`}
+                  lesson={item.data}
+                  ratingAverage={getLessonRatingAverage(item.data)}
+                  ratingCount={getLessonRatingCount(item.data)}
+                />
               ) : (
                 <ResourceCard key={`resource-${item.data.id}`} resource={item.data} />
               )
             )}
           </div>
 
-          {hasMore && !searchQuery && includeResources && (
-            <div className="mt-8 flex justify-center">
+          {displayed.length > RESULTS_PER_PAGE && (
+            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button
                 variant="outline"
-                onClick={() => fetchResources(false)}
-                isLoading={loadingMore}
+                disabled={activePage <= 1}
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
               >
-                Load More
+                Previous
+              </Button>
+              <div className="flex items-center gap-1">
+                {visiblePageNumbers.map((pageNumber) => (
+                  <Button
+                    key={pageNumber}
+                    variant={pageNumber === activePage ? "primary" : "outline"}
+                    size="sm"
+                    onClick={() => setPage(pageNumber)}
+                    aria-label={`Go to page ${pageNumber}`}
+                    aria-current={pageNumber === activePage ? "page" : undefined}
+                  >
+                    {pageNumber}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-sm text-muted">
+                Page {activePage} of {totalPages}
+              </p>
+              <Button
+                variant="outline"
+                disabled={activePage >= totalPages}
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              >
+                Next
               </Button>
             </div>
           )}
@@ -353,14 +459,36 @@ export default function ResourcesPage() {
 
 // --- Lesson plan card ---
 
-function LessonPlanCard({ lesson }: { lesson: Lesson }) {
+function LessonPlanCard({
+  lesson,
+  ratingAverage,
+  ratingCount,
+}: {
+  lesson: Lesson;
+  ratingAverage: number;
+  ratingCount: number;
+}) {
   return (
     <Link href={`/lesson-builder/${lesson.id}`}>
       <Card hoverable className="flex h-full flex-col">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
           <Badge variant="primary">Lesson Plan</Badge>
           {lesson.gradeLevel && (
             <Badge variant="default">{lesson.gradeLevel}</Badge>
+          )}
+          </div>
+          {ratingCount > 0 && (
+            <span className="flex items-center gap-1 text-xs text-muted">
+              <svg
+                className="h-3.5 w-3.5 text-warning-500"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              {ratingAverage.toFixed(1)} ({ratingCount})
+            </span>
           )}
         </div>
         <h3 className="font-semibold text-foreground line-clamp-2">
@@ -515,7 +643,7 @@ function ResourceCard({ resource }: { resource: Resource }) {
           {resource.gradeLevel && (
             <span className="truncate">{resource.gradeLevel}</span>
           )}
-          {resource.gradeLevel && resource.subject && <span>·</span>}
+          {resource.gradeLevel && resource.subject && <span>-</span>}
           {resource.subject && (
             <span className="truncate">{resource.subject}</span>
           )}

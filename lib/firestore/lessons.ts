@@ -3,6 +3,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   increment,
   collection,
@@ -22,6 +23,7 @@ import { byCreatedAtDesc, byUpdatedAtDesc } from "@/lib/utils";
 export interface LessonStep {
   title: string;
   description: string;
+  duration?: string;
 }
 
 export interface LessonAttachment {
@@ -32,6 +34,7 @@ export interface LessonAttachment {
 export interface Lesson {
   id: string;
   title: string;
+  titleLower?: string;
   authorId: string;
   authorName: string;
   authorPhotoURL: string | null;
@@ -42,11 +45,16 @@ export interface Lesson {
   materials: string[];
   steps: LessonStep[];
   attachments: LessonAttachment[];
+  checkForUnderstanding: string[];
+  assessments: string[];
   isPublic: boolean;
   remixedFromId: string | null;
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
   downloadCount: number;
+  bookmarkCount: number;
+  ratingAverage: number;
+  ratingCount: number;
 }
 
 export interface LessonInput {
@@ -61,6 +69,8 @@ export interface LessonInput {
   materials: string[];
   steps: LessonStep[];
   attachments: LessonAttachment[];
+  checkForUnderstanding: string[];
+  assessments: string[];
   isPublic: boolean;
   remixedFromId?: string | null;
 }
@@ -76,11 +86,15 @@ export async function createLesson(data: LessonInput): Promise<string> {
 
   await setDoc(ref, {
     ...data,
+    titleLower: data.title.toLowerCase(),
     id: ref.id,
     remixedFromId: data.remixedFromId ?? null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     downloadCount: 0,
+    bookmarkCount: 0,
+    ratingAverage: 0,
+    ratingCount: 0,
   });
 
   return ref.id;
@@ -102,8 +116,14 @@ export async function updateLesson(
 
   await updateDoc(doc(db, "lessons", lessonId), {
     ...data,
+    ...(data.title !== undefined ? { titleLower: data.title.toLowerCase() } : {}),
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function deleteLesson(lessonId: string): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "lessons", lessonId));
 }
 
 export interface GetLessonsResult {
@@ -118,7 +138,7 @@ export async function getPublicLessons(
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  // Only equality where() filters — no composite index required.
+  // Only equality where() filters - no composite index required.
   // orderBy is done client-side to avoid needing a composite index.
   const constraints: QueryConstraint[] = [
     where("isPublic", "==", true),
@@ -150,7 +170,7 @@ export async function getLessonsByAuthor(
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  // Single equality where() — no composite index required.
+  // Single equality where() - no composite index required.
   // Filtering by isPublic and sorting are done client-side.
   const q = query(
     collection(db, "lessons"),
@@ -242,4 +262,24 @@ export async function getLessonComments(
   const snapshot = await getDocs(q);
 
   return snapshot.docs.map((d) => d.data() as LessonComment);
+}
+
+export async function updateLessonComment(
+  lessonId: string,
+  commentId: string,
+  text: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(doc(db, "lessons", lessonId, "comments", commentId), {
+    content: text.trim().slice(0, 2000),
+    editedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteLessonComment(
+  lessonId: string,
+  commentId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "lessons", lessonId, "comments", commentId));
 }

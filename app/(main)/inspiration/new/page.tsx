@@ -244,7 +244,7 @@ export default function NewInspirationPage() {
               <p className="mt-1 text-xs text-muted">Max 5 MB. JPG, PNG, or WebP.</p>
             </div>
 
-            {/* URL field — only when no file */}
+            {/* URL field - only when no file */}
             {!thumbnailFile && (
               <div>
                 <label className="text-xs text-muted mb-1 block">Or paste an image URL</label>

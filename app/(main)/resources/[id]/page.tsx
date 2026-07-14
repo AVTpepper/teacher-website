@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   getResource,
@@ -15,13 +16,14 @@ import {
   getRelatedResources,
   parseResourceSlug,
   resourceSlug,
+  deleteResource,
   RESOURCE_TYPES,
   type Resource,
 } from "@/lib/firestore/resources";
 import { getUser, type UserProfile } from "@/lib/firestore/users";
-import { Avatar, Badge, Button, Card } from "@/components/ui";
+import { Avatar, Badge, Button, Card, ConfirmDialog, IPNotice } from "@/components/ui";
 import { timeAgo } from "@/lib/utils";
-import { notifyResourceLiked } from "@/lib/notifications";
+import { notifyResourceLiked, notifyResourceDownloaded, notifyResourceShared } from "@/lib/notifications";
 
 export default function ResourceDetailPage({
   params,
@@ -31,6 +33,7 @@ export default function ResourceDetailPage({
   const { id: rawId } = use(params);
   const id = parseResourceSlug(rawId);
   const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
 
   const [resource, setResource] = useState<Resource | null>(null);
   const [author, setAuthor] = useState<UserProfile | null>(null);
@@ -53,6 +56,10 @@ export default function ResourceDetailPage({
   const [related, setRelated] = useState<Resource[]>([]);
   const [copied, setCopied] = useState(false);
 
+  // Delete
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     async function load() {
       try {
@@ -65,7 +72,7 @@ export default function ResourceDetailPage({
         setLocalDownloadCount(res.downloadCount);
         setLocalSavedCount(res.savedByCount);
 
-        // Load author + related in parallel — failures are non-fatal
+        // Load author + related in parallel - failures are non-fatal
         const [authorData] = await Promise.all([
           getUser(res.authorId).catch(() => null),
           getRelatedResources(res).then(setRelated).catch(() => {}),
@@ -94,12 +101,35 @@ export default function ResourceDetailPage({
       .catch(() => {});
   }, [user, resource]);
 
+  async function handleDeleteResource() {
+    if (!resource || deleting) return;
+    setDeleting(true);
+    try {
+      await deleteResource(resource.id);
+      router.push("/resources");
+    } catch {
+      setDeleting(false);
+      setConfirmDeleteOpen(false);
+    }
+  }
+
   async function handleDownload() {
     if (!resource) return;
 
     if (user) {
       trackDownload(resource.id, user.uid).catch(() => {});
       setLocalDownloadCount((c) => c + 1);
+      // Notify resource author (fire-and-forget, skip self-download)
+      if (resource.authorId !== user.uid) {
+        notifyResourceDownloaded({
+          recipientId: resource.authorId,
+          actorId: user.uid,
+          actorName: user.displayName || "Someone",
+          actorPhotoURL: user.photoURL,
+          resourceTitle: resource.title,
+          linkURL: window.location.href,
+        }).catch(() => {});
+      }
     }
 
     // Open file in new tab
@@ -114,6 +144,17 @@ export default function ResourceDetailPage({
       navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+    // Notify resource author (fire-and-forget, skip self-share)
+    if (user && resource && resource.authorId !== user.uid) {
+      notifyResourceShared({
+        recipientId: resource.authorId,
+        actorId: user.uid,
+        actorName: user.displayName || "Someone",
+        actorPhotoURL: user.photoURL,
+        resourceTitle: resource.title,
+        linkURL: window.location.href,
+      }).catch(() => {});
     }
   }
 
@@ -202,6 +243,7 @@ export default function ResourceDetailPage({
   const typeLabel =
     RESOURCE_TYPES.find((t) => t.value === resource.type)?.label ??
     resource.type;
+  const isOwner = user?.uid === resource.authorId;
 
   return (
     <div className={`py-8 space-y-8 ${user ? "pb-24 sm:pb-8" : ""}`}>
@@ -409,6 +451,28 @@ export default function ResourceDetailPage({
                       </svg>
                       {saved ? "Saved" : "Save"}
                     </Button>
+                    {isOwner && (
+                      <>
+                        <Link href={`/resources/upload?edit=${resource.id}`}>
+                          <Button variant="outline">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                            </svg>
+                            Edit
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          onClick={() => setConfirmDeleteOpen(true)}
+                          className="text-destructive hover:bg-destructive/10 border-destructive/30"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                          </svg>
+                          Delete
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
                 <Button variant="outline" onClick={handleShare}>
@@ -432,7 +496,8 @@ export default function ResourceDetailPage({
               Shared{" "}
               {timeAgo(resource.createdAt as { seconds: number } | null)}
             </div>
-          </Card>
+            {/* IP Notice */}
+            <IPNotice />          </Card>
 
         </div>
 
@@ -492,7 +557,7 @@ export default function ResourceDetailPage({
         </div>
       </div>
 
-      {/* Mobile sticky action bar — logged-in only */}
+      {/* Mobile sticky action bar - logged-in only */}
       {user && (
         <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-surface/95 backdrop-blur-sm border-t border-border px-4 py-3 flex items-center gap-2">
           <Button onClick={handleDownload} className="flex-1 justify-center">
@@ -520,6 +585,17 @@ export default function ResourceDetailPage({
           </Button>
         </div>
       )}
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        isOpen={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        onConfirm={handleDeleteResource}
+        title="Delete resource"
+        description="This will permanently delete this resource. This cannot be undone."
+        confirmLabel="Delete"
+        isLoading={deleting}
+      />
     </div>
   );
 }

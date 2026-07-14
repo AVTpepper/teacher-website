@@ -7,11 +7,13 @@ import { type DocumentSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import {
   getInspirationItems,
+  updateInspirationItem,
+  deleteInspirationItem,
   INSPIRATION_CATEGORIES,
   type InspirationCategory,
   type InspirationItem,
 } from "@/lib/firestore/inspiration";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, ConfirmDialog, IPNotice, Modal } from "@/components/ui";
 
 
 
@@ -33,46 +35,79 @@ function categoryIcon(cat: InspirationCategory): string {
 
 // --- Featured card (large, hero-style) ---
 
-function FeaturedCard({ item }: { item: InspirationItem }) {
-  const thumb = item.thumbnailStorageURL || item.thumbnailURL;
-  return (
-    <a
-      href={item.sourceURL}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block group"
-    >
-      <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-        <div className="flex flex-col sm:flex-row gap-0">
-          {/* Thumbnail / colour swatch */}
-          <div
-            className="h-48 sm:h-auto sm:w-64 shrink-0 flex items-center justify-center text-6xl"
-            style={{ background: "var(--color-secondary-50, #f3f4f6)" }}
-          >
-            {thumb ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={thumb}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span role="img" aria-label={categoryLabel(item.category)}>
-                {categoryIcon(item.category)}
-              </span>
-            )}
-          </div>
+interface CardProps {
+  item: InspirationItem;
+  currentUserId?: string | null;
+  onEdit: (item: InspirationItem) => void;
+  onDelete: (item: InspirationItem) => void;
+}
 
-          <div className="p-6 flex flex-col justify-between gap-4">
-            <div>
-              <span
-                className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-3 ${CATEGORY_COLOR[item.category]}`}
-              >
-                {categoryLabel(item.category)}
-              </span>
-              <h2 className="text-xl font-bold text-foreground group-hover:underline leading-snug">
-                {item.title}
-              </h2>
+function FeaturedCard({ item, currentUserId, onEdit, onDelete }: CardProps) {
+  const thumb = item.thumbnailStorageURL || item.thumbnailURL;
+  const isOwner = currentUserId != null && item.submittedBy === currentUserId;
+  return (
+    <div className="relative group">
+      {isOwner && (
+        <div className="absolute top-3 right-3 z-10 flex gap-1">
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); onEdit(item); }}
+            aria-label="Edit inspiration post"
+            className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-foreground hover:bg-surface transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); onDelete(item); }}
+            aria-label="Delete inspiration post"
+            className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+            </svg>
+          </button>
+        </div>
+      )}
+      <a
+        href={item.sourceURL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block group"
+      >
+        <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+          <div className="flex flex-col sm:flex-row gap-0">
+            {/* Thumbnail / colour swatch */}
+            <div
+              className="h-48 sm:h-auto sm:w-64 shrink-0 flex items-center justify-center text-6xl"
+              style={{ background: "var(--color-secondary-50, #f3f4f6)" }}
+            >
+              {thumb ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={thumb}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span role="img" aria-label={categoryLabel(item.category)}>
+                  {categoryIcon(item.category)}
+                </span>
+              )}
+            </div>
+
+            <div className="p-6 flex flex-col justify-between gap-4">
+              <div>
+                <span
+                  className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-3 ${CATEGORY_COLOR[item.category]}`}
+                >
+                  {categoryLabel(item.category)}
+                </span>
+                <h2 className="text-xl font-bold text-foreground group-hover:underline leading-snug">
+                  {item.title}
+                </h2>
               <p className="mt-2 text-sm text-muted line-clamp-3">
                 {item.description}
               </p>
@@ -82,20 +117,47 @@ function FeaturedCard({ item }: { item: InspirationItem }) {
         </div>
       </Card>
     </a>
+    </div>
   );
 }
 
 // --- Regular grid card ---
 
-function InspirationCard({ item }: { item: InspirationItem }) {
+function InspirationCard({ item, currentUserId, onEdit, onDelete }: CardProps) {
   const thumb = item.thumbnailStorageURL || item.thumbnailURL;
+  const isOwner = currentUserId != null && item.submittedBy === currentUserId;
   return (
-    <a
-      href={item.sourceURL}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block group h-full"
-    >
+    <div className="relative group h-full">
+      {isOwner && (
+        <div className="absolute top-2 right-2 z-10 flex gap-1">
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); onEdit(item); }}
+            aria-label="Edit inspiration post"
+            className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-foreground hover:bg-surface transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); onDelete(item); }}
+            aria-label="Delete inspiration post"
+            className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+            </svg>
+          </button>
+        </div>
+      )}
+      <a
+        href={item.sourceURL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block group h-full"
+      >
       <Card className="h-full flex flex-col overflow-hidden hover:shadow-md transition-shadow">
         {/* Thumbnail */}
         <div
@@ -134,6 +196,7 @@ function InspirationCard({ item }: { item: InspirationItem }) {
         </div>
       </Card>
     </a>
+    </div>
   );
 }
 
@@ -149,6 +212,16 @@ export default function InspirationPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const cursorRef = useRef<DocumentSnapshot | null>(null);
+
+  // Edit state
+  const [editingItem, setEditingItem] = useState<InspirationItem | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Delete state
+  const [deletingItem, setDeletingItem] = useState<InspirationItem | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchItems = useCallback(
     async (reset: boolean) => {
@@ -182,6 +255,53 @@ export default function InspirationPage() {
   useEffect(() => {
     fetchItems(true);
   }, [fetchItems]);
+
+  function handleEditOpen(item: InspirationItem) {
+    setEditingItem(item);
+    setEditTitle(item.title);
+    setEditDescription(item.description);
+  }
+
+  async function handleEditSave() {
+    if (!editingItem || editSaving) return;
+    setEditSaving(true);
+    try {
+      await updateInspirationItem(editingItem.id, {
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+      });
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === editingItem.id
+            ? { ...i, title: editTitle.trim(), description: editDescription.trim() }
+            : i
+        )
+      );
+      setEditingItem(null);
+    } catch {
+      // ignore — user can retry
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  function handleDeleteOpen(item: InspirationItem) {
+    setDeletingItem(item);
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deletingItem || deleteLoading) return;
+    setDeleteLoading(true);
+    try {
+      await deleteInspirationItem(deletingItem.id);
+      setItems((prev) => prev.filter((i) => i.id !== deletingItem.id));
+      setDeletingItem(null);
+    } catch {
+      // ignore — user can retry
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
 
   const featured = items[0] ?? null;
   const rest = items.slice(1);
@@ -261,11 +381,24 @@ export default function InspirationPage() {
       {/* Magazine layout */}
       {!loading && items.length > 0 && (
         <div className="space-y-6">
-          {featured && <FeaturedCard item={featured} />}
+          {featured && (
+            <FeaturedCard
+              item={featured}
+              currentUserId={user?.uid ?? null}
+              onEdit={handleEditOpen}
+              onDelete={handleDeleteOpen}
+            />
+          )}
           {rest.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {rest.map((item) => (
-                <InspirationCard key={item.id} item={item} />
+                <InspirationCard
+                  key={item.id}
+                  item={item}
+                  currentUserId={user?.uid ?? null}
+                  onEdit={handleEditOpen}
+                  onDelete={handleDeleteOpen}
+                />
               ))}
             </div>
           )}
@@ -280,6 +413,66 @@ export default function InspirationPage() {
           </Button>
         </div>
       )}
+
+      {/* IP Notice */}
+      <IPNotice />
+
+      {/* Edit modal */}
+      <Modal
+        open={editingItem !== null}
+        onClose={() => setEditingItem(null)}
+        title="Edit inspiration post"
+      >
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="edit-title" className="block text-sm font-medium text-foreground mb-1">
+              Title
+            </label>
+            <input
+              id="edit-title"
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div>
+            <label htmlFor="edit-description" className="block text-sm font-medium text-foreground mb-1">
+              Description
+            </label>
+            <textarea
+              id="edit-description"
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              rows={4}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setEditingItem(null)} disabled={editSaving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditSave}
+              disabled={!editTitle.trim() || editSaving}
+              isLoading={editSaving}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        isOpen={deletingItem !== null}
+        onClose={() => setDeletingItem(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete inspiration post"
+        description="This will permanently remove this post from the feed. This cannot be undone."
+        confirmLabel="Delete"
+        isLoading={deleteLoading}
+      />
     </div>
   );
 }

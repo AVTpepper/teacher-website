@@ -34,7 +34,7 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") || "/";
+  const redirectTo = searchParams.get("redirect") || "/home";
   const { signIn, signInWithGoogle } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -72,7 +72,7 @@ function LoginForm() {
           ? (err as { code: string }).code
           : "";
       if (code === "auth/user-not-found" || code === "auth/invalid-email") {
-        // Don't reveal whether email exists — show generic success
+        // Don't reveal whether email exists - show generic success
         setForgotSent(true);
       } else {
         setForgotError("Failed to send reset email. Please try again.");

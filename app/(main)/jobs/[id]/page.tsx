@@ -49,7 +49,7 @@ export default function JobDetailPage({
             const profile = await getUser(j.postedBy);
             setPoster(profile);
           } catch {
-            // poster profile unavailable — non-critical
+            // poster profile unavailable - non-critical
           }
         }
       })
@@ -249,7 +249,7 @@ export default function JobDetailPage({
                 {poster.displayName}
               </p>
               <p className="text-sm text-muted">
-                {poster.gradeLevel} · {poster.school || poster.location}
+                {poster.gradeLevel} · {poster.school || poster.country}
               </p>
             </div>
           </Link>

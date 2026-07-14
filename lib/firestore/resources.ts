@@ -78,6 +78,7 @@ export const SUGGESTED_TAGS = [
 export interface Resource {
   id: string;
   title: string;
+  titleLower?: string;
   description: string;
   authorId: string;
   authorName: string;
@@ -115,6 +116,23 @@ export interface ResourceInput {
 
 const PAGE_SIZE = 12;
 
+export async function updateResource(
+  resourceId: string,
+  data: Partial<ResourceInput>
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(doc(db, "resources", resourceId), {
+    ...data,
+    ...(data.title !== undefined ? { titleLower: data.title.toLowerCase() } : {}),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteResource(resourceId: string): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "resources", resourceId));
+}
+
 export async function createResource(data: ResourceInput): Promise<string> {
   if (!db) throw new Error("Firestore is not initialized");
 
@@ -122,6 +140,7 @@ export async function createResource(data: ResourceInput): Promise<string> {
 
   await setDoc(ref, {
     ...data,
+    titleLower: data.title.toLowerCase(),
     id: ref.id,
     links: data.links ?? [],
     createdAt: serverTimestamp(),
@@ -203,7 +222,7 @@ export async function getResourcesByAuthor(
 ): Promise<GetResourcesResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  // Single equality where() — uses Firestore auto single-field index, no composite needed.
+  // Single equality where() - uses Firestore auto single-field index, no composite needed.
   // Sort client-side to avoid needing a composite index.
   const q = query(
     collection(db, "resources"),
@@ -226,7 +245,7 @@ export async function trackDownload(
 ): Promise<void> {
   if (!db) throw new Error("Firestore is not initialized");
 
-  // Record individual download (idempotent per user — overwrites)
+  // Record individual download (idempotent per user - overwrites)
   await setDoc(doc(db, "resources", resourceId, "downloads", userId), {
     downloadedAt: serverTimestamp(),
   });
@@ -377,6 +396,26 @@ export async function getResourceComments(
   const snapshot = await getDocs(q);
 
   return snapshot.docs.map((d) => d.data() as ResourceComment);
+}
+
+export async function updateResourceComment(
+  resourceId: string,
+  commentId: string,
+  text: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await updateDoc(doc(db, "resources", resourceId, "comments", commentId), {
+    content: text.trim().slice(0, 2000),
+    editedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteResourceComment(
+  resourceId: string,
+  commentId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "resources", resourceId, "comments", commentId));
 }
 
 // --- Related resources ---

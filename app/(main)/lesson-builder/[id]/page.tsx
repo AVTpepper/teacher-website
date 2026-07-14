@@ -6,21 +6,26 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   getLesson,
+  deleteLesson,
   trackLessonDownload,
   getLessonComments,
   addLessonComment,
+  updateLessonComment,
+  deleteLessonComment,
   type Lesson,
   type LessonComment,
 } from "@/lib/firestore/lessons";
 import { getUser, type UserProfile } from "@/lib/firestore/users";
-import { Avatar, Badge, Button, Card } from "@/components/ui";
+import { getUserRating, submitRating } from "@/lib/firestore/ratings";
+import { Avatar, Badge, Button, Card, ConfirmDialog, IPNotice } from "@/components/ui";
 import CommentThread, {
   type CommentData,
 } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
-import { notifyComment, notifyMention } from "@/lib/notifications";
+import { notifyComment, notifyLessonRated, notifyLessonDownloaded, notifyLessonShared, notifyCommentReplied, notifyMention } from "@/lib/notifications";
 import { pdf } from "@react-pdf/renderer";
 import LessonPDFDocument from "@/components/lessons/LessonPDFDocument";
+import LessonPreviewModal from "@/components/lessons/LessonPreviewModal";
 
 export default function LessonDetailPage({
   params,
@@ -39,6 +44,20 @@ export default function LessonDetailPage({
   // Download
   const [localDownloadCount, setLocalDownloadCount] = useState(0);
   const [copied, setCopied] = useState(false);
+
+  // Preview
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  // Delete
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Ratings
+  const [ratingAverage, setRatingAverage] = useState(0);
+  const [ratingCount, setRatingCount] = useState(0);
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [ratingHover, setRatingHover] = useState<number | null>(null);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
 
   // Comments
   const [comments, setComments] = useState<LessonComment[]>([]);
@@ -66,12 +85,19 @@ export default function LessonDetailPage({
         }
         setLesson(res);
         setLocalDownloadCount(res.downloadCount);
+        setRatingAverage(res.ratingAverage ?? 0);
+        setRatingCount(res.ratingCount ?? 0);
 
         const [authorData] = await Promise.all([
           getUser(res.authorId),
           loadComments(),
         ]);
         setAuthor(authorData);
+
+        // Load user's existing rating
+        if (user) {
+          getUserRating(user.uid, id).then(setUserRating).catch(() => {});
+        }
       } catch {
         setNotFound(true);
       } finally {
@@ -81,16 +107,69 @@ export default function LessonDetailPage({
     load();
   }, [id, loadComments]);
 
+  async function handleDeleteLesson() {
+    if (!lesson || deleting) return;
+    setDeleting(true);
+    try {
+      await deleteLesson(lesson.id);
+      router.push("/lesson-builder");
+    } catch {
+      setDeleting(false);
+      setConfirmDeleteOpen(false);
+    }
+  }
+
+  async function handleRate(value: number) {
+    if (!user || !lesson || ratingSubmitting) return;
+    setRatingSubmitting(true);
+    try {
+      await submitRating(user.uid, lesson.id, value);
+      const wasRated = userRating !== null;
+      const prevTotal = ratingAverage * ratingCount;
+      const newCount = wasRated ? ratingCount : ratingCount + 1;
+      const newAvg = wasRated
+        ? (prevTotal - (userRating ?? 0) + value) / newCount
+        : (prevTotal + value) / newCount;
+      setUserRating(value);
+      setRatingCount(newCount);
+      setRatingAverage(Math.round(newAvg * 10) / 10);
+      // Notify lesson author (fire-and-forget, skip self-rating)
+      if (lesson.authorId !== user.uid) {
+        notifyLessonRated({
+          recipientId: lesson.authorId,
+          actorId: user.uid,
+          actorName: user.displayName || "Someone",
+          actorPhotoURL: user.photoURL,
+          lessonTitle: lesson.title,
+          linkURL: window.location.href,
+        }).catch(() => {});
+      }
+    } finally {
+      setRatingSubmitting(false);
+    }
+  }
+
   async function handleDownload() {
     if (!lesson) return;
 
     if (user) {
       trackLessonDownload(lesson.id, user.uid).catch(() => {});
       setLocalDownloadCount((c) => c + 1);
+      // Notify lesson author (fire-and-forget, skip self-download)
+      if (lesson.authorId !== user.uid) {
+        notifyLessonDownloaded({
+          recipientId: lesson.authorId,
+          actorId: user.uid,
+          actorName: user.displayName || "Someone",
+          actorPhotoURL: user.photoURL,
+          lessonTitle: lesson.title,
+          linkURL: window.location.href,
+        }).catch(() => {});
+      }
     }
 
     // Generate a PDF and trigger download
-    const blob = await pdf(<LessonPDFDocument lesson={lesson} />).toBlob();
+    const blob = await pdf(<LessonPDFDocument lesson={lesson} authorName={lesson.authorName} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -114,6 +193,17 @@ export default function LessonDetailPage({
       navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+    // Notify lesson author (fire-and-forget, skip self-share)
+    if (user && lesson && lesson.authorId !== user.uid) {
+      notifyLessonShared({
+        recipientId: lesson.authorId,
+        actorId: user.uid,
+        actorName: user.displayName || "Someone",
+        actorPhotoURL: user.photoURL,
+        lessonTitle: lesson.title,
+        linkURL: window.location.href,
+      }).catch(() => {});
     }
   }
 
@@ -166,7 +256,7 @@ export default function LessonDetailPage({
   const isOwner = user?.uid === lesson.authorId;
 
   return (
-    <div className={`py-8 space-y-8 ${user ? "pb-24 sm:pb-8" : ""}`}>
+    <div className="py-8 space-y-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted">
         <Link
@@ -205,6 +295,68 @@ export default function LessonDetailPage({
                 {lesson.title}
               </h1>
 
+              {/* Rating display + interactive widget */}
+              <div className="mt-2 flex flex-wrap items-center gap-4">
+                {/* Aggregate display */}
+                {ratingCount > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <svg
+                          key={star}
+                          className={`h-4 w-4 shrink-0 ${
+                            ratingAverage >= star - 0.25
+                              ? "text-amber-400"
+                              : ratingAverage >= star - 0.75
+                              ? "text-amber-300"
+                              : "text-border"
+                          }`}
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 0 .95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 0-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 0 0-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 0-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 0 0 .951-.69l1.07-3.292Z" />
+                        </svg>
+                      ))}
+                    </span>
+                    <span className="text-sm font-medium text-foreground">{ratingAverage.toFixed(1)}</span>
+                    <span className="text-xs text-muted">({ratingCount} rating{ratingCount !== 1 ? "s" : ""})</span>
+                  </div>
+                )}
+
+                {/* Interactive stars for logged-in non-owners */}
+                {user && !isOwner && (
+                  <div className="flex items-center gap-1" role="group" aria-label="Rate this lesson">
+                    <span className="text-xs text-muted mr-1">{userRating ? "Your rating:" : "Rate:"}</span>
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const active = (ratingHover ?? userRating ?? 0) >= star;
+                      return (
+                        <button
+                          key={star}
+                          type="button"
+                          disabled={ratingSubmitting}
+                          onClick={() => handleRate(star)}
+                          onMouseEnter={() => setRatingHover(star)}
+                          onMouseLeave={() => setRatingHover(null)}
+                          aria-label={`Rate ${star} star${star !== 1 ? "s" : ""}`}
+                          className="cursor-pointer disabled:opacity-50 transition-transform hover:scale-110"
+                        >
+                          <svg
+                            className={`h-5 w-5 transition-colors ${active ? "text-amber-400" : "text-border"}`}
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 0 .95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 0-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 0 0-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 0-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 0 0 .951-.69l1.07-3.292Z" />
+                          </svg>
+                        </button>
+                      );
+                    })}
+                    {ratingSubmitting && <span className="ml-1 text-xs text-muted">Saving...</span>}
+                  </div>
+                )}
+              </div>
+
               <div className="mt-2 flex items-center gap-3">
                 <Link href={`/educators/${lesson.authorId}`}>
                   <Avatar
@@ -230,6 +382,12 @@ export default function LessonDetailPage({
             </div>
 
             {/* Objectives */}
+            {/* IP attribution notice — below metadata, above content */}
+            <p className="text-xs text-muted">
+              The content of this lesson plan is the intellectual property of{" "}
+              <span className="font-medium text-foreground">{lesson.authorName}</span>. All rights reserved.
+            </p>
+
             {lesson.objectives.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">
@@ -272,6 +430,14 @@ export default function LessonDetailPage({
               </div>
             )}
 
+            {/* Duration */}
+            {user && lesson.duration && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted">⏱</span>
+                <span className="font-medium text-foreground">{lesson.duration}</span>
+              </div>
+            )}
+
             {/* Steps */}
             {user && lesson.steps.length > 0 && (
               <div>
@@ -284,10 +450,15 @@ export default function LessonDetailPage({
                       key={i}
                       className="border-l-2 border-primary-300 pl-4"
                     >
-                      <p className="text-sm font-semibold text-foreground">
-                        Step {i + 1}
-                        {step.title ? `: ${step.title}` : ""}
-                      </p>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-sm font-semibold text-foreground">
+                          Step {i + 1}
+                          {step.title ? `: ${step.title}` : ""}
+                        </p>
+                        {step.duration && (
+                          <span className="shrink-0 text-xs text-muted">{step.duration}</span>
+                        )}
+                      </div>
                       {step.description && (
                         <p className="mt-1 text-sm text-muted whitespace-pre-wrap">
                           {step.description}
@@ -296,6 +467,34 @@ export default function LessonDetailPage({
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Check for Understanding */}
+            {user && lesson.checkForUnderstanding.filter(Boolean).length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">
+                  🤔 Check for Understanding
+                </h3>
+                <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
+                  {lesson.checkForUnderstanding.filter(Boolean).map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Assessment */}
+            {user && lesson.assessments.filter(Boolean).length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">
+                  📝 Assessment
+                </h3>
+                <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
+                  {lesson.assessments.filter(Boolean).map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
               </div>
             )}
 
@@ -359,6 +558,29 @@ export default function LessonDetailPage({
             <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
               {user && (
                 <>
+                  <Button variant="outline" onClick={() => setPreviewOpen(true)}>
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                      />
+                    </svg>
+                    Preview
+                  </Button>
+
                   <Button onClick={handleDownload}>
                     <svg
                       className="h-4 w-4"
@@ -396,9 +618,21 @@ export default function LessonDetailPage({
                   )}
 
                   {isOwner && (
-                    <Link href={`/lesson-builder/new?edit=${lesson.id}`}>
-                      <Button variant="outline">Edit</Button>
-                    </Link>
+                    <>
+                      <Link href={`/lesson-builder/new?edit=${lesson.id}`}>
+                        <Button variant="outline">Edit</Button>
+                      </Link>
+                      <Button
+                        variant="outline"
+                        onClick={() => setConfirmDeleteOpen(true)}
+                        className="text-destructive hover:bg-destructive/10 border-destructive/30"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                        </svg>
+                        Delete
+                      </Button>
+                    </>
                   )}
 
                   <Button variant="outline" onClick={handleShare}>
@@ -432,7 +666,7 @@ export default function LessonDetailPage({
           {/* Comments */}
           <Card padding="lg">
             <h2 className="text-lg font-semibold text-foreground mb-4">
-              Discussion
+              Discussion, Feedback & Suggestions
             </h2>
             <CommentThread
               comments={commentData}
@@ -449,7 +683,7 @@ export default function LessonDetailPage({
                   content,
                   mentionedUsers: mentionedUsers ?? [],
                 });
-                // Notify lesson author (fire-and-forget)
+                // Notify lesson author on top-level comment (fire-and-forget)
                 if (lesson.authorId !== user.uid && !parentId) {
                   notifyComment({
                     recipientId: lesson.authorId,
@@ -460,7 +694,20 @@ export default function LessonDetailPage({
                     linkURL: window.location.href,
                   }).catch(() => {});
                 }
-                // Notify mentioned users (fire-and-forget)
+                // Notify parent comment author on reply (fire-and-forget)
+                if (parentId) {
+                  const parentComment = comments.find((c) => c.id === parentId);
+                  if (parentComment && parentComment.authorId !== user.uid) {
+                    notifyCommentReplied({
+                      recipientId: parentComment.authorId,
+                      actorId: user.uid,
+                      actorName: user.displayName || "Someone",
+                      actorPhotoURL: user.photoURL,
+                      linkURL: window.location.href,
+                    }).catch(() => {});
+                  }
+                }
+                // Fire mention notifications (fire-and-forget)
                 if (mentionedUsers?.length) {
                   mentionedUsers.forEach(({ uid }) => {
                     if (uid !== user.uid) {
@@ -477,8 +724,17 @@ export default function LessonDetailPage({
                 await loadComments();
                 return newId;
               }}
+              onUpdateComment={async (commentId, text) => {
+                await updateLessonComment(lesson.id, commentId, text);
+              }}
+              onDeleteComment={async (commentId) => {
+                await deleteLessonComment(lesson.id, commentId);
+              }}
             />
           </Card>
+
+          {/* IP Notice */}
+          <IPNotice />
         </div>
 
         {/* Right sidebar */}
@@ -528,18 +784,26 @@ export default function LessonDetailPage({
             </h3>
             <dl className="space-y-2 text-sm">
               {lesson.gradeLevel && (
-                <div className="flex justify-between">
-                  <dt className="text-muted">Grade Level</dt>
-                  <dd className="text-foreground font-medium">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted shrink-0">Grade Level</dt>
+                  <dd className="text-foreground font-medium text-right">
                     {lesson.gradeLevel}
                   </dd>
                 </div>
               )}
               {lesson.subject && (
-                <div className="flex justify-between">
-                  <dt className="text-muted">Subject</dt>
-                  <dd className="text-foreground font-medium">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted shrink-0">Subject</dt>
+                  <dd className="text-foreground font-medium text-right">
                     {lesson.subject}
+                  </dd>
+                </div>
+              )}
+              {lesson.duration && (
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted shrink-0">Duration</dt>
+                  <dd className="text-foreground font-medium text-right">
+                    {lesson.duration}
                   </dd>
                 </div>
               )}
@@ -580,29 +844,28 @@ export default function LessonDetailPage({
         </div>
       </div>
 
-      {/* Mobile sticky action bar — logged-in only */}
-      {user && (
-        <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-surface/95 backdrop-blur-sm border-t border-border px-4 py-3 flex items-center gap-2">
-          <Button onClick={handleDownload} className="flex-1 justify-center">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-            </svg>
-            Download
-          </Button>
-          <Button variant="outline" onClick={handleRemix} className="flex-1 justify-center">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
-            </svg>
-            Modify
-          </Button>
-          <Button variant="outline" onClick={handleShare} className="flex-1 justify-center">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
-            </svg>
-            {copied ? "✓" : "Share"}
-          </Button>
-        </div>
-      )}
+      {/* Lesson Preview Modal */}
+      <LessonPreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        lesson={lesson}
+        authorName={lesson.authorName}
+        onDownload={() => {
+          setPreviewOpen(false);
+          handleDownload();
+        }}
+      />
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        isOpen={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        onConfirm={handleDeleteLesson}
+        title="Delete lesson plan"
+        description="This will permanently delete this lesson plan. This cannot be undone."
+        confirmLabel="Delete"
+        isLoading={deleting}
+      />
     </div>
   );
 }

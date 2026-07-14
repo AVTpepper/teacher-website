@@ -199,3 +199,40 @@ body {
 .focus-ring {
   @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
+
+/* ========================================
+   Print Styles — Lesson Preview
+   ======================================== */
+
+@media print {
+  /* Hide everything on the page */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show only the lesson preview content */
+  .lesson-preview-content,
+  .lesson-preview-content * {
+    visibility: visible;
+  }
+
+  /* Position the content at the top-left */
+  .lesson-preview-content {
+    position: fixed;
+    inset: 0;
+    overflow: visible;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    padding: 2cm !important;
+    background: white !important;
+  }
+
+  /* Hide modal chrome elements */
+  .lesson-preview-header,
+  .lesson-preview-actions,
+  .lesson-preview-close {
+    display: none !important;
+  }
+}

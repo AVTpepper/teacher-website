@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import NavSearchBar from "@/components/layout/NavSearchBar";
 import Avatar from "@/components/ui/Avatar";
 import Dropdown from "@/components/ui/Dropdown";
 import NotificationDropdown from "@/components/layout/NotificationDropdown";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const navLinks = [
-  { href: "/", label: "Home" },
+  { href: "/home", label: "Home" },
   { href: "/educators", label: "Educators" },
   { href: "/forums", label: "Forums" },
   { href: "/resources", label: "Resources" },
@@ -24,6 +25,9 @@ export default function Navbar() {
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
@@ -32,19 +36,32 @@ export default function Navbar() {
 
   return (
     <>
+    <ConfirmDialog
+      isOpen={signOutOpen}
+      onClose={() => setSignOutOpen(false)}
+      onConfirm={async () => {
+        setSignOutOpen(false);
+        await signOut();
+        router.push("/");
+      }}
+      title="Sign out?"
+      description="You will be returned to the home page."
+      confirmLabel="Sign out"
+      isDestructive={false}
+    />
     <header className="sticky top-0 z-50 border-b border-border bg-surface/95 backdrop-blur supports-backdrop-filter:bg-surface/80">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* Top row: Logo + Search + Actions */}
         <div className="flex h-14 items-center justify-between gap-4">
           {/* Logo */}
           <Link
-            href="/"
+            href={mounted && user ? "/home" : "/"}
             className="shrink-0 text-lg font-bold text-primary-900"
           >
             EduConnect
           </Link>
 
-          {/* Search — hidden on mobile, shown md+ */}
+          {/* Search - hidden on mobile, shown md+ */}
           <div className="hidden md:block flex-1 max-w-md mx-4">
             <NavSearchBar placeholder="Search educators, resources, discussions..." />
           </div>
@@ -55,7 +72,7 @@ export default function Navbar() {
             <NotificationDropdown />
 
             {/* User menu */}
-            {!loading && (
+            {mounted && !loading && (
               <>
                 {user ? (
                   <Dropdown
@@ -75,17 +92,14 @@ export default function Navbar() {
                         },
                       },
                       {
-                        label: "Settings",
+                        label: "Account Management",
                         onClick: () => {
-                          router.push("/profile/edit");
+                          router.push("/account");
                         },
                       },
                       {
                         label: "Sign out",
-                        onClick: async () => {
-                          await signOut();
-                          router.push("/");
-                        },
+                        onClick: () => setSignOutOpen(true),
                         destructive: true,
                       },
                     ]}
@@ -161,10 +175,10 @@ export default function Navbar() {
       </div>
     </header>
 
-    {/* Mobile menu — rendered outside header to avoid stacking context issues */}
+    {/* Mobile menu - rendered outside header to avoid stacking context issues */}
     {mobileMenuOpen && (
       <div className="fixed inset-0 top-14 z-40 lg:hidden">
-        {/* Backdrop overlay — below header */}
+        {/* Backdrop overlay - below header */}
         <div
           className="absolute inset-0 bg-black/40"
           onClick={() => setMobileMenuOpen(false)}

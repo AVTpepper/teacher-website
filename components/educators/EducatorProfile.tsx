@@ -51,6 +51,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   const [notFound, setNotFound] = useState(false);
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [followError, setFollowError] = useState<string | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [lessonsLoading, setLessonsLoading] = useState(false);
   const [lessonsLoaded, setLessonsLoaded] = useState(false);
@@ -187,19 +188,21 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   async function handleFollowToggle() {
     if (!user || !profile) return;
     setFollowLoading(true);
+    setFollowError(null);
+
+    // Optimistic update — apply immediately before Firestore confirms
+    const wasFollowing = following;
+    const countDelta = wasFollowing ? -1 : 1;
+    setFollowing(!wasFollowing);
+    setProfile((p) =>
+      p ? { ...p, followerCount: Math.max(0, p.followerCount + countDelta) } : p
+    );
+
     try {
-      if (following) {
+      if (wasFollowing) {
         await unfollowUser(user.uid, profile.uid);
-        setFollowing(false);
-        setProfile((p) =>
-          p ? { ...p, followerCount: Math.max(0, p.followerCount - 1) } : p
-        );
       } else {
         await followUser(user.uid, profile.uid);
-        setFollowing(true);
-        setProfile((p) =>
-          p ? { ...p, followerCount: p.followerCount + 1 } : p
-        );
         // Notify the followed user (fire-and-forget)
         notifyNewFollower({
           recipientId: profile.uid,
@@ -209,7 +212,16 @@ export default function EducatorProfile({ userId }: { userId: string }) {
         }).catch(() => {});
       }
     } catch {
-      // Silently fail
+      // Revert optimistic changes on failure
+      setFollowing(wasFollowing);
+      setProfile((p) =>
+        p ? { ...p, followerCount: Math.max(0, p.followerCount - countDelta) } : p
+      );
+      setFollowError(
+        wasFollowing
+          ? "Could not unfollow. Please try again."
+          : "Could not follow. Please try again."
+      );
     } finally {
       setFollowLoading(false);
     }
@@ -321,7 +333,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
                   {profile.school}
                 </span>
               )}
-              {profile.location && (
+              {profile.country && (
                 <span className="flex items-center gap-1">
                   <svg
                     className="h-4 w-4"
@@ -341,7 +353,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
                       d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0 1 15 0Z"
                     />
                   </svg>
-                  {profile.location}
+                  {profile.country}
                 </span>
               )}
               {profile.yearsOfExperience > 0 && (
@@ -377,20 +389,26 @@ export default function EducatorProfile({ userId }: { userId: string }) {
 
             {/* Stats */}
             <div className="mt-4 flex items-center justify-center gap-6 text-sm sm:justify-start">
-              <span>
+              <Link
+                href={`/educators/${userId}/followers`}
+                className="hover:underline focus-ring rounded"
+              >
                 <strong className="text-foreground">
                   {profile.followerCount}
                 </strong>{" "}
                 <span className="text-muted">
                   {profile.followerCount === 1 ? "Follower" : "Followers"}
                 </span>
-              </span>
-              <span>
+              </Link>
+              <Link
+                href={`/educators/${userId}/following`}
+                className="hover:underline focus-ring rounded"
+              >
                 <strong className="text-foreground">
                   {profile.followingCount}
                 </strong>{" "}
                 <span className="text-muted">Following</span>
-              </span>
+              </Link>
             </div>
 
             {/* Bio */}
@@ -414,6 +432,9 @@ export default function EducatorProfile({ userId }: { userId: string }) {
               Message
             </Button>
           </div>
+        )}
+        {followError && (
+          <p role="alert" className="mt-2 text-xs text-error-600">{followError}</p>
         )}
 
         {isOwnProfile && (
@@ -548,7 +569,7 @@ function PostsTabContent({
         }
         cta={
           isOwnProfile ? (
-            <Link href="/">
+            <Link href="/home">
               <Button size="sm" className="mt-4">
                 Create a Post
               </Button>

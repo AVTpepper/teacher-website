@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import { getPosts, type Post } from "@/lib/firestore/posts";
@@ -229,10 +230,11 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Mobile drawer button — rendered in the main layout on small screens
+// Mobile drawer button - rendered in the main layout on small screens
 // ---------------------------------------------------------------------------
 
 export function SidebarDrawerButton() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   // Close on route changes
@@ -254,9 +256,12 @@ export function SidebarDrawerButton() {
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
+  // Hide on lesson-builder pages - they show their own AI floating button
+  if (pathname?.startsWith("/lesson-builder")) return null;
+
   return (
     <>
-      {/* Toggle button — only visible on mobile */}
+      {/* Toggle button - only visible on mobile */}
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -306,7 +311,7 @@ export function SidebarDrawerButton() {
 }
 
 // ---------------------------------------------------------------------------
-// Default export — desktop aside (hidden on mobile)
+// Default export - desktop aside (hidden on mobile)
 // ---------------------------------------------------------------------------
 
 export default function Sidebar() {

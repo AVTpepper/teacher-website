@@ -17,11 +17,11 @@ export default function CookiesPage() {
         <ul className="space-y-2 text-muted">
           <li className="flex items-start gap-2">
             <span className="text-primary-900 font-bold mt-0.5">•</span>
-            <span><strong className="text-foreground">Authentication</strong> — We use Firebase Authentication, which sets session cookies to keep you logged in.</span>
+            <span><strong className="text-foreground">Authentication</strong>: We use Firebase Authentication, which sets session cookies to keep you logged in.</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary-900 font-bold mt-0.5">•</span>
-            <span><strong className="text-foreground">Preferences</strong> — We may store lightweight preferences (such as theme settings) in your browser's local storage.</span>
+            <span><strong className="text-foreground">Preferences</strong>: We may store lightweight preferences (such as theme settings) in your browser's local storage.</span>
           </li>
         </ul>
       </section>

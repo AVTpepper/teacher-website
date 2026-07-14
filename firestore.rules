@@ -23,11 +23,15 @@ service cloud.firestore {
       allow read: if true;
       // Only the owner can create or update their own profile
       allow create: if isOwner(userId);
-      // Owner can update anything; any authenticated user can increment/decrement followerCount (follow/unfollow)
-      allow update: if isOwner(userId)
+      // Owner can update their profile but cannot change protected fields (tier, createdAt, role)
+      // Any authenticated user can increment/decrement followerCount (follow/unfollow)
+      allow update: if (isOwner(userId)
+                        && !request.resource.data.diff(resource.data)
+                              .affectedKeys().hasAny(['tier', 'createdAt', 'role']))
                     || (isAuth() && request.resource.data.diff(resource.data)
                            .affectedKeys().hasOnly(['followerCount']));
-      allow delete: if false;
+      // Only the owner can delete their own profile (account deletion)
+      allow delete: if isOwner(userId);
 
       // followers sub-collection — users/{userId}/followers/{followerId}
       match /followers/{followerId} {
@@ -38,6 +42,20 @@ service cloud.firestore {
       // following sub-collection — users/{userId}/following/{followingId}
       match /following/{followingId} {
         allow read: if true;
+        allow write: if isOwner(userId);
+      }
+
+      // aiUsage sub-collection — users/{userId}/aiUsage/{dateKey}
+      // Stores daily AI request counts; only the owner may read or write
+      match /aiUsage/{dateKey} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+
+      // aiRefineUsage sub-collection — users/{userId}/aiRefineUsage/{monthKey}
+      // Stores monthly AI refine counts; only the owner may read or write
+      match /aiRefineUsage/{monthKey} {
+        allow read: if isOwner(userId);
         allow write: if isOwner(userId);
       }
     }
@@ -72,7 +90,9 @@ service cloud.firestore {
                       && request.resource.data.authorId == request.auth.uid;
         allow update: if isAuth()
                       && (
-                        resource.data.authorId == request.auth.uid
+                        (resource.data.authorId == request.auth.uid
+                         && request.resource.data.diff(resource.data)
+                              .affectedKeys().hasOnly(['content', 'editedAt']))
                         || request.resource.data.diff(resource.data)
                              .affectedKeys().hasOnly(['likesCount'])
                       );
@@ -120,8 +140,12 @@ service cloud.firestore {
         allow read: if true;
         allow create: if isAuth()
                       && request.resource.data.authorId == request.auth.uid;
-        allow update, delete: if isAuth()
-                              && resource.data.authorId == request.auth.uid;
+        allow update: if isAuth()
+                      && resource.data.authorId == request.auth.uid
+                      && request.resource.data.diff(resource.data)
+                           .affectedKeys().hasOnly(['content', 'editedAt']);
+        allow delete: if isAuth()
+                      && resource.data.authorId == request.auth.uid;
       }
     }
 
@@ -140,7 +164,8 @@ service cloud.firestore {
                     && (
                       resource.data.authorId == request.auth.uid
                       || request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['downloadCount', 'updatedAt'])
+                           .hasOnly(['downloadCount', 'bookmarkCount', 'ratingAverage',
+                                     'ratingCount', 'updatedAt'])
                     );
       allow delete: if isAuth() && resource.data.authorId == request.auth.uid;
 
@@ -155,8 +180,12 @@ service cloud.firestore {
         allow read: if true;
         allow create: if isAuth()
                       && request.resource.data.authorId == request.auth.uid;
-        allow update, delete: if isAuth()
-                              && resource.data.authorId == request.auth.uid;
+        allow update: if isAuth()
+                      && resource.data.authorId == request.auth.uid
+                      && request.resource.data.diff(resource.data)
+                           .affectedKeys().hasOnly(['content', 'editedAt']);
+        allow delete: if isAuth()
+                      && resource.data.authorId == request.auth.uid;
       }
     }
 
@@ -190,7 +219,9 @@ service cloud.firestore {
                         && request.resource.data.authorId == request.auth.uid;
           allow update: if isAuth()
                         && (
-                          resource.data.authorId == request.auth.uid
+                          (resource.data.authorId == request.auth.uid
+                           && request.resource.data.diff(resource.data)
+                                .affectedKeys().hasOnly(['content', 'editedAt']))
                           || request.resource.data.diff(resource.data).affectedKeys()
                                .hasOnly(['upvotes', 'downvotes'])
                         );
@@ -233,12 +264,54 @@ service cloud.firestore {
     match /notifications/{userId}/items/{notificationId} {
       // Only the recipient can read their own notifications
       allow read: if isOwner(userId);
-      // The app writes notifications on behalf of actors — allow any
-      // authenticated user to create a notification for any recipient,
-      // but only the recipient can mark it as read (update) or delete it.
-      allow create: if isAuth();
+      // Any authenticated user can create a notification for another user,
+      // but the actorId must match the authenticated user (prevents impersonation).
+      // System/badge notifications use actorId == "system" — also permitted.
+      allow create: if isAuth()
+                    && (request.resource.data.actorId == request.auth.uid
+                        || request.resource.data.actorId == "system"
+                        || isOwner(userId));
       allow update: if isOwner(userId);
       allow delete: if isOwner(userId);
+    }
+
+    // -----------------------------------------------------------------------
+    // bookmarks/{bookmarkId}  (bookmarkId = "{userId}_{lessonId}")
+    // -----------------------------------------------------------------------
+    match /bookmarks/{bookmarkId} {
+      allow read: if isAuth() && request.auth.uid == resource.data.userId;
+      allow create: if isAuth()
+                    && request.auth.uid == request.resource.data.userId;
+      allow delete: if isAuth()
+                    && request.auth.uid == resource.data.userId;
+    }
+
+    // -----------------------------------------------------------------------
+    // ratings/{ratingId}  (ratingId = "{userId}_{lessonId}")
+    // -----------------------------------------------------------------------
+    match /ratings/{ratingId} {
+      // Any authenticated user can read (needed for aggregate recalculation query)
+      allow read: if isAuth();
+      allow create: if isAuth()
+                    && request.auth.uid == request.resource.data.userId;
+      allow update: if isAuth()
+                    && request.auth.uid == resource.data.userId;
+    }
+
+    // -----------------------------------------------------------------------
+    // follows/{followId}  (followId = "{followerId}_{followeeId}")
+    // Top-level follow documents used for defensive access control.
+    // The primary follow data lives in users/{uid}/followers and /following
+    // sub-collections (see rules above), but this rule covers any top-level
+    // follows collection that may be written to in future.
+    // -----------------------------------------------------------------------
+    match /follows/{followId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+                    && request.auth.uid == request.resource.data.followerId;
+      allow update: if false;
+      allow delete: if isAuth()
+                    && request.auth.uid == resource.data.followerId;
     }
 
     // -----------------------------------------------------------------------

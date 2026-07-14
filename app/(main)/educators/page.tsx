@@ -24,6 +24,7 @@ export default function EducatorsPage() {
   const [nameQuery, setNameQuery] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
+  const [country, setCountry] = useState("");
 
   // Debounce name input → nameQuery (400 ms)
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function EducatorsPage() {
   const filters: SearchEducatorsFilters = {
     gradeLevel: gradeLevel || undefined,
     subject: subject || undefined,
+    country: country.trim() || undefined,
     nameQuery: nameQuery.trim() || undefined,
   };
 
@@ -73,7 +75,7 @@ export default function EducatorsPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gradeLevel, subject, nameQuery, cursor]
+    [gradeLevel, subject, country, nameQuery, cursor]
   );
 
   // Initial load + re-fetch on filter change
@@ -81,7 +83,7 @@ export default function EducatorsPage() {
     setCursor(null);
     fetchEducators(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gradeLevel, subject, nameQuery]);
+  }, [gradeLevel, subject, country, nameQuery]);
 
   // Load which educators the current user is already following
   useEffect(() => {
@@ -163,7 +165,7 @@ export default function EducatorsPage() {
               type="search"
             />
           </div>
-          {/* Grade + Subject row */}
+          {/* Grade + Subject + Country row */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="flex-1">
               <Select
@@ -183,13 +185,22 @@ export default function EducatorsPage() {
                 options={SUBJECTS.map((s) => ({ value: s, label: s }))}
               />
             </div>
-            {(gradeLevel || subject || nameInput) && (
+            <div className="flex-1">
+              <Input
+                label="Country"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                placeholder="e.g. Norway"
+              />
+            </div>
+            {(gradeLevel || subject || country || nameInput) && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
                   setGradeLevel("");
                   setSubject("");
+                  setCountry("");
                   setNameInput("");
                   setNameQuery("");
                 }}
@@ -225,7 +236,7 @@ export default function EducatorsPage() {
             No educators found
           </h3>
           <p className="mt-1 text-xs text-muted">
-            {gradeLevel || subject || nameQuery
+            {gradeLevel || subject || country.trim() || nameQuery
               ? "Try adjusting your search or filters."
               : "Be the first to create a profile!"}
           </p>
@@ -322,7 +333,7 @@ function EducatorCard({
           <p className="mt-1 text-xs text-muted">{educator.gradeLevel}</p>
         )}
 
-        {educator.location && (
+        {educator.country && (
           <p className="mt-0.5 text-xs text-muted flex items-center gap-1">
             <svg
               className="h-3 w-3"
@@ -342,7 +353,7 @@ function EducatorCard({
                 d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0 1 15 0Z"
               />
             </svg>
-            {educator.location}
+            {educator.country}
           </p>
         )}
 

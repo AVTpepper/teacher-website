@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { updateProfile } from "firebase/auth";
 import Image from "next/image";
 
@@ -25,25 +25,28 @@ export default function EditProfilePage() {
   const [displayName, setDisplayName] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
   const [subjects, setSubjects] = useState<string[]>([]);
-  const [location, setLocation] = useState("");
+  const [country, setCountry] = useState("");
   const [school, setSchool] = useState("");
   const [yearsOfExperience, setYearsOfExperience] = useState("");
   const [bio, setBio] = useState("");
   const [photoURL, setPhotoURL] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const [isExisting, setIsExisting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push("/auth/login");
+      router.push("/");
     }
   }, [authLoading, user, router]);
 
@@ -59,7 +62,7 @@ export default function EditProfilePage() {
           setDisplayName(profile.displayName);
           setGradeLevel(profile.gradeLevel);
           setSubjects(profile.subjects);
-          setLocation(profile.location);
+          setCountry(profile.country ?? "");
           setSchool(profile.school);
           setYearsOfExperience(
             profile.yearsOfExperience > 0
@@ -74,7 +77,7 @@ export default function EditProfilePage() {
           setPhotoURL(user!.photoURL || null);
         }
       } catch {
-        // Firestore may not be configured yet — just pre-fill from auth
+        // Firestore may not be configured yet - just pre-fill from auth
         setDisplayName(user!.displayName || "");
         setPhotoURL(user!.photoURL || null);
       } finally {
@@ -89,19 +92,20 @@ export default function EditProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type and size (max 5MB)
-    if (!file.type.startsWith("image/")) {
-      setError("Please select an image file.");
+    if (file.type !== "image/jpeg" && file.type !== "image/png") {
+      setPhotoError("Only JPEG and PNG files are allowed");
+      e.target.value = "";
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image must be less than 5 MB.");
+    if (file.size > 2 * 1024 * 1024) {
+      setPhotoError("Image must be less than 2 MB");
+      e.target.value = "";
       return;
     }
 
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
-    setError("");
+    setPhotoError("");
   }
 
   function toggleSubject(subject: string) {
@@ -125,14 +129,29 @@ export default function EditProfilePage() {
       // Upload photo if a new one was selected
       if (photoFile) {
         if (!storage) {
-          // Storage not activated — skip upload, keep existing photo
-          console.warn("Firebase Storage not activated — skipping photo upload");
+          // Storage not initialised — skip photo upload silently
         } else {
           const storageRef = ref(
             storage,
             `avatars/${user.uid}/${Date.now()}_${photoFile.name}`
           );
-          await uploadBytes(storageRef, photoFile);
+          await new Promise<void>((resolve, reject) => {
+            const task = uploadBytesResumable(storageRef, photoFile);
+            task.on(
+              "state_changed",
+              (snapshot) => {
+                setUploadProgress(
+                  Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
+                );
+              },
+              (err) => {
+                setUploadProgress(null);
+                reject(err);
+              },
+              () => resolve()
+            );
+          });
+          setUploadProgress(null);
           finalPhotoURL = await getDownloadURL(storageRef);
         }
       }
@@ -144,7 +163,7 @@ export default function EditProfilePage() {
         photoURL: finalPhotoURL,
         gradeLevel,
         subjects,
-        location: location.trim(),
+        country: country.trim() || undefined,
         school: school.trim(),
         yearsOfExperience: yearsOfExperience
           ? parseInt(yearsOfExperience, 10)
@@ -165,9 +184,9 @@ export default function EditProfilePage() {
         photoURL: finalPhotoURL,
       });
 
-      router.push("/profile");
-    } catch (err) {
-      console.error("Failed to save profile:", err);
+      setSuccessMsg("Profile updated");
+      setTimeout(() => router.push("/profile"), 1000);
+    } catch {
       setError("Failed to save profile. Please try again.");
     } finally {
       setSaving(false);
@@ -202,6 +221,7 @@ export default function EditProfilePage() {
         <Card className="flex items-center gap-6">
           <button
             type="button"
+            aria-label="Change profile photo"
             onClick={() => fileInputRef.current?.click()}
             className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-secondary-100 transition-opacity hover:opacity-80"
           >
@@ -224,15 +244,35 @@ export default function EditProfilePage() {
               variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
+              disabled={uploadProgress !== null}
             >
               {currentPhoto ? "Change Photo" : "Upload Photo"}
             </Button>
-            <p className="mt-1 text-xs text-muted">JPG, PNG, GIF — max 5 MB</p>
+            <p className="mt-1 text-xs text-muted">JPEG or PNG — max 2 MB</p>
+            {photoError && (
+              <p role="alert" className="mt-1 text-xs text-error-500">{photoError}</p>
+            )}
+            {uploadProgress !== null && (
+              <div className="mt-2 w-40">
+                <div className="h-1.5 w-full rounded-full bg-secondary-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary-500 transition-all"
+                    style={{ width: `${uploadProgress}%` }}
+                    role="progressbar"
+                    aria-valuenow={uploadProgress}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label="Upload progress"
+                  />
+                </div>
+                <p className="mt-0.5 text-xs text-muted">{uploadProgress}%</p>
+              </div>
+            )}
           </div>
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png"
             onChange={handlePhotoChange}
             className="hidden"
           />
@@ -268,10 +308,10 @@ export default function EditProfilePage() {
             />
 
             <Input
-              label="Location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="City, State/Province, Country"
+              label="Country"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="e.g. Australia"
             />
 
             <Input
@@ -324,6 +364,13 @@ export default function EditProfilePage() {
           </p>
         </Card>
 
+        {/* Success message */}
+        {successMsg && (
+          <div role="status" className="rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">
+            {successMsg}
+          </div>
+        )}
+
         {/* Error */}
         {error && (
           <p className="text-sm text-error-500">{error}</p>
@@ -335,11 +382,11 @@ export default function EditProfilePage() {
             type="button"
             variant="ghost"
             onClick={() => router.back()}
-            disabled={saving}
+            disabled={saving || uploadProgress !== null}
           >
             Cancel
           </Button>
-          <Button type="submit" isLoading={saving}>
+          <Button type="submit" isLoading={saving} disabled={uploadProgress !== null}>
             {isExisting ? "Save Changes" : "Create Profile"}
           </Button>
         </div>
