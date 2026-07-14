@@ -303,6 +303,16 @@ export async function getPostComments(
   );
 }
 
+export async function getPostCommentsCount(postId: string): Promise<number> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const snapshot = await getCountFromServer(
+    query(collection(db, "posts", postId, "comments"))
+  );
+
+  return snapshot.data().count;
+}
+
 export async function likeComment(
   postId: string,
   commentId: string,

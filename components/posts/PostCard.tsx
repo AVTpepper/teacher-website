@@ -9,6 +9,7 @@ import {
   hasLikedPost,
   commentOnPost,
   getPostComments,
+  getPostCommentsCount,
   likeComment,
   unlikeComment,
   hasLikedComment,
@@ -80,6 +81,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
   const { user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likesCount);
+  const [commentCount, setCommentCount] = useState(post.commentCount);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -100,7 +102,28 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
     }
   }, [post.id, user]);
 
-  const commentCount = showComments ? comments.length : post.commentCount;
+  useEffect(() => {
+    setCommentCount(post.commentCount);
+  }, [post.id, post.commentCount]);
+
+  useEffect(() => {
+    if (post.commentCount > 0) return;
+
+    let cancelled = false;
+    getPostCommentsCount(post.id)
+      .then((count) => {
+        if (!cancelled && count > 0) {
+          setCommentCount(count);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [post.id, post.commentCount]);
+
+  const displayedCommentCount = showComments ? comments.length : commentCount;
 
   async function handleLike() {
     if (!user || likeLoading) return;
@@ -132,6 +155,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
     try {
       const result = await getPostComments(post.id);
       setComments(result);
+      setCommentCount(result.length);
     } catch {
       // ignore
     } finally {
@@ -332,13 +356,13 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
             {likesCount} {likesCount === 1 ? "like" : "likes"}
           </span>
         )}
-        {commentCount > 0 && (
+        {displayedCommentCount > 0 && (
           <button
             type="button"
             onClick={toggleComments}
             className="hover:underline cursor-pointer"
           >
-            {commentCount} {commentCount === 1 ? "comment" : "comments"}
+            {displayedCommentCount} {displayedCommentCount === 1 ? "comment" : "comments"}
           </button>
         )}
       </div>
@@ -473,6 +497,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
             refreshComments={async () => {
               const result = await getPostComments(post.id);
               setComments(result);
+              setCommentCount(result.length);
             }}
           />
         </div>
