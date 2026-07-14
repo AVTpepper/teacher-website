@@ -65,6 +65,20 @@ const ACTIVITY_STYLE_OPTIONS = [
   "Project-based learning",
 ] as const;
 
+const LESSON_FLOW_OPTIONS = [
+  "Mini-lesson",
+  "Workshop",
+  "Station rotation",
+  "Direct instruction",
+  "Lab",
+] as const;
+
+const ASSESSMENT_INTENT_OPTIONS = ["Formative only", "Summative only", "Mixed"] as const;
+
+const TIME_PER_CLASS_OPTIONS = ["30 min", "45 min", "60 min", "75+ min"] as const;
+const CLASS_SIZE_OPTIONS = ["1-15", "16-25", "26-35", "36+"] as const;
+const ELL_OPTIONS = ["0-10%", "11-25%", "26-50%", "50%+"] as const;
+
 const ASSET_LIMIT = 2;
 
 const ASSET_LABELS: Record<AssetKind, string> = {
@@ -200,6 +214,15 @@ export default function AIGenerateScreen({
   const [learningGoal, setLearningGoal] = useState("");
   const [studentSupports, setStudentSupports] = useState("");
   const [activityStyles, setActivityStyles] = useState<string[]>([]);
+  const [primaryActivityStyle, setPrimaryActivityStyle] = useState("");
+  const [secondaryActivityStyle, setSecondaryActivityStyle] = useState("");
+  const [estimatedLessonFlow, setEstimatedLessonFlow] = useState<string>(LESSON_FLOW_OPTIONS[0]);
+  const [assessmentIntent, setAssessmentIntent] = useState<string>(ASSESSMENT_INTENT_OPTIONS[2]);
+  const [timePerClass, setTimePerClass] = useState<string>(TIME_PER_CLASS_OPTIONS[1]);
+  const [classSize, setClassSize] = useState<string>(CLASS_SIZE_OPTIONS[1]);
+  const [ellPercent, setEllPercent] = useState<string>(ELL_OPTIONS[0]);
+  const [iep504Supports, setIep504Supports] = useState<"yes" | "no">("no");
+  const [techAvailable, setTechAvailable] = useState<"yes" | "no" | "limited">("yes");
   const [gradeLevelOverride, setGradeLevelOverride] = useState("");
   const [additionalContext, setAdditionalContext] = useState("");
   const [assetOptions, setAssetOptions] = useState<Record<AssetKind, AssetOptionState>>({
@@ -256,6 +279,22 @@ export default function AIGenerateScreen({
     }));
   }
 
+  function toggleActivityStyle(style: string, checked: boolean) {
+    setActivityStyles((prev) => {
+      const next = checked
+        ? Array.from(new Set([...prev, style]))
+        : prev.filter((item) => item !== style);
+
+      if (!next.includes(primaryActivityStyle)) {
+        setPrimaryActivityStyle("");
+      }
+      if (!next.includes(secondaryActivityStyle)) {
+        setSecondaryActivityStyle("");
+      }
+      return next;
+    });
+  }
+
   async function generateLesson() {
     if (isSubmitDisabled || !user) return;
 
@@ -290,6 +329,23 @@ export default function AIGenerateScreen({
           ...(learningGoal.trim() ? { learningGoal: learningGoal.trim() } : {}),
           ...(studentSupports.trim() ? { studentSupports: studentSupports.trim() } : {}),
           ...(activityStyles.length > 0 ? { activityStyles } : {}),
+          ...(primaryActivityStyle || secondaryActivityStyle
+            ? {
+                stylePriority: {
+                  ...(primaryActivityStyle ? { primary: primaryActivityStyle } : {}),
+                  ...(secondaryActivityStyle ? { secondary: secondaryActivityStyle } : {}),
+                },
+              }
+            : {}),
+          ...(estimatedLessonFlow ? { estimatedLessonFlow } : {}),
+          ...(assessmentIntent ? { assessmentIntent } : {}),
+          classConstraints: {
+            timePerClass,
+            classSize,
+            ellPercent,
+            iep504Supports,
+            techAvailable,
+          },
           ...(assetRequests.length > 0 ? { assetRequests } : {}),
           ...(userTier === "plus" && gradeLevelOverride ? { gradeLevelOverride } : {}),
           ...(userTier === "plus" && additionalContext.trim()
@@ -569,6 +625,157 @@ export default function AIGenerateScreen({
               </p>
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="ai-lesson-flow" className="block text-sm font-medium text-foreground mb-1.5">
+                  Estimated Lesson Flow
+                </label>
+                <select
+                  id="ai-lesson-flow"
+                  value={estimatedLessonFlow}
+                  onChange={(e) => setEstimatedLessonFlow(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {LESSON_FLOW_OPTIONS.map((flow) => (
+                    <option key={flow} value={flow}>
+                      {flow}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="ai-assessment-intent" className="block text-sm font-medium text-foreground mb-1.5">
+                  Assessment Intent
+                </label>
+                <select
+                  id="ai-assessment-intent"
+                  value={assessmentIntent}
+                  onChange={(e) => setAssessmentIntent(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {ASSESSMENT_INTENT_OPTIONS.map((intent) => (
+                    <option key={intent} value={intent}>
+                      {intent}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-surface px-4 py-4 space-y-3">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Class Constraints</h2>
+                <p className="mt-1 text-sm text-muted">Quick classroom context to keep plans realistic for your setting.</p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-foreground">Time per class</p>
+                <div className="flex flex-wrap gap-2">
+                  {TIME_PER_CLASS_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setTimePerClass(opt)}
+                      className={[
+                        "rounded-full px-3 py-1.5 text-xs font-medium border transition-colors cursor-pointer",
+                        timePerClass === opt
+                          ? "bg-primary-100 text-primary-800 border-primary-300"
+                          : "bg-surface text-muted border-border hover:border-primary-300 hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-foreground">Class size</p>
+                <div className="flex flex-wrap gap-2">
+                  {CLASS_SIZE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setClassSize(opt)}
+                      className={[
+                        "rounded-full px-3 py-1.5 text-xs font-medium border transition-colors cursor-pointer",
+                        classSize === opt
+                          ? "bg-primary-100 text-primary-800 border-primary-300"
+                          : "bg-surface text-muted border-border hover:border-primary-300 hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-foreground">ELL %</p>
+                <div className="flex flex-wrap gap-2">
+                  {ELL_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setEllPercent(opt)}
+                      className={[
+                        "rounded-full px-3 py-1.5 text-xs font-medium border transition-colors cursor-pointer",
+                        ellPercent === opt
+                          ? "bg-primary-100 text-primary-800 border-primary-300"
+                          : "bg-surface text-muted border-border hover:border-primary-300 hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-foreground">IEP/504 supports present?</p>
+                  <div className="flex gap-2">
+                    {(["yes", "no"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setIep504Supports(opt)}
+                        className={[
+                          "rounded-full px-3 py-1.5 text-xs font-medium border transition-colors cursor-pointer",
+                          iep504Supports === opt
+                            ? "bg-primary-100 text-primary-800 border-primary-300"
+                            : "bg-surface text-muted border-border hover:border-primary-300 hover:text-foreground",
+                        ].join(" ")}
+                      >
+                        {opt === "yes" ? "Yes" : "No"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-foreground">Tech available?</p>
+                  <div className="flex gap-2">
+                    {(["yes", "limited", "no"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setTechAvailable(opt)}
+                        className={[
+                          "rounded-full px-3 py-1.5 text-xs font-medium border transition-colors cursor-pointer",
+                          techAvailable === opt
+                            ? "bg-primary-100 text-primary-800 border-primary-300"
+                            : "bg-surface text-muted border-border hover:border-primary-300 hover:text-foreground",
+                        ].join(" ")}
+                      >
+                        {opt === "yes" ? "Yes" : opt === "limited" ? "Limited" : "No"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="rounded-xl border border-border bg-surface px-4 py-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -590,19 +797,55 @@ export default function AIGenerateScreen({
                       <input
                         type="checkbox"
                         checked={checked}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setActivityStyles((prev) => Array.from(new Set([...prev, style])));
-                          } else {
-                            setActivityStyles((prev) => prev.filter((item) => item !== style));
-                          }
-                        }}
+                        onChange={(e) => toggleActivityStyle(style, e.target.checked)}
                         className="mt-1 h-4 w-4 rounded border-border text-primary-600 focus:ring-primary-500"
                       />
                       <span className="text-sm text-foreground">{style}</span>
                     </label>
                   );
                 })}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="ai-primary-style" className="block text-xs font-medium text-foreground mb-1.5">
+                    Primary style priority
+                  </label>
+                  <select
+                    id="ai-primary-style"
+                    value={primaryActivityStyle}
+                    onChange={(e) => setPrimaryActivityStyle(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">No priority</option>
+                    {activityStyles.map((style) => (
+                      <option key={style} value={style}>
+                        {style}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="ai-secondary-style" className="block text-xs font-medium text-foreground mb-1.5">
+                    Secondary style priority
+                  </label>
+                  <select
+                    id="ai-secondary-style"
+                    value={secondaryActivityStyle}
+                    onChange={(e) => setSecondaryActivityStyle(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">No secondary</option>
+                    {activityStyles
+                      .filter((style) => style !== primaryActivityStyle)
+                      .map((style) => (
+                        <option key={style} value={style}>
+                          {style}
+                        </option>
+                      ))}
+                  </select>
+                </div>
               </div>
             </div>
 

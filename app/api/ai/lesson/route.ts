@@ -80,6 +80,21 @@ const VALID_ACTIVITY_STYLES = [
   "Project-based learning",
 ] as const;
 
+const LESSON_FLOW_OPTIONS = [
+  "Mini-lesson",
+  "Workshop",
+  "Station rotation",
+  "Direct instruction",
+  "Lab",
+] as const;
+
+const ASSESSMENT_INTENT_OPTIONS = ["Formative only", "Summative only", "Mixed"] as const;
+const TIME_PER_CLASS_OPTIONS = ["30 min", "45 min", "60 min", "75+ min"] as const;
+const CLASS_SIZE_OPTIONS = ["1-15", "16-25", "26-35", "36+"] as const;
+const ELL_OPTIONS = ["0-10%", "11-25%", "26-50%", "50%+"] as const;
+const IEP_504_OPTIONS = ["yes", "no"] as const;
+const TECH_AVAILABLE_OPTIONS = ["yes", "no", "limited"] as const;
+
 function getUtcDateKey(): string {
   const now = new Date();
   const year = now.getUTCFullYear();
@@ -195,6 +210,19 @@ interface GenerateBody {
   studentSupports?: string;
   activityStyle?: string;
   activityStyles?: string[];
+  stylePriority?: {
+    primary?: string;
+    secondary?: string;
+  };
+  estimatedLessonFlow?: string;
+  assessmentIntent?: string;
+  classConstraints?: {
+    timePerClass?: string;
+    classSize?: string;
+    ellPercent?: string;
+    iep504Supports?: string;
+    techAvailable?: string;
+  };
   assetRequests?: AssetRequest[];
   gradeLevelOverride?: string;
   description?: string;
@@ -247,6 +275,154 @@ function getOpenAIClient(): OpenAI | null {
   const apiKey = process.env.OPENAI_API_KEY;
   _openai = apiKey ? new OpenAI({ apiKey }) : null;
   return _openai;
+}
+
+function logGenerateMetrics(
+  event: string,
+  data: Record<string, unknown>,
+): void {
+  console.info(
+    "[ai-generate-metrics]",
+    JSON.stringify({
+      event,
+      timestamp: new Date().toISOString(),
+      ...data,
+    }),
+  );
+}
+
+function isActivityStyle(value: string): boolean {
+  return VALID_ACTIVITY_STYLES.includes(value as (typeof VALID_ACTIVITY_STYLES)[number]);
+}
+
+function normalizeGenerateStyles(body: GenerateBody): {
+  styles: string[];
+  stylePriority: { primary?: string; secondary?: string };
+} {
+  const styleSet = new Set<string>();
+
+  if (Array.isArray(body.activityStyles)) {
+    for (const style of body.activityStyles) {
+      if (typeof style === "string" && isActivityStyle(style)) styleSet.add(style);
+    }
+  }
+  if (typeof body.activityStyle === "string" && isActivityStyle(body.activityStyle.trim())) {
+    styleSet.add(body.activityStyle.trim());
+  }
+
+  let primary = body.stylePriority?.primary?.trim();
+  let secondary = body.stylePriority?.secondary?.trim();
+
+  if (!primary || !isActivityStyle(primary)) primary = undefined;
+  if (!secondary || !isActivityStyle(secondary) || secondary === primary) secondary = undefined;
+
+  if (primary) styleSet.add(primary);
+  if (secondary) styleSet.add(secondary);
+
+  return {
+    styles: Array.from(styleSet),
+    stylePriority: {
+      ...(primary ? { primary } : {}),
+      ...(secondary ? { secondary } : {}),
+    },
+  };
+}
+
+function buildAssetsSchema(requestedAssetsCount: number): string {
+  return requestedAssetsCount > 0
+    ? `,
+  "assets": [{"type": "worksheet" | "rubric", "title": "<string>", "description": "<what this asset is for>", "sections": [{"heading": "<section heading>", "body": "<plain text content for that section>"}]}]`
+    : "";
+}
+
+type ParsedGenerateLesson = {
+  title: string;
+  duration?: string;
+  objectives: string[];
+  materials: string[];
+  steps: Array<{ title: string; description: string; duration?: string }>;
+  checkForUnderstanding: string[];
+  assessments: string[];
+  assets?: GeneratedAsset[];
+};
+
+function isValidGenerateLesson(value: unknown): value is ParsedGenerateLesson {
+  if (!value || typeof value !== "object") return false;
+  const lesson = value as Record<string, unknown>;
+  return (
+    typeof lesson.title === "string" &&
+    Array.isArray(lesson.objectives) &&
+    Array.isArray(lesson.materials) &&
+    Array.isArray(lesson.steps) &&
+    lesson.steps.every(
+      (s) =>
+        s !== null &&
+        typeof s === "object" &&
+        typeof (s as Record<string, unknown>).title === "string" &&
+        typeof (s as Record<string, unknown>).description === "string",
+    ) &&
+    Array.isArray(lesson.checkForUnderstanding) &&
+    Array.isArray(lesson.assessments)
+  );
+}
+
+function extractRequestedAssets(
+  lesson: ParsedGenerateLesson,
+  requestedAssetTypes: Set<GeneratedAssetType>,
+): GeneratedAsset[] {
+  return Array.isArray(lesson.assets)
+    ? (lesson.assets as unknown[])
+        .filter(
+          (asset): asset is GeneratedAsset =>
+            asset !== null &&
+            typeof asset === "object" &&
+            (asset as Record<string, unknown>).type !== undefined &&
+            requestedAssetTypes.has((asset as Record<string, unknown>).type as GeneratedAssetType) &&
+            typeof (asset as Record<string, unknown>).title === "string" &&
+            typeof (asset as Record<string, unknown>).description === "string" &&
+            Array.isArray((asset as Record<string, unknown>).sections) &&
+            ((asset as Record<string, unknown>).sections as unknown[]).every(
+              (section) =>
+                section !== null &&
+                typeof section === "object" &&
+                typeof (section as Record<string, unknown>).heading === "string" &&
+                typeof (section as Record<string, unknown>).body === "string",
+            ),
+        )
+        .map((asset) => ({
+          type: asset.type,
+          title: asset.title,
+          description: asset.description,
+          sections: asset.sections,
+        }))
+    : [];
+}
+
+function getAlignmentIssues(
+  lesson: ParsedGenerateLesson,
+  assessmentIntent?: string,
+): string[] {
+  const issues: string[] = [];
+  if (lesson.objectives.filter((o) => o.trim() !== "").length < 2) {
+    issues.push("Add at least 2 clear and measurable learning objectives.");
+  }
+  if (lesson.steps.filter((s) => s.title.trim() !== "").length < 3) {
+    issues.push("Provide at least 3 concrete lesson steps with classroom-ready detail.");
+  }
+
+  const cfuCount = lesson.checkForUnderstanding.filter((item) => item.trim() !== "").length;
+  const assessmentCount = lesson.assessments.filter((item) => item.trim() !== "").length;
+  if (assessmentIntent === "Formative only" && cfuCount < 2) {
+    issues.push("Include at least 2 formative checks for understanding.");
+  }
+  if (assessmentIntent === "Summative only" && assessmentCount < 2) {
+    issues.push("Include at least 2 summative assessment tasks.");
+  }
+  if ((!assessmentIntent || assessmentIntent === "Mixed") && (cfuCount < 1 || assessmentCount < 1)) {
+    issues.push("Include at least 1 check for understanding and 1 assessment for mixed intent.");
+  }
+
+  return issues;
 }
 
 // ─── Route Handler ────────────────────────────────────────────────────────────
@@ -647,6 +823,131 @@ export async function POST(request: NextRequest): Promise<Response> {
         }
       }
     }
+    if (raw.stylePriority !== undefined) {
+      if (!raw.stylePriority || typeof raw.stylePriority !== "object" || Array.isArray(raw.stylePriority)) {
+        return Response.json(
+          { error: 'Field "stylePriority" must be an object when provided.' },
+          { status: 400 },
+        );
+      }
+      const stylePriority = raw.stylePriority as Record<string, unknown>;
+      if (stylePriority.primary !== undefined && typeof stylePriority.primary !== "string") {
+        return Response.json(
+          { error: 'Field "stylePriority.primary" must be a string when provided.' },
+          { status: 400 },
+        );
+      }
+      if (stylePriority.secondary !== undefined && typeof stylePriority.secondary !== "string") {
+        return Response.json(
+          { error: 'Field "stylePriority.secondary" must be a string when provided.' },
+          { status: 400 },
+        );
+      }
+      if (typeof stylePriority.primary === "string" && !isActivityStyle(stylePriority.primary.trim())) {
+        return Response.json(
+          { error: 'Field "stylePriority.primary" must be a valid activity style.' },
+          { status: 400 },
+        );
+      }
+      if (typeof stylePriority.secondary === "string" && !isActivityStyle(stylePriority.secondary.trim())) {
+        return Response.json(
+          { error: 'Field "stylePriority.secondary" must be a valid activity style.' },
+          { status: 400 },
+        );
+      }
+      if (
+        typeof stylePriority.primary === "string" &&
+        typeof stylePriority.secondary === "string" &&
+        stylePriority.primary.trim() === stylePriority.secondary.trim()
+      ) {
+        return Response.json(
+          { error: 'Field "stylePriority" must use different primary and secondary values.' },
+          { status: 400 },
+        );
+      }
+    }
+    if (raw.estimatedLessonFlow !== undefined) {
+      if (typeof raw.estimatedLessonFlow !== "string") {
+        return Response.json(
+          { error: 'Field "estimatedLessonFlow" must be a string when provided.' },
+          { status: 400 },
+        );
+      }
+      if (!LESSON_FLOW_OPTIONS.includes(raw.estimatedLessonFlow as (typeof LESSON_FLOW_OPTIONS)[number])) {
+        return Response.json(
+          { error: 'Field "estimatedLessonFlow" has an invalid option.' },
+          { status: 400 },
+        );
+      }
+    }
+    if (raw.assessmentIntent !== undefined) {
+      if (typeof raw.assessmentIntent !== "string") {
+        return Response.json(
+          { error: 'Field "assessmentIntent" must be a string when provided.' },
+          { status: 400 },
+        );
+      }
+      if (!ASSESSMENT_INTENT_OPTIONS.includes(raw.assessmentIntent as (typeof ASSESSMENT_INTENT_OPTIONS)[number])) {
+        return Response.json(
+          { error: 'Field "assessmentIntent" has an invalid option.' },
+          { status: 400 },
+        );
+      }
+    }
+    if (raw.classConstraints !== undefined) {
+      if (!raw.classConstraints || typeof raw.classConstraints !== "object" || Array.isArray(raw.classConstraints)) {
+        return Response.json(
+          { error: 'Field "classConstraints" must be an object when provided.' },
+          { status: 400 },
+        );
+      }
+      const constraints = raw.classConstraints as Record<string, unknown>;
+      if (
+        constraints.timePerClass !== undefined &&
+        (typeof constraints.timePerClass !== "string" || !TIME_PER_CLASS_OPTIONS.includes(constraints.timePerClass as (typeof TIME_PER_CLASS_OPTIONS)[number]))
+      ) {
+        return Response.json(
+          { error: 'Field "classConstraints.timePerClass" has an invalid option.' },
+          { status: 400 },
+        );
+      }
+      if (
+        constraints.classSize !== undefined &&
+        (typeof constraints.classSize !== "string" || !CLASS_SIZE_OPTIONS.includes(constraints.classSize as (typeof CLASS_SIZE_OPTIONS)[number]))
+      ) {
+        return Response.json(
+          { error: 'Field "classConstraints.classSize" has an invalid option.' },
+          { status: 400 },
+        );
+      }
+      if (
+        constraints.ellPercent !== undefined &&
+        (typeof constraints.ellPercent !== "string" || !ELL_OPTIONS.includes(constraints.ellPercent as (typeof ELL_OPTIONS)[number]))
+      ) {
+        return Response.json(
+          { error: 'Field "classConstraints.ellPercent" has an invalid option.' },
+          { status: 400 },
+        );
+      }
+      if (
+        constraints.iep504Supports !== undefined &&
+        (typeof constraints.iep504Supports !== "string" || !IEP_504_OPTIONS.includes(constraints.iep504Supports as (typeof IEP_504_OPTIONS)[number]))
+      ) {
+        return Response.json(
+          { error: 'Field "classConstraints.iep504Supports" has an invalid option.' },
+          { status: 400 },
+        );
+      }
+      if (
+        constraints.techAvailable !== undefined &&
+        (typeof constraints.techAvailable !== "string" || !TECH_AVAILABLE_OPTIONS.includes(constraints.techAvailable as (typeof TECH_AVAILABLE_OPTIONS)[number]))
+      ) {
+        return Response.json(
+          { error: 'Field "classConstraints.techAvailable" has an invalid option.' },
+          { status: 400 },
+        );
+      }
+    }
     if (raw.assetRequests !== undefined) {
       if (!Array.isArray(raw.assetRequests)) {
         return Response.json(
@@ -781,10 +1082,9 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   if (body.mode === "generate") {
     const requestedAssets = body.assetRequests ?? [];
-    const assetsSchema = requestedAssets.length > 0
-      ? `,
-  "assets": [{"type": "worksheet" | "rubric", "title": "<string>", "description": "<what this asset is for>", "sections": [{"heading": "<section heading>", "body": "<plain text content for that section>"}]}]`
-      : "";
+    const assetsSchema = buildAssetsSchema(requestedAssets.length);
+    const normalizedStyles = normalizeGenerateStyles(body);
+
     systemPrompt = `You are an expert educator. Given a topic, grade level, and subject, return a complete lesson plan as a single JSON object with exactly this structure:
 {
   "title": "<string>",
@@ -807,32 +1107,48 @@ Return only the raw JSON object - no markdown, no code fences, no explanation.`;
         ? body.gradeLevelOverride.trim()
         : body.gradeLevel;
 
-    userMessage = `Create a lesson plan for:
-Topic: ${body.topic}
-Grade Level: ${effectiveGradeLevel}
-Subject: ${body.subject}`;
+    const promptLines: string[] = [
+      "Create a lesson plan for:",
+      `Topic: ${body.topic}`,
+      `Grade Level: ${effectiveGradeLevel}`,
+      `Subject: ${body.subject}`,
+    ];
 
-    if (body.learningGoal?.trim()) {
-      userMessage += `\nLearning goal: ${body.learningGoal.trim()}`;
-    }
+    if (body.learningGoal?.trim()) promptLines.push(`Learning goal: ${body.learningGoal.trim()}`);
     if (body.studentSupports?.trim()) {
-      userMessage += `\nStudent support needs: ${body.studentSupports.trim()}`;
+      promptLines.push(`Student support needs: ${body.studentSupports.trim()}`);
     }
-    const preferredStyles = Array.from(
-      new Set(
-        [
-          ...(body.activityStyles ?? []),
-          ...(body.activityStyle?.trim() ? [body.activityStyle.trim()] : []),
-        ].filter((style) => style.trim() !== "")
-      )
-    );
-    if (preferredStyles.length > 0) {
-      userMessage += `\nPreferred activity styles: ${preferredStyles.join(", ")}`;
+    if (body.estimatedLessonFlow?.trim()) {
+      promptLines.push(`Estimated lesson flow: ${body.estimatedLessonFlow.trim()}`);
+    }
+    if (body.assessmentIntent?.trim()) {
+      promptLines.push(`Assessment intent: ${body.assessmentIntent.trim()}`);
+    }
+    if (body.classConstraints) {
+      const constraints = body.classConstraints;
+      const constraintLines: string[] = [];
+      if (constraints.timePerClass) constraintLines.push(`time per class: ${constraints.timePerClass}`);
+      if (constraints.classSize) constraintLines.push(`class size: ${constraints.classSize}`);
+      if (constraints.ellPercent) constraintLines.push(`ELL %: ${constraints.ellPercent}`);
+      if (constraints.iep504Supports) constraintLines.push(`IEP/504 supports: ${constraints.iep504Supports}`);
+      if (constraints.techAvailable) constraintLines.push(`tech available: ${constraints.techAvailable}`);
+      if (constraintLines.length > 0) {
+        promptLines.push(`Class constraints: ${constraintLines.join(", ")}`);
+      }
+    }
+    if (normalizedStyles.styles.length > 0) {
+      promptLines.push(`Preferred activity styles: ${normalizedStyles.styles.join(", ")}`);
+    }
+    if (normalizedStyles.stylePriority.primary || normalizedStyles.stylePriority.secondary) {
+      promptLines.push(
+        `Style priority: primary=${normalizedStyles.stylePriority.primary ?? "none"}; secondary=${normalizedStyles.stylePriority.secondary ?? "none"}`,
+      );
+    }
+    if (userTier === "plus" && body.description?.trim()) {
+      promptLines.push(`Additional context: ${body.description.trim()}`);
     }
 
-    if (userTier === "plus" && body.description?.trim()) {
-      userMessage += `\nAdditional context: ${body.description.trim()}`;
-    }
+    userMessage = promptLines.join("\n");
     if (requestedAssets.length > 0) {
       const assetLines = requestedAssets.map((asset, index) => {
         const example = asset.example?.trim()
@@ -842,6 +1158,16 @@ Subject: ${body.subject}`;
       });
       userMessage += `\nCreate linked teaching assets:\n${assetLines.join("\n")}`;
     }
+
+    logGenerateMetrics("generate_request", {
+      userTier,
+      uidTag: uid.slice(0, 8),
+      styles: normalizedStyles.styles,
+      stylePriority: normalizedStyles.stylePriority,
+      requestedAssetTypes: requestedAssets.map((asset) => asset.type),
+      estimatedLessonFlow: body.estimatedLessonFlow ?? null,
+      assessmentIntent: body.assessmentIntent ?? null,
+    });
   } else {
     const sb = body as SuggestBody;
     const existing =
@@ -936,22 +1262,7 @@ Current content: ${existing}`;
     }
 
     if (body.mode === "generate") {
-      const lesson = parsed as Record<string, unknown>;
-      if (
-        typeof lesson.title !== "string" ||
-        !Array.isArray(lesson.objectives) ||
-        !Array.isArray(lesson.materials) ||
-        !Array.isArray(lesson.steps) ||
-        !(lesson.steps as unknown[]).every(
-          (s) =>
-            s !== null &&
-            typeof s === "object" &&
-            typeof (s as Record<string, unknown>).title === "string" &&
-            typeof (s as Record<string, unknown>).description === "string",
-        ) ||
-        !Array.isArray(lesson.checkForUnderstanding) ||
-        !Array.isArray(lesson.assessments)
-      ) {
+      if (!isValidGenerateLesson(parsed)) {
         return Response.json(
           {
             error:
@@ -960,33 +1271,60 @@ Current content: ${existing}`;
           { status: 502 },
         );
       }
+      let lesson = parsed as ParsedGenerateLesson;
       const requestedAssetTypes = new Set((body.assetRequests ?? []).map((asset) => asset.type));
-      const assets = Array.isArray(lesson.assets)
-        ? (lesson.assets as unknown[])
-            .filter(
-              (asset): asset is GeneratedAsset =>
-                asset !== null &&
-                typeof asset === "object" &&
-                (asset as Record<string, unknown>).type !== undefined &&
-                requestedAssetTypes.has((asset as Record<string, unknown>).type as GeneratedAssetType) &&
-                typeof (asset as Record<string, unknown>).title === "string" &&
-                typeof (asset as Record<string, unknown>).description === "string" &&
-                Array.isArray((asset as Record<string, unknown>).sections) &&
-                ((asset as Record<string, unknown>).sections as unknown[]).every(
-                  (section) =>
-                    section !== null &&
-                    typeof section === "object" &&
-                    typeof (section as Record<string, unknown>).heading === "string" &&
-                    typeof (section as Record<string, unknown>).body === "string",
-                )
-            )
-            .map((asset) => ({
-              type: asset.type,
-              title: asset.title,
-              description: asset.description,
-              sections: asset.sections,
-            }))
-        : [];
+      let assets = extractRequestedAssets(lesson, requestedAssetTypes);
+
+      const alignmentIssues = getAlignmentIssues(lesson, body.assessmentIntent);
+      let repaired = false;
+      if (alignmentIssues.length > 0) {
+        try {
+          const repairPrompt = `You are repairing a generated lesson plan for classroom quality and alignment.\nFix only what is needed to resolve the issues below while preserving the original topic and intent.\nReturn only valid JSON in this exact schema:${buildAssetsSchema((body.assetRequests ?? []).length).replace("\\n", " ")}\n\nIssues to fix:\n- ${alignmentIssues.join("\n- ")}`;
+          const repairInput = {
+            lesson: {
+              title: lesson.title,
+              duration: lesson.duration ?? "",
+              objectives: lesson.objectives,
+              materials: lesson.materials,
+              steps: lesson.steps,
+              checkForUnderstanding: lesson.checkForUnderstanding,
+              assessments: lesson.assessments,
+              ...(assets.length > 0 ? { assets } : {}),
+            },
+          };
+
+          const repairCompletion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: repairPrompt },
+              { role: "user", content: JSON.stringify(repairInput) },
+            ],
+            temperature: 0.2,
+            response_format: { type: "json_object" },
+          });
+
+          const repairedContent = repairCompletion.choices[0]?.message?.content;
+          if (repairedContent) {
+            const repairedParsed = JSON.parse(repairedContent) as unknown;
+            if (isValidGenerateLesson(repairedParsed)) {
+              lesson = repairedParsed as ParsedGenerateLesson;
+              assets = extractRequestedAssets(lesson, requestedAssetTypes);
+              repaired = true;
+            }
+          }
+        } catch {
+          // If repair fails, return the original validated lesson.
+        }
+      }
+
+      logGenerateMetrics("generate_success", {
+        userTier,
+        uidTag: uid.slice(0, 8),
+        requestedAssetCount: (body.assetRequests ?? []).length,
+        returnedAssetCount: assets.length,
+        alignmentIssueCount: alignmentIssues.length,
+        repaired,
+      });
       // Increment usage counter for free tier (best-effort; do not block the response)
       if (userTier === "free") {
         fsIncrementCount(`users/${uid}/aiUsage/${dateKey}`, token).catch(() => {});
@@ -995,11 +1333,11 @@ Current content: ${existing}`;
         lesson: {
           title: lesson.title,
           duration: typeof lesson.duration === "string" ? lesson.duration : "",
-          objectives: lesson.objectives as string[],
-          materials: lesson.materials as string[],
-          steps: lesson.steps as Array<{ title: string; description: string; duration?: string }>,
-          checkForUnderstanding: lesson.checkForUnderstanding as string[],
-          assessments: lesson.assessments as string[],
+          objectives: lesson.objectives,
+          materials: lesson.materials,
+          steps: lesson.steps,
+          checkForUnderstanding: lesson.checkForUnderstanding,
+          assessments: lesson.assessments,
         },
         assets,
         remainingRequests:
@@ -1031,6 +1369,19 @@ Current content: ${existing}`;
       });
     }
   } catch (err: unknown) {
+    if (body.mode === "generate") {
+      const status =
+        err && typeof err === "object" && "status" in err
+          ? (err as { status: number }).status
+          : undefined;
+      logGenerateMetrics("generate_failure", {
+        userTier,
+        uidTag: uid.slice(0, 8),
+        status: status ?? null,
+        message:
+          err instanceof Error ? err.message.slice(0, 200) : "unknown_error",
+      });
+    }
     // Map all OpenAI SDK errors to safe, human-readable messages - no raw objects in responses
     if (err && typeof err === "object") {
       const status =
