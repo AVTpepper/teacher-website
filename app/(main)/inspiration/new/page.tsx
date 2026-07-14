@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -187,6 +188,14 @@ export default function NewInspirationPage() {
 
   return (
     <div className="mx-auto max-w-2xl py-8">
+      <div className="mb-4">
+        <Link href="/inspiration">
+          <Button type="button" variant="outline" size="sm">
+            Back to Inspiration
+          </Button>
+        </Link>
+      </div>
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Submit Inspiration Content</h1>
         <p className="mt-1 text-sm text-muted">

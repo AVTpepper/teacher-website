@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -68,6 +69,14 @@ export default function PostJobPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-8">
+      <div>
+        <Link href="/jobs">
+          <Button type="button" variant="outline" size="sm">
+            Back to Jobs
+          </Button>
+        </Link>
+      </div>
+
       <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Hiring</p>
         <h1 className="text-2xl font-bold">Post a Job</h1>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense } from "react";
 import { useRef, useState, useEffect, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -253,6 +254,14 @@ function UploadResourceForm() {
 
   return (
     <div className="mx-auto max-w-2xl pb-8">
+      <div className="mb-4">
+        <Link href="/resources">
+          <Button type="button" variant="outline" size="sm">
+            Back to Resources
+          </Button>
+        </Link>
+      </div>
+
       <div className="-mx-4 -mt-4 mb-6 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Creator Studio</p>
         <h1 className="text-2xl font-bold">

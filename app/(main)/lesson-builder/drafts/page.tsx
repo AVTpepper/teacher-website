@@ -56,14 +56,21 @@ export default function LessonDraftsPage() {
             Continue editing your saved lesson drafts.
           </p>
         </div>
-        <Link href="/lesson-builder/new">
-          <Button type="button" size="sm">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            New Lesson Plan
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/lesson-builder">
+            <Button type="button" variant="outline" size="sm">
+              Back to Lesson Builder
+            </Button>
+          </Link>
+          <Link href="/lesson-builder/new">
+            <Button type="button" size="sm">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              New Lesson Plan
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {error && (
