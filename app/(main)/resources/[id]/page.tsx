@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   getResource,
+  updateResource,
   getAverageRating,
   trackDownload,
   saveResource,
@@ -69,6 +70,7 @@ export default function ResourceDetailPage({
   // Delete
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   // Comments
   const [comments, setComments] = useState<ResourceComment[]>([]);
@@ -87,10 +89,16 @@ export default function ResourceDetailPage({
   }
 
   useEffect(() => {
+    if (authLoading) return;
+
     async function load() {
       try {
         const res = await getResource(id);
         if (!res) {
+          setNotFound(true);
+          return;
+        }
+        if (res.isPublic === false && (!user || user.uid !== res.authorId)) {
           setNotFound(true);
           return;
         }
@@ -113,7 +121,7 @@ export default function ResourceDetailPage({
       }
     }
     load();
-  }, [id]);
+  }, [authLoading, id, user]);
 
   // Load user-specific states
   useEffect(() => {
@@ -141,7 +149,7 @@ export default function ResourceDetailPage({
   }
 
   async function handleDownload() {
-    if (!resource) return;
+    if (!resource || !resource.fileURL) return;
 
     if (user) {
       trackDownload(resource.id, user.uid).catch(() => {});
@@ -161,6 +169,17 @@ export default function ResourceDetailPage({
 
     // Open file in new tab
     window.open(resource.fileURL, "_blank", "noopener,noreferrer");
+  }
+
+  async function handlePublishResource() {
+    if (!resource || publishing) return;
+    setPublishing(true);
+    try {
+      await updateResource(resource.id, { isPublic: true });
+      setResource({ ...resource, isPublic: true });
+    } finally {
+      setPublishing(false);
+    }
   }
 
   function handleShare() {
@@ -308,6 +327,7 @@ export default function ResourceDetailPage({
             {/* Header */}
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <Badge variant="primary">{typeLabel}</Badge>
+              {resource.isPublic === false && <Badge variant="warning">Draft</Badge>}
               {resource.gradeLevel && (
                 <Badge variant="default">{resource.gradeLevel}</Badge>
               )}
@@ -324,6 +344,17 @@ export default function ResourceDetailPage({
               {resource.description}
             </p>
 
+            {resource.contentSections && resource.contentSections.length > 0 && (
+              <div className="mt-5 space-y-4">
+                {resource.contentSections.map((section) => (
+                  <section key={section.heading} className="rounded-lg border border-border px-4 py-3">
+                    <h2 className="text-sm font-semibold text-foreground">{section.heading}</h2>
+                    <p className="mt-2 text-sm text-muted whitespace-pre-wrap">{section.body}</p>
+                  </section>
+                ))}
+              </div>
+            )}
+
             {/* Tags */}
             {resource.tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-1.5">
@@ -335,6 +366,18 @@ export default function ResourceDetailPage({
                     {tag}
                   </span>
                 ))}
+              </div>
+            )}
+
+            {resource.sourceLessonId && resource.sourceLessonTitle && (
+              <div className="mt-4 rounded-lg border border-border bg-secondary-50 px-4 py-3 text-sm text-secondary-900">
+                Linked lesson:{" "}
+                <Link
+                  href={`/lesson-builder/${resource.sourceLessonId}`}
+                  className="font-medium underline underline-offset-2"
+                >
+                  {resource.sourceLessonTitle}
+                </Link>
               </div>
             )}
 
@@ -456,7 +499,7 @@ export default function ResourceDetailPage({
               <div className="flex flex-wrap gap-3">
                 {user && (
                   <>
-                    <Button onClick={handleDownload}>
+                    <Button onClick={handleDownload} disabled={!resource.fileURL}>
                       <svg
                         className="h-4 w-4"
                         fill="none"
@@ -470,7 +513,7 @@ export default function ResourceDetailPage({
                           d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
                         />
                       </svg>
-                      Download
+                      {resource.fileURL ? "Download" : "Download unavailable"}
                     </Button>
                     <Button
                       variant={saved ? "secondary" : "outline"}
@@ -494,6 +537,15 @@ export default function ResourceDetailPage({
                     </Button>
                     {isOwner && (
                       <>
+                        {resource.isPublic === false && (
+                          <Button
+                            variant="secondary"
+                            onClick={handlePublishResource}
+                            isLoading={publishing}
+                          >
+                            Publish
+                          </Button>
+                        )}
                         <Link href={`/resources/upload?edit=${resource.id}`}>
                           <Button variant="outline">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">

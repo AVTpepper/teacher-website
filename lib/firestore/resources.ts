@@ -41,6 +41,7 @@ export function parseResourceSlug(slug: string): string {
 export type ResourceType =
   | "lessonPlan"
   | "worksheet"
+  | "rubric"
   | "strategy"
   | "slides"
   | "tool";
@@ -53,10 +54,16 @@ export interface AttachedLink {
 export const RESOURCE_TYPES: { value: ResourceType; label: string }[] = [
   { value: "lessonPlan", label: "Lesson Plan" },
   { value: "worksheet", label: "Worksheet" },
+  { value: "rubric", label: "Rubric" },
   { value: "strategy", label: "Strategy" },
   { value: "slides", label: "Slides" },
   { value: "tool", label: "Tool" },
 ];
+
+export interface ResourceContentSection {
+  heading: string;
+  body: string;
+}
 
 export const SUGGESTED_TAGS = [
   "Differentiated Instruction",
@@ -100,6 +107,12 @@ export interface Resource {
   ratingAverage: number;
   savedByCount: number;
   createdAt: Timestamp | null;
+  updatedAt?: Timestamp | null;
+  isPublic: boolean;
+  sourceLessonId?: string | null;
+  sourceLessonTitle?: string | null;
+  generatedFromLesson?: boolean;
+  contentSections?: ResourceContentSection[];
   tags: string[];
   links: AttachedLink[];
 }
@@ -115,6 +128,11 @@ export interface ResourceInput {
   type: ResourceType;
   fileURL: string;
   fileName: string;
+  isPublic?: boolean;
+  sourceLessonId?: string | null;
+  sourceLessonTitle?: string | null;
+  generatedFromLesson?: boolean;
+  contentSections?: ResourceContentSection[];
   tags: string[];
   links?: AttachedLink[];
 }
@@ -150,7 +168,13 @@ export async function createResource(data: ResourceInput): Promise<string> {
     titleLower: data.title.toLowerCase(),
     id: ref.id,
     links: data.links ?? [],
+    isPublic: data.isPublic ?? true,
+    sourceLessonId: data.sourceLessonId ?? null,
+    sourceLessonTitle: data.sourceLessonTitle ?? null,
+    generatedFromLesson: data.generatedFromLesson ?? false,
+    contentSections: data.contentSections ?? [],
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
     downloadCount: 0,
     ratingSum: 0,
     ratingCount: 0,
@@ -191,6 +215,8 @@ export async function getResources(
   if (!db) throw new Error("Firestore is not initialized");
 
   const constraints: QueryConstraint[] = [];
+
+  constraints.push(where("isPublic", "==", true));
 
   if (filters?.gradeLevel) {
     constraints.push(where("gradeLevel", "==", filters.gradeLevel));
@@ -233,7 +259,8 @@ export async function getResources(
 }
 
 export async function getResourcesByAuthor(
-  authorId: string
+  authorId: string,
+  includePrivate = false,
 ): Promise<GetResourcesResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
@@ -245,21 +272,57 @@ export async function getResourcesByAuthor(
   );
   const snapshot = await getDocs(q);
 
-  const resources = snapshot.docs
+  let resources = snapshot.docs
     .map((d) => d.data() as Resource)
     .sort(byCreatedAtDesc);
+
+  if (!includePrivate) {
+    resources = resources.filter((resource) => resource.isPublic !== false);
+  }
 
   return { resources, lastDoc: null };
 }
 
-export async function getResourceCountByAuthor(authorId: string): Promise<number> {
+export async function getResourceCountByAuthor(
+  authorId: string,
+  includePrivate = false,
+): Promise<number> {
   if (!db) throw new Error("Firestore is not initialized");
+
+  if (!includePrivate) {
+    const snapshot = await getCountFromServer(
+      query(
+        collection(db, "resources"),
+        where("authorId", "==", authorId),
+        where("isPublic", "==", true),
+      )
+    );
+
+    return snapshot.data().count;
+  }
 
   const snapshot = await getCountFromServer(
     query(collection(db, "resources"), where("authorId", "==", authorId))
   );
 
   return snapshot.data().count;
+}
+
+export async function getResourcesByIds(resourceIds: string[]): Promise<Resource[]> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const uniqueIds = Array.from(new Set(resourceIds.filter(Boolean)));
+  const results = await Promise.all(
+    uniqueIds.map(async (resourceId) => {
+      try {
+        return await getResource(resourceId);
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return results.filter((resource): resource is Resource => resource !== null);
 }
 
 // --- Download tracking ---
@@ -519,6 +582,7 @@ export async function getRelatedResources(
   // Query by same subject, excluding the current resource
   const q = query(
     collection(db, "resources"),
+    where("isPublic", "==", true),
     where("subject", "==", resource.subject),
     orderBy("downloadCount", "desc"),
     limit(maxResults + 1)

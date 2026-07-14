@@ -18,6 +18,12 @@ import {
   type Lesson,
   type LessonComment,
 } from "@/lib/firestore/lessons";
+import {
+  getResourcesByIds,
+  resourceSlug,
+  RESOURCE_TYPES,
+  type Resource,
+} from "@/lib/firestore/resources";
 import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { getUserRating, submitRating } from "@/lib/firestore/ratings";
 import { Avatar, Badge, Button, Card, ConfirmDialog, IPNotice } from "@/components/ui";
@@ -41,6 +47,7 @@ export default function LessonDetailPage({
   const [author, setAuthor] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [linkedResources, setLinkedResources] = useState<Resource[]>([]);
 
   // Download
   const [localDownloadCount, setLocalDownloadCount] = useState(0);
@@ -85,6 +92,13 @@ export default function LessonDetailPage({
         setLocalDownloadCount(res.downloadCount);
         setRatingAverage(res.ratingAverage ?? 0);
         setRatingCount(res.ratingCount ?? 0);
+
+        if (res.linkedResourceIds && res.linkedResourceIds.length > 0) {
+          const resources = await getResourcesByIds(res.linkedResourceIds);
+          setLinkedResources(resources);
+        } else {
+          setLinkedResources([]);
+        }
 
         const [authorData] = await Promise.all([
           getUser(res.authorId),
@@ -261,6 +275,9 @@ export default function LessonDetailPage({
   const checkForUnderstanding = lesson.checkForUnderstanding ?? [];
   const assessments = lesson.assessments ?? [];
   const attachments = lesson.attachments ?? [];
+  const visibleLinkedResources = linkedResources.filter(
+    (resource) => resource.isPublic !== false || isOwner
+  );
 
   return (
     <div className="py-8 space-y-8">
@@ -536,6 +553,37 @@ export default function LessonDetailPage({
                       {att.name}
                     </a>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {visibleLinkedResources.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-3">
+                  🧰 Linked Teaching Assets
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {visibleLinkedResources.map((resource) => {
+                    const typeLabel =
+                      RESOURCE_TYPES.find((type) => type.value === resource.type)?.label ?? resource.type;
+
+                    return (
+                      <Link
+                        key={resource.id}
+                        href={`/resources/${resourceSlug(resource.title, resource.id)}`}
+                        className="rounded-lg border border-border bg-surface-hover px-4 py-3 transition-colors hover:border-primary-300"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-foreground">{resource.title}</span>
+                          {resource.isPublic === false && <Badge variant="warning">Draft</Badge>}
+                        </div>
+                        <p className="mt-1 text-xs text-muted">{typeLabel}</p>
+                        <p className="mt-2 text-sm text-muted line-clamp-3">
+                          {resource.description}
+                        </p>
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -96,6 +96,7 @@ export interface ResourcePDFProps {
   type: string;
   tags: string[];
   authorName: string;
+  contentSections?: Array<{ heading: string; body: string }>;
 }
 
 export default function ResourcePDFDocument({
@@ -106,6 +107,7 @@ export default function ResourcePDFDocument({
   type,
   tags,
   authorName,
+  contentSections = [],
 }: ResourcePDFProps) {
   const date = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -148,6 +150,13 @@ export default function ResourcePDFDocument({
           <Text style={styles.sectionTitle}>Description</Text>
           <Text style={styles.body}>{description}</Text>
         </View>
+
+        {contentSections.map((section) => (
+          <View key={section.heading} style={styles.section}>
+            <Text style={styles.sectionTitle}>{section.heading}</Text>
+            <Text style={styles.body}>{section.body}</Text>
+          </View>
+        ))}
 
         {/* Tags */}
         {tags.length > 0 && (

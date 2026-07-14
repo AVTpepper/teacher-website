@@ -68,6 +68,8 @@ async function verifyFirebaseToken(token: string): Promise<string | null> {
 
 const FREE_DAILY_LIMIT = 10;
 const FREE_MONTHLY_REFINE_LIMIT = 20;
+const FREE_GENERATED_ASSET_LIMIT = 1;
+const PLUS_GENERATED_ASSET_LIMIT = 2;
 
 function getUtcDateKey(): string {
   const now = new Date();
@@ -157,6 +159,19 @@ function fsIntField(
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ValidSection = "objectives" | "materials" | "steps" | "checkForUnderstanding" | "assessments";
+type GeneratedAssetType = "worksheet" | "rubric";
+
+interface AssetRequest {
+  type: GeneratedAssetType;
+  example?: string;
+}
+
+interface GeneratedAsset {
+  type: GeneratedAssetType;
+  title: string;
+  description: string;
+  sections: Array<{ heading: string; body: string }>;
+}
 
 import { GRADE_LEVELS as VALID_GRADE_LEVELS, SPECIFIC_GRADE_LEVELS } from "@/lib/constants";
 
@@ -170,6 +185,7 @@ interface GenerateBody {
   learningGoal?: string;
   studentSupports?: string;
   activityStyle?: string;
+  assetRequests?: AssetRequest[];
   gradeLevelOverride?: string;
   description?: string;
 }
@@ -593,6 +609,66 @@ export async function POST(request: NextRequest): Promise<Response> {
         );
       }
     }
+    if (raw.assetRequests !== undefined) {
+      if (!Array.isArray(raw.assetRequests)) {
+        return Response.json(
+          { error: 'Field "assetRequests" must be an array when provided.' },
+          { status: 400 },
+        );
+      }
+      const maxAssets =
+        userTier === "plus"
+          ? PLUS_GENERATED_ASSET_LIMIT
+          : FREE_GENERATED_ASSET_LIMIT;
+      if (raw.assetRequests.length > maxAssets) {
+        return Response.json(
+          {
+            error:
+              userTier === "plus"
+                ? `Plus users can generate up to ${PLUS_GENERATED_ASSET_LIMIT} linked assets per lesson in this version.`
+                : `Free users can generate up to ${FREE_GENERATED_ASSET_LIMIT} linked asset per lesson. Upgrade to Plus for more.`,
+          },
+          { status: 400 },
+        );
+      }
+      for (const item of raw.assetRequests) {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+          return Response.json(
+            { error: 'Each item in "assetRequests" must be an object.' },
+            { status: 400 },
+          );
+        }
+
+        const requestItem = item as Record<string, unknown>;
+        if (
+          requestItem.type !== "worksheet" &&
+          requestItem.type !== "rubric"
+        ) {
+          return Response.json(
+            { error: 'Each asset request type must be "worksheet" or "rubric".' },
+            { status: 400 },
+          );
+        }
+        if (
+          requestItem.example !== undefined &&
+          typeof requestItem.example !== "string"
+        ) {
+          return Response.json(
+            { error: 'Each asset request example must be a string when provided.' },
+            { status: 400 },
+          );
+        }
+        if (
+          typeof requestItem.example === "string" &&
+          requestItem.example.length > 500
+        ) {
+          return Response.json(
+            { error: 'Each asset request example must be 500 characters or fewer.' },
+            { status: 400 },
+          );
+        }
+      }
+    }
   } else {
     const VALID_SECTIONS: ValidSection[] = [
       "objectives",
@@ -666,6 +742,11 @@ export async function POST(request: NextRequest): Promise<Response> {
   let userMessage: string;
 
   if (body.mode === "generate") {
+    const requestedAssets = body.assetRequests ?? [];
+    const assetsSchema = requestedAssets.length > 0
+      ? `,
+  "assets": [{"type": "worksheet" | "rubric", "title": "<string>", "description": "<what this asset is for>", "sections": [{"heading": "<section heading>", "body": "<plain text content for that section>"}]}]`
+      : "";
     systemPrompt = `You are an expert educator. Given a topic, grade level, and subject, return a complete lesson plan as a single JSON object with exactly this structure:
 {
   "title": "<string>",
@@ -674,11 +755,12 @@ export async function POST(request: NextRequest): Promise<Response> {
   "materials": ["<string>"],
   "steps": [{"title": "<step title>", "description": "<1-2 sentence description of what happens in this step>", "duration": "<e.g. 5 minutes>"}],
   "checkForUnderstanding": ["<question or activity to check student comprehension>"],
-  "assessments": ["<assessment method or task>"]
+  "assessments": ["<assessment method or task>"]${assetsSchema}
 }
 IMPORTANT: The top-level "duration" field MUST equal the sum of all individual step duration values. If your steps total 45 minutes, "duration" must be "45 minutes". Do not invent a different number of class periods.
 Write a classroom-ready plan with 3-5 concrete objectives, age-appropriate activities, realistic timing, and materials that clearly support the lesson steps.
 When support needs or activity preferences are provided, incorporate them throughout the plan instead of mentioning them once.
+If asset requests are included, create those assets so they clearly match the lesson objectives, sequence, and assessment expectations. Worksheet content should be student-facing. Rubrics should include clear criteria and concise performance descriptors.
 Return only the raw JSON object - no markdown, no code fences, no explanation.`;
 
     // Use gradeLevelOverride (plus-tier only) if provided, otherwise fall back to gradeLevel
@@ -704,6 +786,15 @@ Subject: ${body.subject}`;
 
     if (userTier === "plus" && body.description?.trim()) {
       userMessage += `\nAdditional context: ${body.description.trim()}`;
+    }
+    if (requestedAssets.length > 0) {
+      const assetLines = requestedAssets.map((asset, index) => {
+        const example = asset.example?.trim()
+          ? ` Example or direction: ${asset.example.trim()}`
+          : " Generate it fully from the lesson.";
+        return `Asset ${index + 1}: ${asset.type}.${example}`;
+      });
+      userMessage += `\nCreate linked teaching assets:\n${assetLines.join("\n")}`;
     }
   } else {
     const sb = body as SuggestBody;
@@ -823,6 +914,33 @@ Current content: ${existing}`;
           { status: 502 },
         );
       }
+      const requestedAssetTypes = new Set((body.assetRequests ?? []).map((asset) => asset.type));
+      const assets = Array.isArray(lesson.assets)
+        ? (lesson.assets as unknown[])
+            .filter(
+              (asset): asset is GeneratedAsset =>
+                asset !== null &&
+                typeof asset === "object" &&
+                (asset as Record<string, unknown>).type !== undefined &&
+                requestedAssetTypes.has((asset as Record<string, unknown>).type as GeneratedAssetType) &&
+                typeof (asset as Record<string, unknown>).title === "string" &&
+                typeof (asset as Record<string, unknown>).description === "string" &&
+                Array.isArray((asset as Record<string, unknown>).sections) &&
+                ((asset as Record<string, unknown>).sections as unknown[]).every(
+                  (section) =>
+                    section !== null &&
+                    typeof section === "object" &&
+                    typeof (section as Record<string, unknown>).heading === "string" &&
+                    typeof (section as Record<string, unknown>).body === "string",
+                )
+            )
+            .map((asset) => ({
+              type: asset.type,
+              title: asset.title,
+              description: asset.description,
+              sections: asset.sections,
+            }))
+        : [];
       // Increment usage counter for free tier (best-effort; do not block the response)
       if (userTier === "free") {
         fsIncrementCount(`users/${uid}/aiUsage/${dateKey}`, token).catch(() => {});
@@ -837,6 +955,7 @@ Current content: ${existing}`;
           checkForUnderstanding: lesson.checkForUnderstanding as string[],
           assessments: lesson.assessments as string[],
         },
+        assets,
         remainingRequests:
           userTier === "free"
             ? Math.max(0, FREE_DAILY_LIMIT - (currentCount + 1))

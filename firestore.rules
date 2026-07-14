@@ -15,6 +15,12 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
+    function canReadResourceDoc(resourceId) {
+      let resourceDoc = get(/databases/$(database)/documents/resources/$(resourceId));
+      return resourceDoc.data.isPublic != false
+        || (isAuth() && resourceDoc.data.authorId == request.auth.uid);
+    }
+
     // -----------------------------------------------------------------------
     // users/{userId}
     // -----------------------------------------------------------------------
@@ -111,7 +117,8 @@ service cloud.firestore {
     // resources/{resourceId}
     // -----------------------------------------------------------------------
     match /resources/{resourceId} {
-      allow read: if true;
+      allow read: if resource.data.isPublic != false
+                  || (isAuth() && resource.data.authorId == request.auth.uid);
       allow create: if isAuth()
                     && request.resource.data.authorId == request.auth.uid;
       allow update: if isAuth()
@@ -125,19 +132,19 @@ service cloud.firestore {
 
       // ratings sub-collection — resources/{resourceId}/ratings/{userId}
       match /ratings/{userId} {
-        allow read: if true;
+        allow read: if canReadResourceDoc(resourceId);
         allow write: if isOwner(userId);
       }
 
       // saves sub-collection — resources/{resourceId}/saves/{userId}
       match /saves/{userId} {
-        allow read: if true;
+        allow read: if canReadResourceDoc(resourceId);
         allow write: if isOwner(userId);
       }
 
       // comments sub-collection — resources/{resourceId}/comments/{commentId}
       match /comments/{commentId} {
-        allow read: if true;
+        allow read: if canReadResourceDoc(resourceId);
         allow create: if isAuth()
                       && request.resource.data.authorId == request.auth.uid;
         allow update: if isAuth()
@@ -146,6 +153,11 @@ service cloud.firestore {
                            .affectedKeys().hasOnly(['content', 'editedAt']);
         allow delete: if isAuth()
                       && resource.data.authorId == request.auth.uid;
+
+        match /likes/{userId} {
+          allow read: if canReadResourceDoc(resourceId);
+          allow write: if isOwner(userId);
+        }
       }
     }
 

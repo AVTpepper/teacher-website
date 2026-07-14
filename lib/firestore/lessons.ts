@@ -55,6 +55,7 @@ export interface Lesson {
   attachments: LessonAttachment[];
   checkForUnderstanding: string[];
   assessments: string[];
+  linkedResourceIds?: string[];
   isPublic: boolean;
   remixedFromId: string | null;
   createdAt: Timestamp | null;
@@ -79,6 +80,7 @@ export interface LessonInput {
   attachments: LessonAttachment[];
   checkForUnderstanding: string[];
   assessments: string[];
+  linkedResourceIds?: string[];
   isPublic: boolean;
   remixedFromId?: string | null;
 }
@@ -96,6 +98,7 @@ export async function createLesson(data: LessonInput): Promise<string> {
     ...data,
     titleLower: data.title.toLowerCase(),
     id: ref.id,
+    linkedResourceIds: data.linkedResourceIds ?? [],
     remixedFromId: data.remixedFromId ?? null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

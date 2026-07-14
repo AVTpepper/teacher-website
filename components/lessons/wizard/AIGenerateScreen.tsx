@@ -1,21 +1,38 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { User } from "firebase/auth";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { pdf } from "@react-pdf/renderer";
 import { GRADE_LEVELS, SPECIFIC_GRADE_LEVELS } from "@/lib/constants";
 import { SUBJECTS } from "@/lib/firestore/users";
+import { storage } from "@/lib/firebase";
+import { createLesson, updateLesson } from "@/lib/firestore/lessons";
+import {
+  createResource,
+  type ResourceContentSection,
+  type ResourceType,
+} from "@/lib/firestore/resources";
+import ResourcePDFDocument from "@/components/resources/ResourcePDFDocument";
 import Spinner from "@/components/ui/Spinner";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import type { WizardLessonState } from "./LessonWizardState";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+type AssetKind = "worksheet" | "rubric";
 
 type AIGenerateScreenProps = {
   user: User | null;
   userTier: "free" | "plus";
-  onGenerated: (state: WizardLessonState) => void;
+  onGenerated: (state: WizardLessonState, draftId: string) => void;
   onBack: () => void;
+};
+
+type GeneratedAssetPreview = {
+  type: AssetKind;
+  title: string;
+  description: string;
+  sections: ResourceContentSection[];
 };
 
 type GenerateResponse = {
@@ -28,10 +45,16 @@ type GenerateResponse = {
     checkForUnderstanding: string[];
     assessments: string[];
   };
+  assets?: GeneratedAssetPreview[];
   remainingRequests?: number | null;
 };
 
 type GeneratedLessonPreview = GenerateResponse["lesson"];
+
+type AssetOptionState = {
+  selected: boolean;
+  example: string;
+};
 
 const ACTIVITY_STYLE_OPTIONS = [
   "Hands-on exploration",
@@ -42,7 +65,10 @@ const ACTIVITY_STYLE_OPTIONS = [
   "Project-based learning",
 ] as const;
 
-// ─── Error mapping ────────────────────────────────────────────────────────────
+const ASSET_LABELS: Record<AssetKind, string> = {
+  worksheet: "Worksheet",
+  rubric: "Rubric",
+};
 
 function mapErrorToMessage(
   err: unknown,
@@ -54,6 +80,9 @@ function mapErrorToMessage(
   }
   if (err instanceof TypeError) {
     return "Could not reach the AI service. Check your connection and try again.";
+  }
+  if (responseStatus === 400 && typeof responseData?.error === "string") {
+    return responseData.error;
   }
   if (responseStatus === 503) {
     return "AI features are not available in this environment.";
@@ -106,7 +135,9 @@ function buildQualityChecks(lesson: GeneratedLessonPreview) {
     {
       label: "Duration math",
       status:
-        totalDuration !== null && stepDurationTotal !== null && totalDuration === stepDurationTotal
+        totalDuration !== null &&
+        stepDurationTotal !== null &&
+        totalDuration === stepDurationTotal
           ? "pass"
           : "warn",
       detail:
@@ -125,7 +156,35 @@ function buildQualityChecks(lesson: GeneratedLessonPreview) {
   ] as const;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+function buildAssetTags(type: AssetKind): string[] {
+  if (type === "rubric") return ["Assessment", "Rubric", "Printable"];
+  return ["Worksheet", "Printable", "Student Practice"];
+}
+
+function buildWizardState(
+  lesson: GeneratedLessonPreview,
+  gradeLevel: string,
+  subject: string,
+): WizardLessonState {
+  return {
+    title: lesson.title ?? "",
+    gradeLevel,
+    subject,
+    duration: typeof lesson.duration === "string" ? lesson.duration : "",
+    objectives: lesson.objectives?.length > 0 ? lesson.objectives : [""],
+    materials: lesson.materials?.length > 0 ? lesson.materials : [""],
+    steps:
+      lesson.steps?.length > 0
+        ? lesson.steps
+        : [{ title: "", description: "" }],
+    checkForUnderstanding:
+      lesson.checkForUnderstanding?.length > 0
+        ? lesson.checkForUnderstanding
+        : [""],
+    assessments:
+      lesson.assessments?.length > 0 ? lesson.assessments : [""],
+  };
+}
 
 export default function AIGenerateScreen({
   user,
@@ -141,21 +200,33 @@ export default function AIGenerateScreen({
   const [activityStyle, setActivityStyle] = useState("");
   const [gradeLevelOverride, setGradeLevelOverride] = useState("");
   const [additionalContext, setAdditionalContext] = useState("");
+  const [assetOptions, setAssetOptions] = useState<Record<AssetKind, AssetOptionState>>({
+    worksheet: { selected: false, example: "" },
+    rubric: { selected: false, example: "" },
+  });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isAcceptingDrafts, setIsAcceptingDrafts] = useState(false);
   const [error, setError] = useState("");
   const [previewLesson, setPreviewLesson] = useState<GeneratedLessonPreview | null>(null);
-  const [remainingRequests, setRemainingRequests] = useState<number | null>(
-    null
-  );
+  const [previewAssets, setPreviewAssets] = useState<GeneratedAssetPreview[]>([]);
+  const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
 
-  // Fetch remaining daily requests on mount (free tier guard)
+  const assetLimit = userTier === "plus" ? 2 : 1;
+  const selectedAssetCount = useMemo(
+    () => Object.values(assetOptions).filter((option) => option.selected).length,
+    [assetOptions]
+  );
+  const isLimitReached = remainingRequests === 0;
+  const isSubmitDisabled = !topic.trim() || isGenerating || isLimitReached;
+  const remainsId = "ai-generate-remaining";
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
 
     async function fetchUsage() {
       try {
-        const token = await user!.getIdToken();
+        const token = await user.getIdToken();
         const res = await fetch("/api/ai/lesson", {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -167,19 +238,22 @@ export default function AIGenerateScreen({
           setRemainingRequests(data.remainingRequests ?? null);
         }
       } catch {
-        // Non-critical - usage limit is enforced server-side
+        // Usage is enforced server-side; failure here is non-blocking.
       }
     }
 
-    fetchUsage();
+    void fetchUsage();
     return () => {
       cancelled = true;
     };
   }, [user]);
 
-  const isLimitReached = remainingRequests === 0;
-  const isSubmitDisabled = !topic.trim() || isGenerating || isLimitReached;
-  const remainsId = "ai-generate-remaining";
+  function updateAssetOption(kind: AssetKind, patch: Partial<AssetOptionState>) {
+    setAssetOptions((prev) => ({
+      ...prev,
+      [kind]: { ...prev[kind], ...patch },
+    }));
+  }
 
   async function generateLesson() {
     if (isSubmitDisabled || !user) return;
@@ -194,6 +268,13 @@ export default function AIGenerateScreen({
 
     try {
       const token = await user.getIdToken();
+      const assetRequests = (Object.entries(assetOptions) as Array<[AssetKind, AssetOptionState]>)
+        .filter(([, option]) => option.selected)
+        .map(([type, option]) => ({
+          type,
+          ...(option.example.trim() ? { example: option.example.trim() } : {}),
+        }));
+
       const res = await fetch("/api/ai/lesson", {
         method: "POST",
         headers: {
@@ -205,16 +286,11 @@ export default function AIGenerateScreen({
           topic: topic.trim(),
           gradeLevel,
           subject,
-          ...(learningGoal.trim()
-            ? { learningGoal: learningGoal.trim() }
-            : {}),
-          ...(studentSupports.trim()
-            ? { studentSupports: studentSupports.trim() }
-            : {}),
+          ...(learningGoal.trim() ? { learningGoal: learningGoal.trim() } : {}),
+          ...(studentSupports.trim() ? { studentSupports: studentSupports.trim() } : {}),
           ...(activityStyle ? { activityStyle } : {}),
-          ...(userTier === "plus" && gradeLevelOverride
-            ? { gradeLevelOverride }
-            : {}),
+          ...(assetRequests.length > 0 ? { assetRequests } : {}),
+          ...(userTier === "plus" && gradeLevelOverride ? { gradeLevelOverride } : {}),
           ...(userTier === "plus" && additionalContext.trim()
             ? { description: additionalContext.trim() }
             : {}),
@@ -223,28 +299,23 @@ export default function AIGenerateScreen({
       });
 
       responseStatus = res.status;
-      responseData = (await res.json().catch(() => ({}))) as Record<
-        string,
-        unknown
-      >;
+      responseData = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
       if (!res.ok) throw new Error("api_error");
 
-      // Update remaining requests counter
       const remField = (responseData as GenerateResponse).remainingRequests;
       if (typeof remField === "number") setRemainingRequests(remField);
       else if (remField === null) setRemainingRequests(null);
 
-      const lesson = (responseData as GenerateResponse).lesson;
-      setPreviewLesson(lesson);
+      setPreviewLesson((responseData as GenerateResponse).lesson);
+      setPreviewAssets(
+        Array.isArray((responseData as GenerateResponse).assets)
+          ? ((responseData as GenerateResponse).assets as GeneratedAssetPreview[])
+          : []
+      );
     } catch (err) {
-      const msg = mapErrorToMessage(err, responseStatus, responseData);
-      setError(msg);
-      // Update remaining counter if returned in 429 response
-      if (
-        responseStatus === 429 &&
-        typeof responseData.remainingRequests === "number"
-      ) {
+      setError(mapErrorToMessage(err, responseStatus, responseData));
+      if (responseStatus === 429 && typeof responseData.remainingRequests === "number") {
         setRemainingRequests(responseData.remainingRequests);
       }
     } finally {
@@ -258,44 +329,107 @@ export default function AIGenerateScreen({
     await generateLesson();
   }
 
-  function handleAcceptPreview() {
-    if (!previewLesson) return;
+  async function handleAcceptPreview() {
+    if (!previewLesson || !user) return;
 
-    const wizardState: WizardLessonState = {
-      title: previewLesson.title ?? "",
-      gradeLevel,
-      subject,
-      duration:
-        typeof previewLesson.duration === "string" ? previewLesson.duration : "",
-      objectives:
-        previewLesson.objectives?.length > 0 ? previewLesson.objectives : [""],
-      materials:
-        previewLesson.materials?.length > 0 ? previewLesson.materials : [""],
-      steps:
-        previewLesson.steps?.length > 0
-          ? previewLesson.steps
-          : [{ title: "", description: "" }],
-      checkForUnderstanding:
-        previewLesson.checkForUnderstanding?.length > 0
-          ? previewLesson.checkForUnderstanding
-          : [""],
-      assessments:
-        previewLesson.assessments?.length > 0 ? previewLesson.assessments : [""],
-    };
+    const wizardState = buildWizardState(previewLesson, gradeLevel, subject);
+    setIsAcceptingDrafts(true);
+    setError("");
 
-    onGenerated(wizardState);
+    try {
+      const lessonId = await createLesson({
+        title: wizardState.title,
+        authorId: user.uid,
+        authorName: user.displayName ?? "Anonymous",
+        authorPhotoURL: user.photoURL ?? null,
+        gradeLevel: wizardState.gradeLevel,
+        subject: wizardState.subject,
+        duration: wizardState.duration,
+        objectives: wizardState.objectives.filter((item) => item.trim() !== ""),
+        materials: wizardState.materials.filter((item) => item.trim() !== ""),
+        steps: wizardState.steps.filter((step) => step.title.trim() !== ""),
+        attachments: [],
+        checkForUnderstanding: wizardState.checkForUnderstanding.filter(
+          (item) => item.trim() !== ""
+        ),
+        assessments: wizardState.assessments.filter((item) => item.trim() !== ""),
+        linkedResourceIds: [],
+        isPublic: false,
+      });
+
+      const linkedResourceIds = await Promise.all(
+        previewAssets.map(async (asset) => {
+          let fileURL = "";
+          let fileName = "";
+
+          if (storage) {
+            const pdfBlob = await pdf(
+              <ResourcePDFDocument
+                title={asset.title}
+                description={asset.description}
+                gradeLevel={gradeLevel}
+                subject={subject}
+                type={ASSET_LABELS[asset.type]}
+                tags={buildAssetTags(asset.type)}
+                authorName={user.displayName || "Anonymous"}
+                contentSections={asset.sections}
+              />
+            ).toBlob();
+            const safeName = asset.title
+              .trim()
+              .replace(/[^a-z0-9]/gi, "_")
+              .toLowerCase();
+            fileName = `${safeName || asset.type}.pdf`;
+            const storageRef = ref(
+              storage,
+              `resources/${user.uid}/${Date.now()}_${fileName}`
+            );
+            await uploadBytes(storageRef, pdfBlob, {
+              contentType: "application/pdf",
+            });
+            fileURL = await getDownloadURL(storageRef);
+          }
+
+          return createResource({
+            title: asset.title,
+            description: asset.description,
+            authorId: user.uid,
+            authorName: user.displayName || "Anonymous",
+            authorPhotoURL: user.photoURL ?? null,
+            gradeLevel,
+            subject,
+            type: asset.type as ResourceType,
+            fileURL,
+            fileName,
+            isPublic: false,
+            sourceLessonId: lessonId,
+            sourceLessonTitle: wizardState.title,
+            generatedFromLesson: true,
+            contentSections: asset.sections,
+            tags: buildAssetTags(asset.type),
+            links: [],
+          });
+        })
+      );
+
+      if (linkedResourceIds.length > 0) {
+        await updateLesson(lessonId, { linkedResourceIds });
+      }
+
+      onGenerated(wizardState, lessonId);
+    } catch {
+      setError("We couldn't save your lesson draft and linked assets. Please try again.");
+    } finally {
+      setIsAcceptingDrafts(false);
+    }
   }
 
-  // Full-screen loading overlay while generating
   if (isGenerating) {
     return (
       <main className="flex min-h-[60vh] flex-col items-center justify-center gap-6 py-16 px-4">
         <div role="status" className="flex flex-col items-center gap-6">
           <Spinner className="h-12 w-12 border-[3px]" />
-          <p
-            aria-live="polite"
-            className="text-base font-medium text-foreground"
-          >
+          <p aria-live="polite" className="text-base font-medium text-foreground">
             Generating your lesson plan…
           </p>
         </div>
@@ -307,270 +441,294 @@ export default function AIGenerateScreen({
     <>
       <main className="flex min-h-[60vh] flex-col items-center justify-center py-16 px-4">
         <div className="w-full max-w-lg">
-        {/* Back button */}
-        <button
-          type="button"
-          onClick={onBack}
-          className="mb-6 flex items-center gap-1 text-sm text-muted hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded"
-        >
-          ← Back
-        </button>
-
-        <h1 className="text-2xl font-bold tracking-tight text-foreground mb-1">
-          Generate a Lesson with AI
-        </h1>
-        <p className="text-sm text-muted mb-6">
-          Describe the lesson you need, then add a few teaching constraints so the first draft is easier to trust and edit.
-        </p>
-
-        <div className="mb-6 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">
-          Best results: name the topic, clarify the main learning outcome, and note any support or pacing needs the AI should respect.
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-          {/* Topic */}
-          <div>
-            <label
-              htmlFor="ai-topic"
-              className="block text-sm font-medium text-foreground mb-1.5"
-            >
-              Topic{" "}
-              <span aria-hidden="true" className="text-red-500">
-                *
-              </span>
-            </label>
-            <textarea
-              id="ai-topic"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              maxLength={300}
-              required
-              aria-required="true"
-              placeholder="e.g. Introduction to fractions using real-world examples"
-              rows={3}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-            />
-            <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
-              {topic.length} / 300
-            </p>
-          </div>
-
-          <div>
-            <label
-              htmlFor="ai-learning-goal"
-              className="block text-sm font-medium text-foreground mb-1.5"
-            >
-              Learning Goal
-            </label>
-            <textarea
-              id="ai-learning-goal"
-              value={learningGoal}
-              onChange={(e) => setLearningGoal(e.target.value.slice(0, 200))}
-              maxLength={200}
-              rows={2}
-              placeholder="e.g. Students will compare fractions using visual models and explain their reasoning."
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-            />
-            <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
-              {learningGoal.length} / 200
-            </p>
-          </div>
-
-          <div>
-            <label
-              htmlFor="ai-student-supports"
-              className="block text-sm font-medium text-foreground mb-1.5"
-            >
-              Student Support Needs
-            </label>
-            <textarea
-              id="ai-student-supports"
-              value={studentSupports}
-              onChange={(e) =>
-                setStudentSupports(e.target.value.slice(0, 300))
-              }
-              maxLength={300}
-              rows={2}
-              placeholder="e.g. Include ELL scaffolds, sentence stems, and one extension task for fast finishers."
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-            />
-            <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
-              {studentSupports.length} / 300
-            </p>
-          </div>
-
-          <div>
-            <label
-              htmlFor="ai-activity-style"
-              className="block text-sm font-medium text-foreground mb-1.5"
-            >
-              Preferred Activity Style
-            </label>
-            <select
-              id="ai-activity-style"
-              value={activityStyle}
-              onChange={(e) => setActivityStyle(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">No preference</option>
-              {ACTIVITY_STYLE_OPTIONS.map((style) => (
-                <option key={style} value={style}>
-                  {style}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Grade Level */}
-          <div>
-            <label
-              htmlFor="ai-grade-level"
-              className="block text-sm font-medium text-foreground mb-1.5"
-            >
-              Grade Level
-            </label>
-            <select
-              id="ai-grade-level"
-              value={gradeLevel}
-              onChange={(e) => setGradeLevel(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              {GRADE_LEVELS.map((level) => (
-                <option key={level} value={level}>
-                  {level}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Subject */}
-          <div>
-            <label
-              htmlFor="ai-subject"
-              className="block text-sm font-medium text-foreground mb-1.5"
-            >
-              Subject
-            </label>
-            <select
-              id="ai-subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              {SUBJECTS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Plus-tier only: specific grade override & additional context */}
-          {userTier === "plus" && (
-            <>
-              <div>
-                <label
-                  htmlFor="ai-grade-override"
-                  className="block text-sm font-medium text-foreground mb-1.5"
-                >
-                  Specific Grade{" "}
-                  <span className="ml-1 inline-flex items-center rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">
-                    Plus
-                  </span>
-                </label>
-                <select
-                  id="ai-grade-override"
-                  value={gradeLevelOverride}
-                  onChange={(e) => setGradeLevelOverride(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="">No override</option>
-                  {SPECIFIC_GRADE_LEVELS.map((level) => (
-                    <option key={level} value={level}>
-                      {level}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="ai-context"
-                  className="block text-sm font-medium text-foreground mb-1.5"
-                >
-                  Additional Context{" "}
-                  <span className="ml-1 inline-flex items-center rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">
-                    Plus
-                  </span>
-                </label>
-                <textarea
-                  id="ai-context"
-                  value={additionalContext}
-                  onChange={(e) =>
-                    setAdditionalContext(e.target.value.slice(0, 500))
-                  }
-                  maxLength={500}
-                  rows={3}
-                  placeholder="Add curriculum standards, special requirements, or other context…"
-                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-                />
-                <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
-                  {additionalContext.length} / 500
-                </p>
-              </div>
-            </>
-          )}
-
-          {/* Error */}
-          {error && (
-            <p
-              role="alert"
-              className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
-            >
-              {error}
-            </p>
-          )}
-
-          {/* Free-tier remaining requests indicator */}
-          {remainingRequests !== null && (
-            <p
-              id={remainsId}
-              className={`text-xs ${
-                remainingRequests === 0 ? "text-red-600 font-medium" : "text-muted"
-              }`}
-            >
-              {remainingRequests === 0
-                ? "You've reached your daily AI limit. Upgrade to Plus for unlimited access."
-                : `${remainingRequests} / 10 requests remaining today`}
-            </p>
-          )}
-
-          {/* Generate button */}
           <button
-            type="submit"
-            disabled={isSubmitDisabled}
-            aria-disabled={isSubmitDisabled ? "true" : undefined}
-            aria-describedby={
-              remainingRequests !== null ? remainsId : undefined
-            }
-            className={[
-              "w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
-              isSubmitDisabled
-                ? "bg-primary-200 text-primary-400 cursor-not-allowed"
-                : "bg-primary-600 text-white hover:bg-primary-700 cursor-pointer",
-            ].join(" ")}
+            type="button"
+            onClick={onBack}
+            className="mb-6 flex items-center gap-1 text-sm text-muted hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded"
           >
-            Generate Lesson
+            ← Back
           </button>
-        </form>
-      </div>
-    </main>
+
+          <h1 className="text-2xl font-bold tracking-tight text-foreground mb-1">
+            Generate a Lesson with AI
+          </h1>
+          <p className="text-sm text-muted mb-6">
+            Describe the lesson you need, then add a few teaching constraints so the first draft is easier to trust and edit.
+          </p>
+
+          <div className="mb-6 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">
+            Best results: name the topic, clarify the main learning outcome, and note any support or pacing needs the AI should respect.
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+            <div>
+              <label htmlFor="ai-topic" className="block text-sm font-medium text-foreground mb-1.5">
+                Topic <span aria-hidden="true" className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="ai-topic"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                maxLength={300}
+                required
+                aria-required="true"
+                placeholder="e.g. Introduction to fractions using real-world examples"
+                rows={3}
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              />
+              <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
+                {topic.length} / 300
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="ai-learning-goal" className="block text-sm font-medium text-foreground mb-1.5">
+                Learning Goal
+              </label>
+              <textarea
+                id="ai-learning-goal"
+                value={learningGoal}
+                onChange={(e) => setLearningGoal(e.target.value.slice(0, 200))}
+                maxLength={200}
+                rows={2}
+                placeholder="e.g. Students will compare fractions using visual models and explain their reasoning."
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              />
+              <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
+                {learningGoal.length} / 200
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="ai-student-supports" className="block text-sm font-medium text-foreground mb-1.5">
+                Student Support Needs
+              </label>
+              <textarea
+                id="ai-student-supports"
+                value={studentSupports}
+                onChange={(e) => setStudentSupports(e.target.value.slice(0, 300))}
+                maxLength={300}
+                rows={2}
+                placeholder="e.g. Include ELL scaffolds, sentence stems, and one extension task for fast finishers."
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              />
+              <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
+                {studentSupports.length} / 300
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="ai-activity-style" className="block text-sm font-medium text-foreground mb-1.5">
+                Preferred Activity Style
+              </label>
+              <select
+                id="ai-activity-style"
+                value={activityStyle}
+                onChange={(e) => setActivityStyle(e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">No preference</option>
+                {ACTIVITY_STYLE_OPTIONS.map((style) => (
+                  <option key={style} value={style}>
+                    {style}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="rounded-xl border border-border bg-surface px-4 py-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">Optional teaching assets</h2>
+                  <p className="mt-1 text-sm text-muted">
+                    Ask AI to draft linked assets with your lesson. They will be saved as private resource drafts only after you accept the lesson.
+                  </p>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-secondary-100 px-2.5 py-0.5 text-xs font-medium text-secondary-700">
+                  {selectedAssetCount} / {assetLimit} selected
+                </span>
+              </div>
+
+              {(["worksheet", "rubric"] as AssetKind[]).map((kind) => {
+                const option = assetOptions[kind];
+                const limitReachedForNew = !option.selected && selectedAssetCount >= assetLimit;
+                return (
+                  <div key={kind} className="rounded-lg border border-border px-3 py-3 space-y-2">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={option.selected}
+                        disabled={limitReachedForNew}
+                        onChange={(e) => {
+                          if (!e.target.checked) {
+                            updateAssetOption(kind, { selected: false });
+                            return;
+                          }
+                          if (selectedAssetCount < assetLimit) {
+                            updateAssetOption(kind, { selected: true });
+                          }
+                        }}
+                        className="mt-1 h-4 w-4 rounded border-border text-primary-600 focus:ring-primary-500"
+                      />
+                      <div>
+                        <div className="text-sm font-medium text-foreground">{ASSET_LABELS[kind]}</div>
+                        <p className="text-xs text-muted mt-0.5">
+                          {kind === "worksheet"
+                            ? "Create guided student practice tied to the lesson objectives and steps."
+                            : "Create a clear assessment rubric with criteria and performance descriptors."}
+                        </p>
+                      </div>
+                    </label>
+
+                    {option.selected && (
+                      <div>
+                        <label htmlFor={`asset-example-${kind}`} className="block text-xs font-medium text-foreground mb-1.5">
+                          Example or direction (optional)
+                        </label>
+                        <textarea
+                          id={`asset-example-${kind}`}
+                          value={option.example}
+                          onChange={(e) => updateAssetOption(kind, { example: e.target.value.slice(0, 500) })}
+                          maxLength={500}
+                          rows={2}
+                          placeholder={
+                            kind === "worksheet"
+                              ? "e.g. Include 6 mixed-practice problems and one short reflection question."
+                              : "e.g. Use a 4-point rubric with criteria for accuracy, explanation, and participation."
+                          }
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                        />
+                        <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
+                          {option.example.length} / 500
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              <div className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted">
+                Slides outline is planned next. This first version ships with linked worksheets and rubrics.
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="ai-grade-level" className="block text-sm font-medium text-foreground mb-1.5">
+                Grade Level
+              </label>
+              <select
+                id="ai-grade-level"
+                value={gradeLevel}
+                onChange={(e) => setGradeLevel(e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                {GRADE_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="ai-subject" className="block text-sm font-medium text-foreground mb-1.5">
+                Subject
+              </label>
+              <select
+                id="ai-subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                {SUBJECTS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {userTier === "plus" && (
+              <>
+                <div>
+                  <label htmlFor="ai-grade-override" className="block text-sm font-medium text-foreground mb-1.5">
+                    Specific Grade <span className="ml-1 inline-flex items-center rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">Plus</span>
+                  </label>
+                  <select
+                    id="ai-grade-override"
+                    value={gradeLevelOverride}
+                    onChange={(e) => setGradeLevelOverride(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">No override</option>
+                    {SPECIFIC_GRADE_LEVELS.map((level) => (
+                      <option key={level} value={level}>
+                        {level}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="ai-context" className="block text-sm font-medium text-foreground mb-1.5">
+                    Additional Context <span className="ml-1 inline-flex items-center rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">Plus</span>
+                  </label>
+                  <textarea
+                    id="ai-context"
+                    value={additionalContext}
+                    onChange={(e) => setAdditionalContext(e.target.value.slice(0, 500))}
+                    maxLength={500}
+                    rows={3}
+                    placeholder="Add curriculum standards, special requirements, or other context…"
+                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                  />
+                  <p className="mt-1 text-xs text-muted text-right" aria-live="polite">
+                    {additionalContext.length} / 500
+                  </p>
+                </div>
+              </>
+            )}
+
+            {error && (
+              <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
+
+            {remainingRequests !== null && (
+              <p id={remainsId} className={`text-xs ${remainingRequests === 0 ? "text-red-600 font-medium" : "text-muted"}`}>
+                {remainingRequests === 0
+                  ? "You've reached your daily AI limit. Upgrade to Plus for unlimited access."
+                  : `${remainingRequests} / 10 requests remaining today`}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSubmitDisabled}
+              aria-disabled={isSubmitDisabled ? "true" : undefined}
+              aria-describedby={remainingRequests !== null ? remainsId : undefined}
+              className={[
+                "w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
+                isSubmitDisabled
+                  ? "bg-primary-200 text-primary-400 cursor-not-allowed"
+                  : "bg-primary-600 text-white hover:bg-primary-700 cursor-pointer",
+              ].join(" ")}
+            >
+              Generate Lesson
+            </button>
+          </form>
+        </div>
+      </main>
 
       <Modal
         open={previewLesson !== null}
-        onClose={() => setPreviewLesson(null)}
+        onClose={() => {
+          setPreviewLesson(null);
+          setPreviewAssets([]);
+        }}
         title="Review AI Draft"
-        className="max-w-3xl"
+        className="max-w-4xl"
       >
         {previewLesson && (
           <div className="space-y-5">
@@ -578,7 +736,7 @@ export default function AIGenerateScreen({
               Review this draft before you adopt it. AI can speed up planning, but timing, rigor, and student fit still need a teacher check.
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-[1.3fr_0.9fr]">
+            <div className="grid gap-5 lg:grid-cols-[1.25fr_0.95fr]">
               <div className="space-y-4">
                 <div>
                   <h2 className="text-lg font-semibold text-foreground">
@@ -591,9 +749,7 @@ export default function AIGenerateScreen({
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-2">
-                    Objectives
-                  </h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Objectives</h3>
                   <ul className="space-y-1.5 list-disc list-inside text-sm text-foreground">
                     {previewLesson.objectives.filter((item) => item.trim() !== "").map((item, index) => (
                       <li key={index}>{item}</li>
@@ -602,9 +758,7 @@ export default function AIGenerateScreen({
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-2">
-                    Lesson steps
-                  </h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Lesson steps</h3>
                   <ol className="space-y-2">
                     {previewLesson.steps.filter((step) => step.title.trim() !== "").map((step, index) => (
                       <li key={`${step.title}-${index}`} className="rounded-lg border border-border px-3 py-2">
@@ -612,15 +766,9 @@ export default function AIGenerateScreen({
                           <span className="text-sm font-medium text-foreground">
                             {index + 1}. {step.title}
                           </span>
-                          {step.duration && (
-                            <span className="ml-auto text-xs text-muted">
-                              {step.duration}
-                            </span>
-                          )}
+                          {step.duration && <span className="ml-auto text-xs text-muted">{step.duration}</span>}
                         </div>
-                        {step.description && (
-                          <p className="mt-1 text-sm text-muted">{step.description}</p>
-                        )}
+                        {step.description && <p className="mt-1 text-sm text-muted">{step.description}</p>}
                       </li>
                     ))}
                   </ol>
@@ -629,21 +777,15 @@ export default function AIGenerateScreen({
 
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-2">
-                    Quick quality check
-                  </h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Quick quality check</h3>
                   <ul className="space-y-2">
                     {buildQualityChecks(previewLesson).map((check) => (
                       <li key={check.label} className="rounded-lg border border-border px-3 py-2 text-sm">
                         <div className="flex items-center gap-2">
-                          <span
-                            className={[
-                              "inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold",
-                              check.status === "pass"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-amber-100 text-amber-700",
-                            ].join(" ")}
-                          >
+                          <span className={[
+                            "inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold",
+                            check.status === "pass" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700",
+                          ].join(" ")}>
                             {check.status === "pass" ? "✓" : "!"}
                           </span>
                           <span className="font-medium text-foreground">{check.label}</span>
@@ -654,12 +796,36 @@ export default function AIGenerateScreen({
                   </ul>
                 </div>
 
+                {previewAssets.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground mb-2">Linked draft assets</h3>
+                    <div className="space-y-2">
+                      {previewAssets.map((asset) => (
+                        <div key={asset.type} className="rounded-lg border border-border px-3 py-3 text-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-foreground">{asset.title}</span>
+                            <span className="inline-flex items-center rounded-full bg-secondary-100 px-2 py-0.5 text-xs font-medium text-secondary-700">
+                              {ASSET_LABELS[asset.type]}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-muted">{asset.description}</p>
+                          {asset.sections.length > 0 && (
+                            <ul className="mt-2 space-y-1 text-xs text-muted">
+                              {asset.sections.slice(0, 3).map((section) => (
+                                <li key={`${asset.type}-${section.heading}`}>• {section.heading}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-2">
-                    Next step
-                  </h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Next step</h3>
                   <p className="text-sm text-muted">
-                    Use this draft to continue into review, adjust your inputs, or generate another version before anything is saved.
+                    Using this draft will create a lesson draft and any selected assets as private linked resource drafts.
                   </p>
                 </div>
               </div>
@@ -669,7 +835,11 @@ export default function AIGenerateScreen({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setPreviewLesson(null)}
+                onClick={() => {
+                  setPreviewLesson(null);
+                  setPreviewAssets([]);
+                }}
+                disabled={isAcceptingDrafts}
               >
                 Edit Inputs
               </Button>
@@ -678,13 +848,19 @@ export default function AIGenerateScreen({
                 variant="outline"
                 onClick={() => {
                   setPreviewLesson(null);
+                  setPreviewAssets([]);
                   void generateLesson();
                 }}
-                disabled={isGenerating}
+                disabled={isAcceptingDrafts}
               >
                 Regenerate
               </Button>
-              <Button type="button" variant="primary" onClick={handleAcceptPreview}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => void handleAcceptPreview()}
+                isLoading={isAcceptingDrafts}
+              >
                 Use This Draft
               </Button>
             </div>

@@ -104,6 +104,7 @@ function LessonBuilderNewEntry() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   // US-12: AI creation path state
   const [aiGeneratedState, setAiGeneratedState] = useState<WizardLessonState | null>(null);
+  const [aiDraftId, setAiDraftId] = useState<string | null>(null);
   const [userTier, setUserTier] = useState<"free" | "plus">("free");
 
   // Edit / Remix path: load lesson into wizard state
@@ -369,6 +370,7 @@ function LessonBuilderNewEntry() {
       return (
         <WizardShell
           user={user}
+          initialDraftId={aiDraftId}
           initialState={aiGeneratedState}
           initialCompletedSteps={new Set([1, 2, 3, 4, 5, 6, 7])}
           startAtStep={7}
@@ -376,6 +378,7 @@ function LessonBuilderNewEntry() {
           onExit={() => {
             setWizardPath(null);
             setAiGeneratedState(null);
+            setAiDraftId(null);
           }}
         />
       );
@@ -384,8 +387,9 @@ function LessonBuilderNewEntry() {
       <AIGenerateScreen
         user={user}
         userTier={userTier}
-        onGenerated={(state) => {
+        onGenerated={(state, draftId) => {
           setAiGeneratedState(state);
+          setAiDraftId(draftId);
         }}
         onBack={() => setWizardPath(null)}
       />

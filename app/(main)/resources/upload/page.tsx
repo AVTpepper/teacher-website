@@ -45,6 +45,9 @@ function UploadResourceForm() {
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
   const [resType, setResType] = useState<string>("");
+  const [isPublic, setIsPublic] = useState(true);
+  const [sourceLessonId, setSourceLessonId] = useState<string | null>(null);
+  const [sourceLessonTitle, setSourceLessonTitle] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [links, setLinks] = useState<AttachedLink[]>([]);
@@ -72,6 +75,9 @@ function UploadResourceForm() {
         setGradeLevel(resource.gradeLevel ?? "");
         setSubject(resource.subject ?? "");
         setResType(resource.type ?? "");
+        setIsPublic(resource.isPublic !== false);
+        setSourceLessonId(resource.sourceLessonId ?? null);
+        setSourceLessonTitle(resource.sourceLessonTitle ?? null);
         setTags(resource.tags ?? []);
         setLinks((resource.links as AttachedLink[]) ?? []);
       } catch {
@@ -212,6 +218,7 @@ function UploadResourceForm() {
           gradeLevel,
           subject,
           type: resType as ResourceType,
+          isPublic,
           tags,
           links,
           ...(fileURL ? { fileURL, fileName } : {}),
@@ -229,6 +236,9 @@ function UploadResourceForm() {
           type: resType as ResourceType,
           fileURL,
           fileName,
+          isPublic,
+          sourceLessonId,
+          sourceLessonTitle,
           tags,
           links,
         });
@@ -331,6 +341,30 @@ function UploadResourceForm() {
             }))}
             error={fieldErrors.resType ? "Resource type is required" : undefined}
           />
+
+          <div className="space-y-1.5">
+            <label htmlFor="resource-visibility" className="text-sm font-medium text-foreground">
+              Visibility
+            </label>
+            <select
+              id="resource-visibility"
+              value={isPublic ? "published" : "draft"}
+              onChange={(e) => setIsPublic(e.target.value === "published")}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground transition-colors focus-ring cursor-pointer"
+            >
+              <option value="published">Published to resource library</option>
+              <option value="draft">Keep as private draft</option>
+            </select>
+            <p className="text-xs text-muted">
+              Draft resources stay private to you until you publish them.
+            </p>
+          </div>
+
+          {sourceLessonId && sourceLessonTitle && (
+            <div className="rounded-lg border border-border bg-secondary-50 px-4 py-3 text-sm text-secondary-900">
+              Linked to lesson: <Link href={`/lesson-builder/${sourceLessonId}`} className="font-medium underline underline-offset-2">{sourceLessonTitle}</Link>
+            </div>
+          )}
 
           {/* Tags */}
           <div className="flex flex-col gap-1.5">
