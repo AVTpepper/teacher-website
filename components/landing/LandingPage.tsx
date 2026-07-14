@@ -82,7 +82,7 @@ export default function LandingPage() {
               href="/auth/signup"
               className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-3 text-base font-semibold text-primary-900 shadow-sm transition-colors hover:bg-accent-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white min-h-11 min-w-11"
             >
-              Get Started Free
+              Get Started
             </Link>
             <Link
               href="/auth/login"

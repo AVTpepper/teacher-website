@@ -44,6 +44,13 @@ function sourceHost(url: string): string {
   }
 }
 
+function cleanDisplayText(value: string | null | undefined): string {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return "";
+  if (/^[\W_]+$/.test(trimmed)) return "";
+  return trimmed;
+}
+
 function primaryLink(item: InspirationItem): string | null {
   return item.videoURL || item.sourceURL || null;
 }
@@ -75,6 +82,9 @@ function FeaturedCard({
   const isOwner = currentUserId != null && item.submittedBy === currentUserId;
   const source = sourceHost(item.sourceURL || "");
   const link = primaryLink(item);
+  const displayTitle = cleanDisplayText(item.title) || "Untitled inspiration";
+  const displayDescription = cleanDisplayText(item.description) || "No description provided.";
+  const displayCreator = cleanDisplayText(item.creator) || "Community";
   return (
     <div className="relative group">
       <div className="absolute top-3 right-3 z-10 flex gap-1">
@@ -151,10 +161,10 @@ function FeaturedCard({
                   {categoryLabel(item.category)}
                 </span>
                 <h2 className="text-xl font-bold text-foreground group-hover:underline leading-snug">
-                  {item.title}
+                  {displayTitle}
                 </h2>
                 <p className="mt-2 text-sm text-muted line-clamp-3">
-                  {item.description}
+                  {displayDescription}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs text-muted font-medium">
@@ -163,10 +173,10 @@ function FeaturedCard({
                   className="hover:text-primary-900"
                   onClick={(e) => {
                     e.preventDefault();
-                    if (item.creator) onCreatorClick(item.creator);
+                    if (displayCreator !== "Community") onCreatorClick(displayCreator);
                   }}
                 >
-                  by {item.creator || "Community"}
+                  by {displayCreator}
                 </button>
                 <span className="text-border">•</span>
                 <button
@@ -213,11 +223,11 @@ function FeaturedCard({
                 <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-3 ${CATEGORY_COLOR[item.category]}`}>
                   {categoryLabel(item.category)}
                 </span>
-                <h2 className="text-xl font-bold text-foreground leading-snug">{item.title}</h2>
-                <p className="mt-2 text-sm text-muted line-clamp-3">{item.description}</p>
+                <h2 className="text-xl font-bold text-foreground leading-snug">{displayTitle}</h2>
+                <p className="mt-2 text-sm text-muted line-clamp-3">{displayDescription}</p>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs text-muted font-medium">
-                <span>{item.creator || "Community submission"}</span>
+                <span>{displayCreator}</span>
               </div>
             </div>
           </div>
@@ -243,6 +253,9 @@ function InspirationCard({
   const isOwner = currentUserId != null && item.submittedBy === currentUserId;
   const source = sourceHost(item.sourceURL || "");
   const link = primaryLink(item);
+  const displayTitle = cleanDisplayText(item.title) || "Untitled inspiration";
+  const displayDescription = cleanDisplayText(item.description) || "No description provided.";
+  const displayCreator = cleanDisplayText(item.creator) || "Community";
   return (
     <div className="relative group h-full">
       <div className="absolute top-2 right-2 z-10 flex gap-1">
@@ -317,10 +330,10 @@ function InspirationCard({
             {categoryLabel(item.category)}
           </span>
           <h3 className="text-sm font-semibold text-foreground group-hover:underline leading-snug line-clamp-2">
-            {item.title}
+            {displayTitle}
           </h3>
           <p className="text-xs text-muted line-clamp-3 flex-1">
-            {item.description}
+            {displayDescription}
           </p>
           <div className="mt-auto pt-2 border-t border-border text-xs text-muted font-medium space-y-1">
             <button
@@ -328,10 +341,10 @@ function InspirationCard({
               className="hover:text-primary-900"
               onClick={(e) => {
                 e.preventDefault();
-                if (item.creator) onCreatorClick(item.creator);
+                if (displayCreator !== "Community") onCreatorClick(displayCreator);
               }}
             >
-              {item.creator || "Community submission"}
+              {displayCreator}
             </button>
             {(item.sourceURL || item.videoURL) && (
               <button
@@ -368,10 +381,10 @@ function InspirationCard({
             <span className={`inline-block self-start px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLOR[item.category]}`}>
               {categoryLabel(item.category)}
             </span>
-            <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{item.title}</h3>
-            <p className="text-xs text-muted line-clamp-3 flex-1">{item.description}</p>
+            <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{displayTitle}</h3>
+            <p className="text-xs text-muted line-clamp-3 flex-1">{displayDescription}</p>
             <div className="mt-auto pt-2 border-t border-border text-xs text-muted font-medium">
-              {item.creator || "Community submission"}
+              {displayCreator}
             </div>
           </div>
         </Card>
@@ -555,11 +568,15 @@ export default function InspirationPage() {
 
   const filteredItems = items
     .filter((item) => {
+      const creatorValue = cleanDisplayText(item.creator);
+      const titleValue = cleanDisplayText(item.title);
+      const descriptionValue = cleanDisplayText(item.description);
+
       if (mineOnly && user?.uid) {
         if (item.submittedBy !== user.uid) return false;
       }
 
-      if (creatorFilter && item.creator !== creatorFilter) {
+      if (creatorFilter && creatorValue !== creatorFilter) {
         return false;
       }
 
@@ -583,17 +600,20 @@ export default function InspirationPage() {
       if (!normalizedQuery) return true;
 
       return (
-        item.title.toLowerCase().includes(normalizedQuery) ||
-        item.description.toLowerCase().includes(normalizedQuery) ||
-        (item.creator || "").toLowerCase().includes(normalizedQuery)
+        titleValue.toLowerCase().includes(normalizedQuery) ||
+        descriptionValue.toLowerCase().includes(normalizedQuery) ||
+        creatorValue.toLowerCase().includes(normalizedQuery)
       );
     })
     .sort((a, b) => {
+      const creatorA = cleanDisplayText(a.creator);
+      const creatorB = cleanDisplayText(b.creator);
+
       if (sortBy === "oldest") {
         return (a.createdAt?.seconds ?? 0) - (b.createdAt?.seconds ?? 0);
       }
       if (sortBy === "creator") {
-        return (a.creator || "").localeCompare(b.creator || "");
+        return creatorA.localeCompare(creatorB);
       }
       return (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0);
     });

@@ -175,7 +175,7 @@ export default function Navbar() {
 
     {/* Mobile menu - rendered outside header to avoid stacking context issues */}
     {mobileMenuOpen && (
-      <div className="fixed inset-0 top-14 z-40 lg:hidden">
+      <div className="fixed inset-0 top-14 z-40 overflow-y-auto lg:hidden">
         {/* Backdrop overlay - below header */}
         <div
           className="absolute inset-0 bg-primary-950/65"
@@ -184,7 +184,7 @@ export default function Navbar() {
         />
 
         {/* Menu panel */}
-        <div className="absolute left-0 right-0 top-0 border-t border-primary-700 bg-primary-900 shadow-lg">
+        <div className="absolute left-0 right-0 top-0 border-t border-primary-700 bg-primary-900 shadow-lg max-h-[calc(100dvh-3.5rem)] overflow-y-auto">
           {/* Mobile search */}
           <div className="px-4 py-3 md:hidden">
             <NavSearchBar
@@ -193,13 +193,13 @@ export default function Navbar() {
             />
           </div>
 
-          <nav className="px-2 pb-3 space-y-1" aria-label="Mobile">
+          <nav className="px-2 pb-6 space-y-1" aria-label="Mobile">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                className={`inline-flex rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   isActive(link.href)
                       ? "bg-accent-300 text-primary-950"
                       : "text-primary-100 hover:bg-primary-800 hover:text-accent-100"

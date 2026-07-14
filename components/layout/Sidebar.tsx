@@ -13,6 +13,14 @@ interface SidebarContentsProps {
   onClose?: () => void;
 }
 
+function cleanDisplayText(value: string | null | undefined): string {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return "";
+  // Treat placeholder-like punctuation-only values as empty.
+  if (/^[\W_]+$/.test(trimmed)) return "";
+  return trimmed;
+}
+
 function SidebarContents({ onClose }: SidebarContentsProps) {
   const [trendingPosts, setTrendingPosts] = useState<Post[]>([]);
   const [loadedTrending, setLoadedTrending] = useState(false);
@@ -180,19 +188,29 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
           <ul className="space-y-2">
             {inspirationItems.map((item) => (
               <li key={item.id}>
+                {(() => {
+                  const title = cleanDisplayText(item.title) || "Untitled inspiration";
+                  const creator = cleanDisplayText(item.creator) || "Community";
+                  const href = item.videoURL || item.sourceURL || undefined;
+
+                  return (
+                    <>
                 {item.videoURL || item.sourceURL ? (
                   <a
-                    href={item.videoURL || item.sourceURL || undefined}
+                    href={href}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-foreground hover:text-primary-900 hover:underline line-clamp-2 leading-relaxed"
                   >
-                    {item.title}
+                    {title}
                   </a>
                 ) : (
-                  <p className="text-xs text-foreground line-clamp-2 leading-relaxed">{item.title}</p>
+                  <p className="text-xs text-foreground line-clamp-2 leading-relaxed">{title}</p>
                 )}
-                <p className="text-xs text-muted mt-0.5">{item.creator || "Community"}</p>
+                <p className="text-xs text-muted mt-0.5">{creator}</p>
+                    </>
+                  );
+                })()}
               </li>
             ))}
           </ul>
