@@ -5,7 +5,7 @@ export default function BlogPage() {
         <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Insights</p>
         <h1 className="mt-1 text-3xl font-bold">Blog</h1>
         <p className="mt-2 text-primary-100/90 text-base leading-relaxed max-w-3xl">
-          Tips, stories, and updates from the EduConnect team and educator community.
+          Tips, stories, and updates from the TeacherlyConnect team and educator community.
         </p>
       </div>
 

@@ -6,9 +6,9 @@ export default function AboutPage() {
     <div className="pb-12 space-y-10">
       <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Who We Are</p>
-        <h1 className="mt-1 text-3xl font-bold">About EduConnect</h1>
+        <h1 className="mt-1 text-3xl font-bold">About TeacherlyConnect</h1>
         <p className="mt-2 text-primary-100/90 text-base leading-relaxed max-w-3xl">
-          EduConnect is the central hub for educators to connect, collaborate, and grow professionally. We believe great teachers deserve a great community.
+          TeacherlyConnect is the central hub for educators to connect, collaborate, and grow professionally. We believe great teachers deserve a great community.
         </p>
       </div>
 

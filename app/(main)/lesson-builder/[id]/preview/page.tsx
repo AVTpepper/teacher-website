@@ -190,7 +190,7 @@ export default function LessonPreviewPage({
         )}
 
         <div className="border-t border-secondary-200 pt-4 text-center text-xs text-secondary-400">
-          © {year} {lesson.authorName}. All rights reserved. Created on EduConnect.
+          © {year} {lesson.authorName}. All rights reserved. Created on TeacherlyConnect.
         </div>
       </Card>
     </div>

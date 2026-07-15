@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EduConnect: Educator Platform",
+  title: "TeacherlyConnect: Educator Platform",
   description:
     "Connect, collaborate, share resources, and grow professionally with educators worldwide.",
 };

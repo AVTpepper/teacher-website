@@ -181,7 +181,7 @@ function LoginForm() {
         Sign In
       </h1>
       <p className="mt-1 text-sm text-muted text-center">
-        Welcome back. Sign in to your EduConnect account.
+        Welcome back. Sign in to your TeacherlyConnect account.
       </p>
 
       {error && (

@@ -174,7 +174,7 @@ export default function ResourcePDFDocument({
 
         {/* Footer */}
         <Text style={styles.footer} fixed>
-          Shared on EduConnect · {date}
+          Shared on TeacherlyConnect · {date}
         </Text>
       </Page>
     </Document>

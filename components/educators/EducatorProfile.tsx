@@ -673,7 +673,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
                 Sign in to view {isOwnProfile ? "your" : `${profile.displayName}'s`} content
               </h3>
               <p className="text-sm text-muted mt-1">
-                Create a free account to see posts, resources, and lessons from educators on EduConnect.
+                Create a free account to see posts, resources, and lessons from educators on TeacherlyConnect.
               </p>
               <div className="mt-4 flex justify-center gap-3">
                 <Button variant="primary" onClick={() => window.location.href = "/auth/signup"}>

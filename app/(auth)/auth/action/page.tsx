@@ -334,11 +334,11 @@ function VerifyEmailHandler({ oobCode }: { oobCode: string }) {
           <h1 className="text-xl font-bold text-foreground">Email Verified</h1>
           <p className="text-sm text-muted">
             Your email address has been verified. You can now use all features
-            of EduConnect.
+            of TeacherlyConnect.
           </p>
         </div>
         <Link href="/" className="mt-6 block">
-          <Button className="w-full">Go to EduConnect</Button>
+          <Button className="w-full">Go to TeacherlyConnect</Button>
         </Link>
       </Card>
     );
@@ -372,7 +372,7 @@ function VerifyEmailHandler({ oobCode }: { oobCode: string }) {
         </p>
       </div>
       <Link href="/" className="mt-6 block">
-        <Button className="w-full">Go to EduConnect</Button>
+        <Button className="w-full">Go to TeacherlyConnect</Button>
       </Link>
     </Card>
   );

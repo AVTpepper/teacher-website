@@ -42,7 +42,7 @@ export default function Footer() {
               href="/"
               className="text-lg font-bold text-accent-300"
             >
-              EduConnect
+              TeacherlyConnect
             </Link>
             <p className="mt-2 text-sm text-primary-100/90">
               The central hub for educators to connect, collaborate, and grow
@@ -73,7 +73,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-8 border-t border-primary-700 pt-6 text-center text-xs text-primary-200/80">
-          &copy; {new Date().getFullYear()} EduConnect. All rights reserved.
+          &copy; {new Date().getFullYear()} TeacherlyConnect. All rights reserved.
         </div>
       </div>
     </footer>

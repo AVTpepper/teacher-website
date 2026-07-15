@@ -21,7 +21,7 @@ export default function IPNotice() {
         />
       </svg>
       <p>
-        The content shared by educators on EduConnect remains the intellectual
+        The content shared by educators on TeacherlyConnect remains the intellectual
         property of its author.{" "}
         <Link
           href="/terms#content-ownership"

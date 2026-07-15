@@ -12,17 +12,17 @@ export default function TermsPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">1. Acceptance of Terms</h2>
-        <p className="text-muted leading-relaxed">By accessing or using EduConnect, you agree to be bound by these Terms of Service. If you do not agree, please do not use the platform.</p>
+        <p className="text-muted leading-relaxed">By accessing or using TeacherlyConnect, you agree to be bound by these Terms of Service. If you do not agree, please do not use the platform.</p>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">2. User Conduct</h2>
-        <p className="text-muted leading-relaxed">You agree to use EduConnect only for lawful purposes and in a manner that does not infringe the rights of others. You may not post content that is harmful, hateful, or violates any applicable law.</p>
+        <p className="text-muted leading-relaxed">You agree to use TeacherlyConnect only for lawful purposes and in a manner that does not infringe the rights of others. You may not post content that is harmful, hateful, or violates any applicable law.</p>
       </section>
 
       <section id="content-ownership" className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">3. Content Ownership</h2>
-        <p className="text-muted leading-relaxed">Educators retain full intellectual property ownership of all lesson plans, resources, inspiration posts, and other content they publish on EduConnect. By posting content, you grant EduConnect a non-exclusive, royalty-free licence to display and distribute it to other users on the platform solely for the purpose of operating the service. This licence does not transfer ownership and may be revoked by deleting the content from your account.</p>
+        <p className="text-muted leading-relaxed">Educators retain full intellectual property ownership of all lesson plans, resources, inspiration posts, and other content they publish on TeacherlyConnect. By posting content, you grant TeacherlyConnect a non-exclusive, royalty-free licence to display and distribute it to other users on the platform solely for the purpose of operating the service. This licence does not transfer ownership and may be revoked by deleting the content from your account.</p>
       </section>
 
       <section className="space-y-3">
@@ -32,7 +32,7 @@ export default function TermsPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">5. Disclaimers</h2>
-        <p className="text-muted leading-relaxed">EduConnect is provided &quot;as is&quot; without warranties of any kind. We are not responsible for the accuracy of user-generated content.</p>
+        <p className="text-muted leading-relaxed">TeacherlyConnect is provided &quot;as is&quot; without warranties of any kind. We are not responsible for the accuracy of user-generated content.</p>
       </section>
 
       <section className="space-y-3">

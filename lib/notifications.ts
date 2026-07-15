@@ -269,7 +269,7 @@ export function notifyBadgeEarned(params: {
     recipientId: params.recipientId,
     type: "badge-earned",
     actorId: "system", // sentinel — bypasses self-notification guard
-    actorName: "EduConnect",
+    actorName: "TeacherlyConnect",
     actorPhotoURL: null,
     message: `You earned the "${params.badgeLabel}" badge! 🎉`,
     linkURL: `/educators/${params.recipientId}`,

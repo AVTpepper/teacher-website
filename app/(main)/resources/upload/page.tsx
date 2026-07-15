@@ -280,7 +280,7 @@ function UploadResourceForm() {
         <p className="mt-1 text-sm text-primary-100/90">
           {isEditMode
             ? "Update your resource details below."
-            : "Share a teaching resource with the EduConnect community."}
+            : "Share a teaching resource with the TeacherlyConnect community."}
         </p>
       </div>
 

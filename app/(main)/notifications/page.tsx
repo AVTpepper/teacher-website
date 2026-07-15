@@ -180,7 +180,7 @@ export default function NotificationsPage() {
             >
               {/* Avatar / icon */}
               <div className="shrink-0 mt-0.5">
-                {n.actorPhotoURL || n.actorName !== "EduConnect" ? (
+                {n.actorPhotoURL || n.actorName !== "TeacherlyConnect" ? (
                   <Avatar src={n.actorPhotoURL} alt={n.actorName} size="sm" />
                 ) : (
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary-100 text-base">

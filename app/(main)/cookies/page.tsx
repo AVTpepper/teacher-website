@@ -36,7 +36,7 @@ export default function CookiesPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Managing Cookies</h2>
-        <p className="text-muted leading-relaxed">You can control cookies through your browser settings. Note that disabling cookies may affect your ability to log in and use EduConnect.</p>
+        <p className="text-muted leading-relaxed">You can control cookies through your browser settings. Note that disabling cookies may affect your ability to log in and use TeacherlyConnect.</p>
       </section>
 
       <section className="space-y-3">

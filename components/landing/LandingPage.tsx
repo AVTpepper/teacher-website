@@ -242,7 +242,7 @@ export default function LandingPage() {
 
         <div className="relative mx-auto max-w-4xl px-4 sm:px-6 py-20 sm:py-28 lg:py-36 text-center">
           <p className="mb-4 text-sm font-semibold tracking-widest uppercase text-accent-300">
-            Welcome to EduConnect
+            Welcome to TeacherlyConnect
           </p>
 
           <h1
@@ -288,7 +288,7 @@ export default function LandingPage() {
             </h2>
             <p className="mt-4 text-base text-muted max-w-xl mx-auto">
               From early lesson plan drafts to professional connections,
-              EduConnect has you covered.
+              TeacherlyConnect has you covered.
             </p>
           </div>
 

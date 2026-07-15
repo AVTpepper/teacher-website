@@ -99,7 +99,7 @@ export default function SignupPage() {
         Create Account
       </h1>
       <p className="mt-1 text-sm text-muted text-center">
-        Join EduConnect and connect with educators worldwide.
+        Join TeacherlyConnect and connect with educators worldwide.
       </p>
 
       {error && (

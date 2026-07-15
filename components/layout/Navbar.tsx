@@ -56,7 +56,7 @@ export default function Navbar() {
             href={user ? "/home" : "/"}
             className="shrink-0 text-lg font-bold text-accent-300"
           >
-            EduConnect
+            TeacherlyConnect
           </Link>
 
           {/* Search - hidden on mobile, shown md+ */}
