@@ -484,7 +484,8 @@ export default function LessonBuilderPage() {
   const latestDraft = drafts[0] ?? null;
 
   return (
-    <div className="pb-8">
+    <div className="flex-1 min-w-0 pb-8 space-y-6">
+      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
       {/* Page header */}
       <div className="-mx-4 -mt-4 mb-8 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-center text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Lesson Studio</p>
@@ -749,6 +750,9 @@ export default function LessonBuilderPage() {
         )}
       </div>
 
+      </div>
+
+      <div>
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
@@ -790,6 +794,7 @@ export default function LessonBuilderPage() {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }

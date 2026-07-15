@@ -141,79 +141,82 @@ export default function EducatorsPage() {
   }
 
   return (
-    <div className="pb-8">
-      {/* Header */}
-      <div className="-mx-4 -mt-4 mb-6 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
-        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Directory</p>
-        <h1 className="text-2xl font-bold">
-          Discover Educators
-        </h1>
-        <p className="mt-1 text-sm text-primary-100/90">
-          Find and connect with educators by grade level, subject, and more.
-        </p>
+    <div className="flex-1 min-w-0 space-y-6 pb-8">
+      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+        {/* Header */}
+        <div className="-mx-4 -mt-4 mb-6 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
+          <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Directory</p>
+          <h1 className="text-2xl font-bold">
+            Discover Educators
+          </h1>
+          <p className="mt-1 text-sm text-primary-100/90">
+            Find and connect with educators by grade level, subject, and more.
+          </p>
+        </div>
+
+        {/* Filters */}
+        <Card>
+          <div className="flex flex-col gap-4">
+            {/* Name search row */}
+            <div>
+              <Input
+                label="Search by name"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="Type an educator's name…"
+                type="search"
+              />
+            </div>
+            {/* Grade + Subject + Country row */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <Select
+                  label="Grade Level"
+                  value={gradeLevel}
+                  onChange={(e) => setGradeLevel(e.target.value)}
+                  placeholder="All Grade Levels"
+                  options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
+                />
+              </div>
+              <div className="flex-1">
+                <Select
+                  label="Subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="All Subjects"
+                  options={SUBJECTS.map((s) => ({ value: s, label: s }))}
+                />
+              </div>
+              <div className="flex-1">
+                <Input
+                  label="Country"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  placeholder="e.g. Norway"
+                />
+              </div>
+              {(gradeLevel || subject || country || nameInput) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setGradeLevel("");
+                    setSubject("");
+                    setCountry("");
+                    setNameInput("");
+                    setNameQuery("");
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
       </div>
 
-      {/* Filters */}
-      <Card className="mb-8">
-        <div className="flex flex-col gap-4">
-          {/* Name search row */}
-          <div>
-            <Input
-              label="Search by name"
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              placeholder="Type an educator's name…"
-              type="search"
-            />
-          </div>
-          {/* Grade + Subject + Country row */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <Select
-                label="Grade Level"
-                value={gradeLevel}
-                onChange={(e) => setGradeLevel(e.target.value)}
-                placeholder="All Grade Levels"
-                options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
-              />
-            </div>
-            <div className="flex-1">
-              <Select
-                label="Subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="All Subjects"
-                options={SUBJECTS.map((s) => ({ value: s, label: s }))}
-              />
-            </div>
-            <div className="flex-1">
-              <Input
-                label="Country"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                placeholder="e.g. Norway"
-              />
-            </div>
-            {(gradeLevel || subject || country || nameInput) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setGradeLevel("");
-                  setSubject("");
-                  setCountry("");
-                  setNameInput("");
-                  setNameQuery("");
-                }}
-              >
-                Clear Filters
-              </Button>
-            )}
-          </div>
-        </div>
-      </Card>
-
       {/* Results */}
+      <div>
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
@@ -280,6 +283,7 @@ export default function EducatorsPage() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

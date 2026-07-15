@@ -3,7 +3,13 @@
 import { usePathname } from "next/navigation";
 
 const FULL_BLEED_ROUTES = [
+  /^\/educators$/,
+  /^\/forums$/,
+  /^\/home$/,
   /^\/inspiration$/,
+  /^\/jobs$/,
+  /^\/resources$/,
+  /^\/lesson-builder$/,
   /^\/inspiration\/[^/]+$/,
   /^\/jobs\/[^/]+$/,
   /^\/resources\/[^/]+$/,

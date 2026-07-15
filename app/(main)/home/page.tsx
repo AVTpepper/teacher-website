@@ -118,20 +118,45 @@ function HomePageInner() {
   const showGuestWall = !user && feedPosts.length > 0;
 
   return (
-    <div className="space-y-6">
-      <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Daily Hub</p>
-        <h1 className="mt-1 text-2xl font-bold">Home Feed</h1>
-        <p className="mt-2 text-sm text-primary-100/90">
-          Your personalized educator feed with posts, trending discussions, and
-          more.
-        </p>
+    <div className="flex-1 min-w-0 space-y-6">
+      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+        <div className="space-y-4">
+          <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:p-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Daily Hub</p>
+            <h1 className="mt-1 text-2xl font-bold">Home Feed</h1>
+            <p className="mt-2 text-sm text-primary-100/90">
+              Your personalized educator feed with posts, trending discussions, and
+              more.
+            </p>
+          </div>
+
+          {/* Create post (logged in only) */}
+          {user && <CreatePost onPostCreated={() => loadPosts(true, typeFilter)} />}
+
+          {/* Type filters */}
+          <HorizontalScrollHint
+            innerClassName="flex gap-2 pb-0.5"
+            nudgeKey="home-feed-type-filters"
+          >
+            {TYPE_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => handleTypeChange(f.value)}
+                className={`shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
+                  typeFilter === f.value
+                    ? "bg-accent-300 text-primary-950 border-accent-400"
+                    : "bg-surface/90 border-primary-200 text-primary-800 hover:border-primary-500 hover:text-primary-900 hover:bg-primary-50"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </HorizontalScrollHint>
+        </div>
       </div>
 
-      {/* Create post (logged in only) */}
-      {user && <CreatePost onPostCreated={() => loadPosts(true, typeFilter)} />}
-
-      {/* Shared / linked post - pinned below the create form */}
+      {/* Shared / linked post - rendered as part of feed cards */}
       {pinnedPostId && (
         <div ref={sharedPostRef} className="scroll-mt-28">
           {sharedPostLoading ? (
@@ -161,27 +186,6 @@ function HomePageInner() {
           )}
         </div>
       )}
-
-      {/* Type filters */}
-      <HorizontalScrollHint
-        innerClassName="flex gap-2 pb-0.5"
-        nudgeKey="home-feed-type-filters"
-      >
-        {TYPE_FILTERS.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            onClick={() => handleTypeChange(f.value)}
-            className={`shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
-              typeFilter === f.value
-                ? "bg-accent-300 text-primary-950 border-accent-400"
-                : "bg-surface/90 border-primary-200 text-primary-800 hover:border-primary-500 hover:text-primary-900 hover:bg-primary-50"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </HorizontalScrollHint>
 
       {/* Feed */}
       {loading ? (

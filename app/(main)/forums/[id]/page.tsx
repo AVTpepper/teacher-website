@@ -146,7 +146,7 @@ export default function ForumThreadPage({
   // ─── Loading state ───
   if (loading) {
     return (
-      <div className="space-y-4 animate-pulse">
+      <div className="flex-1 min-w-0 space-y-4 animate-pulse">
         <div className="h-4 w-24 bg-secondary-100 rounded" />
         <div className="rounded-xl border border-border bg-surface p-6 space-y-3">
           <div className="h-6 w-2/3 bg-secondary-100 rounded" />
@@ -167,7 +167,7 @@ export default function ForumThreadPage({
   // ─── Not found ───
   if (notFound || !thread || !categoryId) {
     return (
-      <div className="text-center py-16">
+      <div className="flex-1 min-w-0 text-center py-16">
         <div className="text-5xl mb-4">🔍</div>
         <h1 className="text-2xl font-bold text-foreground">Thread Not Found</h1>
         <p className="text-sm text-muted mt-2">
@@ -213,126 +213,128 @@ export default function ForumThreadPage({
   const commentCount = comments.length > 0 ? comments.length : thread.commentCount;
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-muted">
-        <Link href="/forums" className="hover:text-foreground transition-colors">
-          Forums
-        </Link>
-        <span>/</span>
-        {categoryData && (
+    <div className="flex-1 min-w-0 space-y-6 pb-8">
+      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-sm text-muted">
           <Link href="/forums" className="hover:text-foreground transition-colors">
-            {categoryData.icon} {categoryData.name}
+            Forums
           </Link>
-        )}
-      </div>
-
-      {/* Thread card */}
-      <div className="rounded-xl border border-border bg-surface shadow-card">
-        <div className="p-6">
-          {/* Title */}
-          <h1 className="text-xl font-bold text-foreground">{thread.title}</h1>
-
-          {/* Author row */}
-          <div className="flex items-center gap-3 mt-3">
-            <Link href={`/educators/${thread.authorId}`}>
-              <Avatar
-                src={thread.authorPhotoURL}
-                alt={thread.authorName}
-                size="md"
-              />
+          <span>/</span>
+          {categoryData && (
+            <Link href="/forums" className="hover:text-foreground transition-colors">
+              {categoryData.icon} {categoryData.name}
             </Link>
-            <div>
-              <Link
-                href={`/educators/${thread.authorId}`}
-                className="text-sm font-semibold text-foreground hover:underline"
-              >
-                {thread.authorName}
-              </Link>
-              <p className="text-xs text-muted">
-                {timeAgo(thread.createdAt as { seconds: number } | null)}
-              </p>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="mt-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-            {thread.content}
-          </div>
-
-          {/* Tags */}
-          {(thread.gradeLevel || thread.subject || thread.tags.length > 0) && (
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {thread.gradeLevel && (
-                <Badge variant="default">{thread.gradeLevel}</Badge>
-              )}
-              {thread.subject && (
-                <Badge variant="info">{thread.subject}</Badge>
-              )}
-              {thread.tags.map((tag) => (
-                <Tag key={tag} label={tag} />
-              ))}
-            </div>
-          )}
-
-          {/* Attached links */}
-          {thread.links?.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {thread.links.map((link, i) => (
-                <a
-                  key={i}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-info-50 text-info-700 border border-info-200 hover:bg-info-100 transition-colors max-w-[260px] truncate"
-                  title={link.url}
-                >
-                  <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  <span className="truncate">{link.label}</span>
-                </a>
-              ))}
-            </div>
           )}
         </div>
 
-        {/* Vote bar */}
-        <div className="px-6 py-3 border-t border-border flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleUpvote}
-              disabled={!user || isOwnThread}
-              title={isOwnThread ? "You can't upvote your own discussion" : !user ? "Sign in to upvote" : undefined}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-                vote === "up"
-                  ? "text-primary-900 bg-primary-100"
-                  : "text-muted hover:text-foreground hover:bg-surface-hover"
-              }`}
-              aria-label="Upvote"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-              </svg>
-              <span>{upvotes}</span>
-            </button>
+        {/* Thread card */}
+        <div className="mt-4 rounded-xl border border-border bg-surface shadow-card">
+          <div className="p-6">
+            {/* Title */}
+            <h1 className="text-xl font-bold text-foreground">{thread.title}</h1>
+
+            {/* Author row */}
+            <div className="flex items-center gap-3 mt-3">
+              <Link href={`/educators/${thread.authorId}`}>
+                <Avatar
+                  src={thread.authorPhotoURL}
+                  alt={thread.authorName}
+                  size="md"
+                />
+              </Link>
+              <div>
+                <Link
+                  href={`/educators/${thread.authorId}`}
+                  className="text-sm font-semibold text-foreground hover:underline"
+                >
+                  {thread.authorName}
+                </Link>
+                <p className="text-xs text-muted">
+                  {timeAgo(thread.createdAt as { seconds: number } | null)}
+                </p>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="mt-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+              {thread.content}
+            </div>
+
+            {/* Tags */}
+            {(thread.gradeLevel || thread.subject || thread.tags.length > 0) && (
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {thread.gradeLevel && (
+                  <Badge variant="default">{thread.gradeLevel}</Badge>
+                )}
+                {thread.subject && (
+                  <Badge variant="info">{thread.subject}</Badge>
+                )}
+                {thread.tags.map((tag) => (
+                  <Tag key={tag} label={tag} />
+                ))}
+              </div>
+            )}
+
+            {/* Attached links */}
+            {thread.links?.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {thread.links.map((link, i) => (
+                  <a
+                    key={i}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-info-50 text-info-700 border border-info-200 hover:bg-info-100 transition-colors max-w-[260px] truncate"
+                    title={link.url}
+                  >
+                    <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    <span className="truncate">{link.label}</span>
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
 
-          <span className="text-sm text-muted">
-            {commentCount} {commentCount === 1 ? "comment" : "comments"}
-          </span>
+          {/* Vote bar */}
+          <div className="px-6 py-3 border-t border-border flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleUpvote}
+                disabled={!user || isOwnThread}
+                title={isOwnThread ? "You can't upvote your own discussion" : !user ? "Sign in to upvote" : undefined}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                  vote === "up"
+                    ? "text-primary-900 bg-primary-100"
+                    : "text-muted hover:text-foreground hover:bg-surface-hover"
+                }`}
+                aria-label="Upvote"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                </svg>
+                <span>{upvotes}</span>
+              </button>
+            </div>
 
-          <button
-            type="button"
-            onClick={handleShare}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm text-muted hover:text-foreground hover:bg-surface-hover transition-colors cursor-pointer"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
-            </svg>
-            {copied ? "✓ Copied!" : "Share"}
-          </button>
+            <span className="text-sm text-muted">
+              {commentCount} {commentCount === 1 ? "comment" : "comments"}
+            </span>
+
+            <button
+              type="button"
+              onClick={handleShare}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm text-muted hover:text-foreground hover:bg-surface-hover transition-colors cursor-pointer"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+              </svg>
+              {copied ? "✓ Copied!" : "Share"}
+            </button>
+          </div>
         </div>
       </div>
 

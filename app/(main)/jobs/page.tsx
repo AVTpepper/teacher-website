@@ -111,8 +111,8 @@ export default function JobsPage() {
   const hasFilters = !!(gradeLevel || subject || jobType || locationQuery);
 
   return (
-    <>
-      <div className="space-y-6 pb-8">
+    <div className="flex-1 min-w-0 space-y-6 pb-8">
+      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
         <div className="-mx-4 -mt-4 flex flex-col gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Opportunities</p>
@@ -133,7 +133,7 @@ export default function JobsPage() {
           )}
         </div>
 
-        <Card>
+        <Card className="mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Input
               label="Location"
@@ -169,6 +169,8 @@ export default function JobsPage() {
           )}
         </Card>
       </div>
+
+      <div>
 
       {loading && (
         <div className="py-16 text-center text-sm text-muted">Loading jobs…</div>
@@ -206,6 +208,8 @@ export default function JobsPage() {
           )}
         </div>
       )}
-    </>
+
+      </div>
+    </div>
   );
 }

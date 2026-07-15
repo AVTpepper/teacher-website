@@ -100,48 +100,91 @@ export default function ForumsPage() {
   );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="-mx-4 -mt-4 flex items-center justify-between flex-wrap gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:p-6">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Community Voice</p>
-          <h1 className="mt-1 text-2xl font-bold">Forums</h1>
-          <p className="mt-2 text-sm text-primary-100/90">
-            Browse discussion categories and join conversations with fellow
-            educators.
-          </p>
-        </div>
-        {user && (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              if (selectedCategory) {
-                openNewThread();
-              } else {
-                // If no category selected, pick the first one by default
-                openNewThread(FORUM_CATEGORIES[0].id);
-              }
-            }}
-          >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+    <div className="flex-1 min-w-0 space-y-6 pb-8">
+      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+        {/* Header */}
+        <div className="-mx-4 -mt-4 flex items-center justify-between flex-wrap gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:p-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Community Voice</p>
+            <h1 className="mt-1 text-2xl font-bold">Forums</h1>
+            <p className="mt-2 text-sm text-primary-100/90">
+              Browse discussion categories and join conversations with fellow
+              educators.
+            </p>
+          </div>
+          {user && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (selectedCategory) {
+                  openNewThread();
+                } else {
+                  // If no category selected, pick the first one by default
+                  openNewThread(FORUM_CATEGORIES[0].id);
+                }
+              }}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            New Discussion
-          </Button>
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              New Discussion
+            </Button>
+          )}
+        </div>
+
+        {selectedCategory && (
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={backToCategories}
+                className="flex items-center gap-1 text-sm text-primary-800 hover:text-primary-950 transition-colors cursor-pointer"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+                All Categories
+              </button>
+            </div>
+
+            {selectedCategoryData && (
+              <div className="flex items-center gap-3 rounded-xl border border-primary-100 bg-secondary-50/70 p-4">
+                <span className="text-3xl">{selectedCategoryData.icon}</span>
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">
+                    {selectedCategoryData.name}
+                  </h2>
+                  <p className="text-sm text-muted">
+                    {selectedCategoryData.description}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
       {/* Category Grid or Thread Listing */}
+      <div>
       {!selectedCategory ? (
         /* ===== Category Cards ===== */
         loadingCategories ? (
@@ -194,43 +237,6 @@ export default function ForumsPage() {
       ) : (
         /* ===== Thread Listing for Selected Category ===== */
         <div className="space-y-4">
-          {/* Back button + category header */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={backToCategories}
-              className="flex items-center gap-1 text-sm text-primary-800 hover:text-primary-950 transition-colors cursor-pointer"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              All Categories
-            </button>
-          </div>
-
-          {selectedCategoryData && (
-            <div className="flex items-center gap-3 rounded-xl border border-primary-100 bg-secondary-50/70 p-4">
-              <span className="text-3xl">{selectedCategoryData.icon}</span>
-              <div>
-                <h2 className="text-xl font-bold text-foreground">
-                  {selectedCategoryData.name}
-                </h2>
-                <p className="text-sm text-muted">
-                  {selectedCategoryData.description}
-                </p>
-              </div>
-            </div>
-          )}
-
           {/* Thread list */}
           {loadingThreads && threads.length === 0 ? (
             <div className="space-y-3">
@@ -374,6 +380,7 @@ export default function ForumsPage() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

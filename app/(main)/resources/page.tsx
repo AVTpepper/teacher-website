@@ -366,122 +366,125 @@ export default function ResourcesPage() {
   }
 
   return (
-    <div className="pb-8 space-y-6">
-      {/* Header */}
-      <div className="-mx-4 -mt-4 flex flex-col gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:p-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Resource Discovery</p>
-          <h1 className="mt-1 text-2xl font-bold">
-            Resource Library
-          </h1>
-          <p className="mt-2 text-sm text-primary-100/90">
-            Browse, share, and download teaching resources including lesson
-            plans, worksheets, strategies, and more.
-          </p>
-        </div>
-        {user && (
-          <Link href="/resources/upload">
-            <Button className="shrink-0" variant="secondary">
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4.5v15m7.5-7.5h-15"
-                />
-              </svg>
-              Upload Resource
-            </Button>
-          </Link>
-        )}
-      </div>
-
-      {/* Filters + Search */}
-      <Card className="border-primary-200 bg-secondary-50/70">
-        <div className="flex flex-col gap-4">
-          <Input
-            placeholder="Search resources and lesson plans..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            icon={
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            }
-          />
-
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Select
-                label="Grade Level"
-                value={gradeLevel}
-                onChange={(e) => setGradeLevel(e.target.value)}
-                placeholder="All Grade Levels"
-                options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
-              />
-              <Select
-                label="Subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="All Subjects"
-                options={SUBJECTS.map((s) => ({ value: s, label: s }))}
-              />
-              <Select
-                label="Type"
-                value={resourceType}
-                onChange={(e) => setResourceType(e.target.value)}
-                placeholder="All Types"
-                options={RESOURCE_TYPES.map((t) => ({
-                  value: t.value,
-                  label: t.label,
-                }))}
-              />
-              <Select
-                label="Sort By"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as LibrarySortBy)}
-                options={[
-                  { value: "newest", label: "Newest" },
-                  { value: "oldest", label: "Oldest" },
-                  { value: "rating", label: "Rating" },
-                  { value: "downloads", label: "Downloads" },
-                  { value: "bookmarks", label: "Bookmarks" },
-                ]}
-              />
+    <div className="flex-1 min-w-0 pb-8 space-y-6">
+      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+        {/* Header */}
+        <div className="-mx-4 -mt-4 flex flex-col gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Resource Discovery</p>
+            <h1 className="mt-1 text-2xl font-bold">
+              Resource Library
+            </h1>
+            <p className="mt-2 text-sm text-primary-100/90">
+              Browse, share, and download teaching resources including lesson
+              plans, worksheets, strategies, and more.
+            </p>
           </div>
-          {hasFilters && (
-            <div className="mt-3 flex justify-end">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setGradeLevel("");
-                  setSubject("");
-                  setResourceType("");
-                }}
-              >
-                Clear Filters
+          {user && (
+            <Link href="/resources/upload">
+              <Button className="shrink-0" variant="secondary">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4.5v15m7.5-7.5h-15"
+                  />
+                </svg>
+                Upload Resource
               </Button>
-            </div>
+            </Link>
           )}
         </div>
-      </Card>
+
+        {/* Filters + Search */}
+        <Card className="mt-4 border-primary-200 bg-secondary-50/70">
+          <div className="flex flex-col gap-4">
+            <Input
+              placeholder="Search resources and lesson plans..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              icon={
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              }
+            />
+
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <Select
+                  label="Grade Level"
+                  value={gradeLevel}
+                  onChange={(e) => setGradeLevel(e.target.value)}
+                  placeholder="All Grade Levels"
+                  options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
+                />
+                <Select
+                  label="Subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="All Subjects"
+                  options={SUBJECTS.map((s) => ({ value: s, label: s }))}
+                />
+                <Select
+                  label="Type"
+                  value={resourceType}
+                  onChange={(e) => setResourceType(e.target.value)}
+                  placeholder="All Types"
+                  options={RESOURCE_TYPES.map((t) => ({
+                    value: t.value,
+                    label: t.label,
+                  }))}
+                />
+                <Select
+                  label="Sort By"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as LibrarySortBy)}
+                  options={[
+                    { value: "newest", label: "Newest" },
+                    { value: "oldest", label: "Oldest" },
+                    { value: "rating", label: "Rating" },
+                    { value: "downloads", label: "Downloads" },
+                    { value: "bookmarks", label: "Bookmarks" },
+                  ]}
+                />
+            </div>
+            {hasFilters && (
+              <div className="mt-3 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setGradeLevel("");
+                    setSubject("");
+                    setResourceType("");
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
 
       {/* Results */}
+      <div>
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
@@ -536,6 +539,7 @@ export default function ResourcesPage() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
