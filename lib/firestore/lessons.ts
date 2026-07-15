@@ -197,7 +197,8 @@ export async function getLessonsByAuthor(
   authorId: string,
   includePrivate = false,
   // cursor + pageSize params kept for API compatibility
-  _cursor?: DocumentSnapshot | null
+  _cursor?: DocumentSnapshot | null,
+  maxResults = 100,
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
   void _cursor;
@@ -206,7 +207,8 @@ export async function getLessonsByAuthor(
   // Filtering by isPublic and sorting are done client-side.
   const q = query(
     collection(db, "lessons"),
-    where("authorId", "==", authorId)
+    where("authorId", "==", authorId),
+    limit(Math.max(1, maxResults))
   );
 
   const snapshot = await getDocs(q);

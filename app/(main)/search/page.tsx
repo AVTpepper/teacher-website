@@ -92,21 +92,6 @@ async function prefixQueryGroup<T>(
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as T));
 }
 
-async function scanCollectionByTitle<T extends { id: string; title: string }>(
-  collectionName: string,
-  term: string,
-  max: number,
-  excludeIds = new Set<string>()
-): Promise<T[]> {
-  if (!db || max <= 0) return [];
-  const lower = term.toLowerCase();
-  const snap = await getDocs(collection(db, collectionName));
-  return snap.docs
-    .map((d) => ({ id: d.id, ...d.data() } as T))
-    .filter((item) => !excludeIds.has(item.id) && item.title.toLowerCase().includes(lower))
-    .slice(0, max);
-}
-
 async function runSearch(rawQuery: string): Promise<SearchResults> {
   const term = rawQuery.trim().toLowerCase();
   if (!term) return { educators: [], resources: [], discussions: [], lessons: [], jobs: [] };
@@ -119,32 +104,14 @@ async function runSearch(rawQuery: string): Promise<SearchResults> {
     prefixQuery<Job>("jobs", "title", term, 8),
   ]);
 
-  const [resourceFallback, lessonFallback] = await Promise.all([
-    scanCollectionByTitle<Resource>(
-      "resources",
-      term,
-      8 - resources.length,
-      new Set(resources.map((r) => r.id))
-    ),
-    scanCollectionByTitle<Lesson>(
-      "lessons",
-      term,
-      8 - lessons.length,
-      new Set(lessons.map((l) => l.id))
-    ),
-  ]);
-
-  const mergedResources = [...resources, ...resourceFallback];
-  const mergedLessons = [...lessons, ...lessonFallback];
-
   // Client-side substring filter so partial-word matches work too
   const sub = (val: string) => val.toLowerCase().includes(term);
 
   return {
     educators: educators.filter((u) => sub(u.displayName)),
-    resources: mergedResources.filter((r) => sub(r.title)),
+    resources: resources.filter((r) => sub(r.title)),
     discussions: discussions.filter((t) => sub(t.title)),
-    lessons: mergedLessons.filter((l) => sub(l.title)),
+    lessons: lessons.filter((l) => sub(l.title)),
     jobs: jobs.filter((j) => sub(j.title)),
   };
 }

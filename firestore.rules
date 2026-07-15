@@ -28,7 +28,12 @@ service cloud.firestore {
       // Anyone (even unauthenticated) can read profiles — public directory
       allow read: if true;
       // Only the owner can create or update their own profile
-      allow create: if isOwner(userId);
+      allow create: if isOwner(userId)
+                    && request.resource.data.tier == "free"
+                    && request.resource.data.isVerified == false
+                    && request.resource.data.followerCount == 0
+                    && request.resource.data.followingCount == 0
+                    && !request.resource.data.keys().hasAny(['role']);
       // Owner can update their profile but cannot change protected fields (tier, createdAt, role)
       // Any authenticated user can increment/decrement followerCount (follow/unfollow)
       allow update: if (isOwner(userId)
@@ -52,17 +57,37 @@ service cloud.firestore {
       }
 
       // aiUsage sub-collection — users/{userId}/aiUsage/{dateKey}
-      // Stores daily AI request counts; only the owner may read or write
+      // Stores daily AI request counts. Clients can only increment by exactly 1.
       match /aiUsage/{dateKey} {
         allow read: if isOwner(userId);
-        allow write: if isOwner(userId);
+        allow create: if isOwner(userId)
+                      && request.resource.data.keys().hasOnly(['count'])
+                      && request.resource.data.count is int
+                      && request.resource.data.count == 1;
+        allow update: if isOwner(userId)
+                      && request.resource.data.diff(resource.data)
+                           .affectedKeys().hasOnly(['count'])
+                      && request.resource.data.count is int
+                      && resource.data.count is int
+                      && request.resource.data.count == resource.data.count + 1;
+        allow delete: if false;
       }
 
       // aiRefineUsage sub-collection — users/{userId}/aiRefineUsage/{monthKey}
-      // Stores monthly AI refine counts; only the owner may read or write
+      // Stores monthly AI refine counts. Clients can only increment by exactly 1.
       match /aiRefineUsage/{monthKey} {
         allow read: if isOwner(userId);
-        allow write: if isOwner(userId);
+        allow create: if isOwner(userId)
+                      && request.resource.data.keys().hasOnly(['count'])
+                      && request.resource.data.count is int
+                      && request.resource.data.count == 1;
+        allow update: if isOwner(userId)
+                      && request.resource.data.diff(resource.data)
+                           .affectedKeys().hasOnly(['count'])
+                      && request.resource.data.count is int
+                      && resource.data.count is int
+                      && request.resource.data.count == resource.data.count + 1;
+        allow delete: if false;
       }
     }
 

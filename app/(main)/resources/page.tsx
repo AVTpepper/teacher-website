@@ -35,6 +35,7 @@ type DisplayItem =
 type LibrarySortBy = "newest" | "oldest" | "rating" | "downloads" | "bookmarks";
 
 const RESULTS_PER_PAGE = 20;
+const SEARCH_PAGE_LIMIT = 5;
 
 export default function ResourcesPage() {
   const { user } = useAuth();
@@ -57,6 +58,7 @@ export default function ResourcesPage() {
   const [lessonRatingSummaries, setLessonRatingSummaries] = useState<Record<string, LessonRatingSummary>>({});
   const [lessonsHasMore, setLessonsHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [searchCoverageLimited, setSearchCoverageLimited] = useState(false);
 
   // Keep pagination cursors and merged lessons stable across callback re-creations.
   const resourceCursorRef = useRef<DocumentSnapshot | null>(null);
@@ -83,6 +85,7 @@ export default function ResourcesPage() {
     } else {
       setLoadingMore(true);
     }
+    setSearchCoverageLimited(false);
 
     try {
       const [resourceResult, lessonResult] = await Promise.all([
@@ -157,16 +160,21 @@ export default function ResourcesPage() {
   const fetchAllForSearch = useCallback(async () => {
     setLoading(true);
     setLoadingMore(false);
+    setSearchCoverageLimited(false);
 
     try {
       let allResources: Resource[] = [];
       let allLessons: Lesson[] = [];
+      let resourcePagesFetched = 0;
+      let lessonPagesFetched = 0;
+      let resourceCoverageLimited = false;
+      let lessonCoverageLimited = false;
 
       if (includeResources) {
         let cursor: DocumentSnapshot | null = null;
         let hasNext = true;
 
-        while (hasNext) {
+        while (hasNext && resourcePagesFetched < SEARCH_PAGE_LIMIT) {
           const result = await getResources(
             {
               gradeLevel: gradeLevel || undefined,
@@ -181,14 +189,17 @@ export default function ResourcesPage() {
           allResources = [...allResources, ...result.resources];
           cursor = result.lastDoc;
           hasNext = Boolean(result.lastDoc);
+          resourcePagesFetched += 1;
         }
+
+        resourceCoverageLimited = hasNext;
       }
 
       if (includeLessons) {
         let cursor: DocumentSnapshot | null = null;
         let hasNext = true;
 
-        while (hasNext) {
+        while (hasNext && lessonPagesFetched < SEARCH_PAGE_LIMIT) {
           const result = await getPublicLessons(
             {
               gradeLevel: gradeLevel || undefined,
@@ -202,7 +213,10 @@ export default function ResourcesPage() {
           allLessons = [...allLessons, ...result.lessons];
           cursor = result.lastDoc;
           hasNext = Boolean(result.lastDoc);
+          lessonPagesFetched += 1;
         }
+
+        lessonCoverageLimited = hasNext;
       }
 
       setResources(allResources);
@@ -217,6 +231,7 @@ export default function ResourcesPage() {
       lessonCursorRef.current = null;
       setResourcesHasMore(false);
       setLessonsHasMore(false);
+      setSearchCoverageLimited(resourceCoverageLimited || lessonCoverageLimited);
     } catch (err) {
       console.error("search fetch error:", err);
       setResources([]);
@@ -227,6 +242,7 @@ export default function ResourcesPage() {
       lessonCursorRef.current = null;
       setResourcesHasMore(false);
       setLessonsHasMore(false);
+      setSearchCoverageLimited(false);
     } finally {
       setLoading(false);
     }
@@ -485,6 +501,11 @@ export default function ResourcesPage() {
 
       {/* Results */}
       <div>
+      {isSearchMode && searchCoverageLimited && (
+        <div className="mb-3 rounded-lg border border-warning-200 bg-warning-50 px-3 py-2 text-xs text-warning-900">
+          Showing top matches from the newest results. Narrow filters for more precise search coverage.
+        </div>
+      )}
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />

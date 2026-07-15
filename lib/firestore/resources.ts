@@ -323,6 +323,7 @@ export async function getResources(
 export async function getResourcesByAuthor(
   authorId: string,
   includePrivate = false,
+  maxResults = 100,
 ): Promise<GetResourcesResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
@@ -330,7 +331,8 @@ export async function getResourcesByAuthor(
   // Sort client-side to avoid needing a composite index.
   const q = query(
     collection(db, "resources"),
-    where("authorId", "==", authorId)
+    where("authorId", "==", authorId),
+    limit(Math.max(1, maxResults))
   );
   const snapshot = await getDocs(q);
 

@@ -15,6 +15,8 @@ import {
 } from "@/lib/firestore/inspiration";
 import { Button, Card, ConfirmDialog, IPNotice, Input, Modal, Select } from "@/components/ui";
 
+const SEARCH_PAGE_LIMIT = 5;
+
 
 
 const CATEGORY_COLOR: Record<InspirationCategory, string> = {
@@ -377,6 +379,7 @@ export default function InspirationPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [searchCoverageLimited, setSearchCoverageLimited] = useState(false);
   const cursorRef = useRef<DocumentSnapshot | null>(null);
 
   // Edit state
@@ -417,6 +420,7 @@ export default function InspirationPage() {
       } else {
         setLoadingMore(true);
       }
+      setSearchCoverageLimited(false);
 
       try {
         const filters = activeCategory !== "all" ? { category: activeCategory } : {};
@@ -442,14 +446,16 @@ export default function InspirationPage() {
     setLoading(true);
     setLoadingMore(false);
     cursorRef.current = null;
+    setSearchCoverageLimited(false);
 
     try {
       const filters = activeCategory !== "all" ? { category: activeCategory } : {};
       const allItems: InspirationItem[] = [];
       let cursor: DocumentSnapshot | null = null;
       let hasNext = true;
+      let pagesFetched = 0;
 
-      while (hasNext) {
+      while (hasNext && pagesFetched < SEARCH_PAGE_LIMIT) {
         const { items: fetched, cursor: nextCursor } = await getInspirationItems(
           filters,
           24,
@@ -459,14 +465,17 @@ export default function InspirationPage() {
         allItems.push(...fetched);
         cursor = nextCursor;
         hasNext = Boolean(nextCursor);
+        pagesFetched += 1;
       }
 
       setItems(allItems);
       setHasMore(false);
+      setSearchCoverageLimited(hasNext);
     } catch (err) {
       console.error(err);
       setItems([]);
       setHasMore(false);
+      setSearchCoverageLimited(false);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -750,6 +759,11 @@ export default function InspirationPage() {
       </div>
 
       <div className="space-y-6 pb-8">
+        {isSearchMode && searchCoverageLimited && (
+          <div className="rounded-lg border border-warning-200 bg-warning-50 px-3 py-2 text-xs text-warning-900">
+            Showing top matches from the newest items. Narrow filters for more precise search coverage.
+          </div>
+        )}
         {/* Loading state */}
         {loading && (
           <div className="py-16 flex items-center justify-center">

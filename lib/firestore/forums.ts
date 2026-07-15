@@ -291,7 +291,8 @@ export async function getThread(
 
 /** Get all forum threads created by a specific author across all categories. */
 export async function getThreadsByAuthor(
-  authorId: string
+  authorId: string,
+  maxResults = 100,
 ): Promise<GetThreadsResult> {
   if (!db) throw new Error("Firestore is not initialized");
 
@@ -300,7 +301,8 @@ export async function getThreadsByAuthor(
   // Sort client-side to avoid orderBy composite index requirement.
   const q = query(
     collectionGroup(db, "threads"),
-    where("authorId", "==", authorId)
+    where("authorId", "==", authorId),
+    limit(Math.max(1, maxResults))
   );
   const snapshot = await getDocs(q);
 

@@ -8,6 +8,7 @@ import {
   collection,
   query,
   where,
+  limit,
   getDocs,
   serverTimestamp,
   type Timestamp,
@@ -62,9 +63,13 @@ export async function removeBookmark(userId: string, lessonId: string): Promise<
 }
 
 /** Returns all lessons bookmarked by a user (as Bookmark records). */
-export async function getUserBookmarks(userId: string): Promise<Bookmark[]> {
+export async function getUserBookmarks(userId: string, maxResults = 200): Promise<Bookmark[]> {
   if (!db) return [];
-  const q = query(collection(db, "bookmarks"), where("userId", "==", userId));
+  const q = query(
+    collection(db, "bookmarks"),
+    where("userId", "==", userId),
+    limit(Math.max(1, maxResults))
+  );
   const snap = await getDocs(q);
   return snap.docs.map((d) => d.data() as Bookmark);
 }
