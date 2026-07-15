@@ -2,18 +2,15 @@
 
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   updateProfile,
   reauthenticateWithCredential,
   EmailAuthProvider,
   updatePassword,
-  deleteUser,
 } from "firebase/auth";
 
 import { useAuth } from "@/lib/auth-context";
 import { getUser, updateUser } from "@/lib/firestore/users";
-import { cleanupUserAccountData } from "@/lib/firestore/accountCleanup";
 import { Button, Input, Card, Badge, ConfirmDialog } from "@/components/ui";
 
 interface Toast {
@@ -29,8 +26,9 @@ interface PasswordErrors {
 }
 
 export default function AccountManagementPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
+  const isSandboxBilling = (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "").startsWith("pk_test_");
 
   // Display name state
   const [displayName, setDisplayName] = useState("");
@@ -39,6 +37,7 @@ export default function AccountManagementPage() {
   // Tier state
   const [tier, setTier] = useState<"free" | "plus" | null>(null);
   const [loadingTier, setLoadingTier] = useState(true);
+  const [billingLoading, setBillingLoading] = useState(false);
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -50,10 +49,12 @@ export default function AccountManagementPage() {
   // Delete account state
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cancelSubscriptionOpen, setCancelSubscriptionOpen] = useState(false);
 
   // Toast state
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastCounter = useRef(0);
+  const tierRefreshTimerRef = useRef<number | null>(null);
 
   function addToast(message: string, type: "success" | "error" = "success") {
     const id = ++toastCounter.current;
@@ -73,17 +74,77 @@ export default function AccountManagementPage() {
   // Pre-fill display name and load tier from Firestore
   useEffect(() => {
     if (!user) return;
-    setDisplayName(user.displayName || "");
-    getUser(user.uid)
-      .then((profile) => {
+
+    let cancelled = false;
+    const userId = user.uid;
+
+    async function loadTier() {
+      try {
+        const profile = await getUser(userId);
+        if (cancelled) return;
+
         if (profile) {
           setTier(profile.tier ?? "free");
         } else {
           setTier("free");
         }
-      })
-      .catch(() => setTier("free"))
-      .finally(() => setLoadingTier(false));
+      } catch {
+        if (!cancelled) setTier("free");
+      } finally {
+        if (!cancelled) setLoadingTier(false);
+      }
+    }
+
+    setDisplayName(user.displayName || "");
+    setLoadingTier(true);
+    void loadTier();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const billing = params.get("billing");
+
+    const clearTierRefreshTimer = () => {
+      if (tierRefreshTimerRef.current !== null) {
+        window.clearTimeout(tierRefreshTimerRef.current);
+        tierRefreshTimerRef.current = null;
+      }
+    };
+
+    const refreshTierFromFirestore = async () => {
+      if (!user) return;
+      try {
+        const profile = await getUser(user.uid);
+        setTier(profile?.tier ?? "free");
+      } catch {
+        // Ignore - the normal account view already has a fallback state.
+      }
+    };
+
+    if (billing === "success") {
+      addToast("Subscription updated. Your Plus access will refresh shortly.");
+      params.delete("billing");
+      const qs = params.toString();
+      window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+
+      clearTierRefreshTimer();
+      void refreshTierFromFirestore();
+
+      tierRefreshTimerRef.current = window.setTimeout(() => {
+        void refreshTierFromFirestore();
+      }, 2500);
+    } else if (billing === "cancelled") {
+      addToast("Checkout was cancelled.", "error");
+      params.delete("billing");
+      const qs = params.toString();
+      window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+    }
+
+    return clearTierRefreshTimer;
   }, [user]);
 
   if (authLoading || !user) {
@@ -182,8 +243,20 @@ export default function AccountManagementPage() {
     if (!user) return;
     setDeleting(true);
     try {
-      await cleanupUserAccountData(user.uid);
-      await deleteUser(user);
+      const token = await user.getIdToken();
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error("delete_queue_failed");
+      }
+
+      await signOut();
 
       // Clear session cookie and redirect to landing page.
       document.cookie = "__session=; path=/; max-age=0";
@@ -195,6 +268,65 @@ export default function AccountManagementPage() {
         "Failed to delete account. Please sign out, sign back in, and try again.",
         "error"
       );
+    }
+  }
+
+  async function beginCheckout() {
+    if (billingLoading) return;
+    setBillingLoading(true);
+    router.push("/account/upgrade");
+  }
+
+  async function openBillingPortal() {
+    if (!user || billingLoading) return;
+    setBillingLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/billing/portal", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        throw new Error(data.error ?? "portal_failed");
+      }
+
+      window.location.assign(data.url);
+    } catch {
+      addToast("Unable to open billing portal right now.", "error");
+      setBillingLoading(false);
+    }
+  }
+
+  async function cancelSubscription() {
+    if (!user || billingLoading) return;
+    setBillingLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/billing/cancel", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error ?? "cancel_failed");
+      }
+
+      setTier("free");
+      setCancelSubscriptionOpen(false);
+      addToast("Subscription canceled. Your account has been moved back to Free.");
+    } catch {
+      addToast("Unable to cancel subscription right now.", "error");
+    } finally {
+      setBillingLoading(false);
     }
   }
 
@@ -230,6 +362,19 @@ export default function AccountManagementPage() {
         confirmLabel="Delete Account"
         isDestructive
         isLoading={deleting}
+      />
+
+      <ConfirmDialog
+        isOpen={cancelSubscriptionOpen}
+        onClose={() => {
+          if (!billingLoading) setCancelSubscriptionOpen(false);
+        }}
+        onConfirm={cancelSubscription}
+        title="Cancel Plus subscription"
+        description="This immediately cancels the current Stripe subscription and moves the account back to the Free tier."
+        confirmLabel="Cancel Subscription"
+        isDestructive
+        isLoading={billingLoading}
       />
 
       <div className="max-w-2xl mx-auto space-y-6 pb-12">
@@ -282,6 +427,18 @@ export default function AccountManagementPage() {
           <h2 className="text-base font-semibold text-foreground mb-4">
             Subscription Tier
           </h2>
+          {isSandboxBilling && tier !== "plus" && (
+            <div className="mb-4 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
+              <p className="font-semibold">Sandbox early-access Plus</p>
+              <p className="mt-1">
+                This site is using Stripe test mode. Early users can upgrade themselves to Plus for free using the Stripe test card:
+                <span className="font-medium"> 4242 4242 4242 4242</span>.
+              </p>
+              <p className="mt-1 text-xs">
+                Use any future expiry date, any 3-digit CVC, and any ZIP/postcode.
+              </p>
+            </div>
+          )}
           {loadingTier ? (
             <div className="h-5 w-16 bg-secondary-100 rounded animate-pulse" />
           ) : (
@@ -289,13 +446,19 @@ export default function AccountManagementPage() {
               <Badge variant={tier === "plus" ? "success" : "default"}>
                 {tier === "plus" ? "Plus" : "Free"}
               </Badge>
-              {tier !== "plus" && (
-                <Link
-                  href="/careers"
-                  className="text-sm text-primary-900 hover:underline font-medium"
-                >
-                  Upgrade to Plus →
-                </Link>
+              {tier !== "plus" ? (
+                <Button size="sm" onClick={beginCheckout} isLoading={billingLoading}>
+                  Upgrade to Plus
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" size="sm" onClick={openBillingPortal} isLoading={billingLoading}>
+                    Manage Billing
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => setCancelSubscriptionOpen(true)} isLoading={billingLoading}>
+                    Cancel Subscription
+                  </Button>
+                </>
               )}
             </div>
           )}
@@ -370,8 +533,8 @@ export default function AccountManagementPage() {
             Danger Zone
           </h2>
           <p className="text-sm text-muted mb-4">
-            Permanently delete your account and all associated data. This
-            action cannot be undone.
+            Submit a permanent account deletion request. Background cleanup will
+            remove your data and account shortly after confirmation.
           </p>
           <button
             type="button"

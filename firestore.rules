@@ -33,12 +33,28 @@ service cloud.firestore {
                     && request.resource.data.isVerified == false
                     && request.resource.data.followerCount == 0
                     && request.resource.data.followingCount == 0
+                    && !request.resource.data.keys().hasAny([
+                      'stripeCustomerId',
+                      'stripeSubscriptionId',
+                      'stripeSubscriptionStatus',
+                      'deletionStatus',
+                      'deletionRequestedAt'
+                    ])
                     && !request.resource.data.keys().hasAny(['role']);
       // Owner can update their profile but cannot change protected fields (tier, createdAt, role)
       // Any authenticated user can increment/decrement followerCount (follow/unfollow)
       allow update: if (isOwner(userId)
                         && !request.resource.data.diff(resource.data)
-                              .affectedKeys().hasAny(['tier', 'createdAt', 'role']))
+                              .affectedKeys().hasAny([
+                                'tier',
+                                'createdAt',
+                                'role',
+                                'stripeCustomerId',
+                                'stripeSubscriptionId',
+                                'stripeSubscriptionStatus',
+                                'deletionStatus',
+                                'deletionRequestedAt'
+                              ]))
                     || (isAuth() && request.resource.data.diff(resource.data)
                            .affectedKeys().hasOnly(['followerCount']));
       // Only the owner can delete their own profile (account deletion)
