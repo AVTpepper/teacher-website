@@ -246,11 +246,12 @@ export default function AIGenerateScreen({
 
   useEffect(() => {
     if (!user) return;
+    const currentUser = user;
     let cancelled = false;
 
     async function fetchUsage() {
       try {
-        const token = await user.getIdToken();
+        const token = await currentUser.getIdToken();
         const res = await fetch("/api/ai/lesson", {
           headers: { Authorization: `Bearer ${token}` },
         });
