@@ -48,18 +48,37 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     const canceled = await stripe.subscriptions.cancel(subscriptionId);
+    const canceledRecord = canceled as unknown as Record<string, unknown>;
+
+    const currentPeriodEnd =
+      typeof canceledRecord.current_period_end === "number"
+        ? canceledRecord.current_period_end
+        : null;
+    const cancelAt =
+      typeof canceledRecord.cancel_at === "number" ? canceledRecord.cancel_at : null;
+    const cancelAtPeriodEnd = Boolean(canceledRecord.cancel_at_period_end);
+    const canceledAt =
+      typeof canceledRecord.canceled_at === "number" ? canceledRecord.canceled_at : null;
+    const canceledId = typeof canceledRecord.id === "string" ? canceledRecord.id : subscriptionId;
+    const canceledStatus =
+      typeof canceledRecord.status === "string" ? canceledRecord.status : "canceled";
 
     await userRef.set(
       {
         tier: "free",
-        stripeSubscriptionId: canceled.id,
-        stripeSubscriptionStatus: canceled.status,
+        stripeSubscriptionId: canceledId,
+        stripeSubscriptionStatus: canceledStatus,
+        stripeCurrentPeriodEnd: currentPeriodEnd,
+        stripeCancelAt: cancelAt,
+        stripeCancelAtPeriodEnd: cancelAtPeriodEnd,
+        stripeCanceledAt: canceledAt,
+        stripeLastSyncedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
     );
 
-    return Response.json({ ok: true, status: canceled.status });
+    return Response.json({ ok: true, status: canceledStatus });
   } catch (error) {
     if (error instanceof ApiAuthError) {
       return Response.json({ error: error.message }, { status: 401 });

@@ -10,7 +10,7 @@ import {
 } from "firebase/auth";
 
 import { useAuth } from "@/lib/auth-context";
-import { getUser, updateUser } from "@/lib/firestore/users";
+import { getUser, updateUser, type UserProfile } from "@/lib/firestore/users";
 import { Button, Input, Card, Badge, ConfirmDialog } from "@/components/ui";
 
 interface Toast {
@@ -23,6 +23,91 @@ interface PasswordErrors {
   currentPassword?: string;
   newPassword?: string;
   confirmPassword?: string;
+}
+
+type BillingProfileSnapshot = Pick<
+  UserProfile,
+  | "stripeCustomerId"
+  | "stripeSubscriptionId"
+  | "stripeSubscriptionStatus"
+  | "stripeCurrentPeriodEnd"
+  | "stripeCancelAt"
+  | "stripeCancelAtPeriodEnd"
+  | "stripeCanceledAt"
+  | "stripeLastSyncedAt"
+  | "updatedAt"
+>;
+
+function maskStripeId(value?: string): string {
+  if (!value) return "Not linked";
+  if (value.length <= 10) return value;
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
+function formatBillingStatus(status?: string): string {
+  if (!status) return "No subscription yet";
+  return status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatDateTime(value: unknown): string {
+  if (!value) return "Not available";
+
+  let date: Date | null = null;
+
+  if (typeof value === "number") {
+    date = new Date(value * 1000);
+  } else if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === "string") {
+    const parsed = new Date(value);
+    date = Number.isNaN(parsed.getTime()) ? null : parsed;
+  } else if (
+    typeof value === "object" &&
+    value !== null &&
+    "seconds" in value &&
+    typeof (value as { seconds?: unknown }).seconds === "number"
+  ) {
+    date = new Date(((value as { seconds: number }).seconds) * 1000);
+  } else if (
+    typeof value === "object" &&
+    value !== null &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    date = (value as { toDate: () => Date }).toDate();
+  }
+
+  if (!date || Number.isNaN(date.getTime())) return "Not available";
+
+  return date.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getBillingCycleLabel(profile: BillingProfileSnapshot | null, tier: "free" | "plus" | null): string {
+  if (!profile) return "No billing cycle yet";
+
+  const cycleEnd = profile.stripeCurrentPeriodEnd ?? profile.stripeCancelAt ?? profile.stripeCanceledAt;
+  if (!cycleEnd) {
+    return tier === "plus" ? "Awaiting Stripe sync" : "No active billing cycle";
+  }
+
+  if (profile.stripeCancelAtPeriodEnd) {
+    return `Access ends ${formatDateTime(cycleEnd)}`;
+  }
+
+  if (tier === "plus") {
+    return `Renews ${formatDateTime(cycleEnd)}`;
+  }
+
+  return `Ended ${formatDateTime(cycleEnd)}`;
 }
 
 export default function AccountManagementPage() {
@@ -38,6 +123,7 @@ export default function AccountManagementPage() {
   const [tier, setTier] = useState<"free" | "plus" | null>(null);
   const [loadingTier, setLoadingTier] = useState(true);
   const [billingLoading, setBillingLoading] = useState(false);
+  const [billingProfile, setBillingProfile] = useState<BillingProfileSnapshot | null>(null);
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -78,18 +164,36 @@ export default function AccountManagementPage() {
     let cancelled = false;
     const userId = user.uid;
 
+    function applyProfile(profile: UserProfile | null) {
+      if (profile) {
+        setTier(profile.tier ?? "free");
+        setBillingProfile({
+          stripeCustomerId: profile.stripeCustomerId,
+          stripeSubscriptionId: profile.stripeSubscriptionId,
+          stripeSubscriptionStatus: profile.stripeSubscriptionStatus,
+          stripeCurrentPeriodEnd: profile.stripeCurrentPeriodEnd,
+          stripeCancelAt: profile.stripeCancelAt,
+          stripeCancelAtPeriodEnd: profile.stripeCancelAtPeriodEnd,
+          stripeCanceledAt: profile.stripeCanceledAt,
+          stripeLastSyncedAt: profile.stripeLastSyncedAt,
+          updatedAt: profile.updatedAt,
+        });
+      } else {
+        setTier("free");
+        setBillingProfile(null);
+      }
+    }
+
     async function loadTier() {
       try {
         const profile = await getUser(userId);
         if (cancelled) return;
-
-        if (profile) {
-          setTier(profile.tier ?? "free");
-        } else {
-          setTier("free");
-        }
+        applyProfile(profile);
       } catch {
-        if (!cancelled) setTier("free");
+        if (!cancelled) {
+          setTier("free");
+          setBillingProfile(null);
+        }
       } finally {
         if (!cancelled) setLoadingTier(false);
       }
@@ -120,6 +224,21 @@ export default function AccountManagementPage() {
       try {
         const profile = await getUser(user.uid);
         setTier(profile?.tier ?? "free");
+        setBillingProfile(
+          profile
+            ? {
+                stripeCustomerId: profile.stripeCustomerId,
+                stripeSubscriptionId: profile.stripeSubscriptionId,
+                stripeSubscriptionStatus: profile.stripeSubscriptionStatus,
+                stripeCurrentPeriodEnd: profile.stripeCurrentPeriodEnd,
+                stripeCancelAt: profile.stripeCancelAt,
+                stripeCancelAtPeriodEnd: profile.stripeCancelAtPeriodEnd,
+                stripeCanceledAt: profile.stripeCanceledAt,
+                stripeLastSyncedAt: profile.stripeLastSyncedAt,
+                updatedAt: profile.updatedAt,
+              }
+            : null,
+        );
       } catch {
         // Ignore - the normal account view already has a fallback state.
       }
@@ -321,6 +440,17 @@ export default function AccountManagementPage() {
       }
 
       setTier("free");
+      setBillingProfile((prev) => ({
+        stripeCustomerId: prev?.stripeCustomerId,
+        stripeSubscriptionId: prev?.stripeSubscriptionId,
+        stripeSubscriptionStatus: "canceled",
+        stripeCurrentPeriodEnd: prev?.stripeCurrentPeriodEnd ?? null,
+        stripeCancelAt: prev?.stripeCancelAt ?? null,
+        stripeCancelAtPeriodEnd: false,
+        stripeCanceledAt: Math.floor(Date.now() / 1000),
+        stripeLastSyncedAt: new Date(),
+        updatedAt: prev?.updatedAt,
+      }));
       setCancelSubscriptionOpen(false);
       addToast("Subscription canceled. Your account has been moved back to Free.");
     } catch {
@@ -442,24 +572,60 @@ export default function AccountManagementPage() {
           {loadingTier ? (
             <div className="h-5 w-16 bg-secondary-100 rounded animate-pulse" />
           ) : (
-            <div className="flex items-center gap-3 flex-wrap">
-              <Badge variant={tier === "plus" ? "success" : "default"}>
-                {tier === "plus" ? "Plus" : "Free"}
-              </Badge>
-              {tier !== "plus" ? (
-                <Button size="sm" onClick={beginCheckout} isLoading={billingLoading}>
-                  Upgrade to Plus
-                </Button>
-              ) : (
-                <>
-                  <Button variant="outline" size="sm" onClick={openBillingPortal} isLoading={billingLoading}>
-                    Manage Billing
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Badge variant={tier === "plus" ? "success" : "default"}>
+                  {tier === "plus" ? "Plus" : "Free"}
+                </Badge>
+                {tier !== "plus" ? (
+                  <Button size="sm" onClick={beginCheckout} isLoading={billingLoading}>
+                    Upgrade to Plus
                   </Button>
-                  <Button variant="destructive" size="sm" onClick={() => setCancelSubscriptionOpen(true)} isLoading={billingLoading}>
-                    Cancel Subscription
-                  </Button>
-                </>
-              )}
+                ) : (
+                  <>
+                    <Button variant="outline" size="sm" onClick={openBillingPortal} isLoading={billingLoading}>
+                      Manage Billing
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => setCancelSubscriptionOpen(true)} isLoading={billingLoading}>
+                      Cancel Subscription
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-border bg-secondary-50/70 px-4 py-3">
+                <h3 className="text-sm font-semibold text-foreground">Billing Status</h3>
+                <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Mode</dt>
+                    <dd className="mt-1 text-foreground">{isSandboxBilling ? "Sandbox / Test" : "Live"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Subscription Status</dt>
+                    <dd className="mt-1 text-foreground">{formatBillingStatus(billingProfile?.stripeSubscriptionStatus)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Renews / Ends</dt>
+                    <dd className="mt-1 text-foreground">{getBillingCycleLabel(billingProfile, tier)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Customer Record</dt>
+                    <dd className="mt-1 text-foreground">{billingProfile?.stripeCustomerId ? "Linked" : "Not linked"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Customer ID</dt>
+                    <dd className="mt-1 font-mono text-foreground">{maskStripeId(billingProfile?.stripeCustomerId)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Subscription ID</dt>
+                    <dd className="mt-1 font-mono text-foreground">{maskStripeId(billingProfile?.stripeSubscriptionId)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Last Stripe Sync</dt>
+                    <dd className="mt-1 text-foreground">{formatDateTime(billingProfile?.stripeLastSyncedAt)}</dd>
+                  </div>
+                </dl>
+              </div>
             </div>
           )}
         </Card>

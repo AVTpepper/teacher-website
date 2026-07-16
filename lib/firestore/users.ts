@@ -33,6 +33,15 @@ export interface UserProfile {
   bio: string;
   isVerified: boolean;
   tier?: "free" | "plus";
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripeSubscriptionStatus?: string;
+  stripeCurrentPeriodEnd?: number | null;
+  stripeCancelAt?: number | null;
+  stripeCancelAtPeriodEnd?: boolean;
+  stripeCanceledAt?: number | null;
+  stripeLastSyncedAt?: unknown;
+  updatedAt?: unknown;
   createdAt: unknown;
   badges: string[];
   followerCount: number;

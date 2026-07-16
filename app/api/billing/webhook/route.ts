@@ -28,9 +28,21 @@ async function syncTierFromSubscription(
   customerId: string,
   subscriptionId: string,
   status: string,
+  subscription: Stripe.Subscription,
 ): Promise<void> {
   const uid = await findUserByCustomerId(customerId);
   if (!uid) return;
+
+  const subscriptionRecord = subscription as unknown as Record<string, unknown>;
+  const currentPeriodEnd =
+    typeof subscriptionRecord.current_period_end === "number"
+      ? subscriptionRecord.current_period_end
+      : null;
+  const cancelAt =
+    typeof subscriptionRecord.cancel_at === "number" ? subscriptionRecord.cancel_at : null;
+  const cancelAtPeriodEnd = Boolean(subscriptionRecord.cancel_at_period_end);
+  const canceledAt =
+    typeof subscriptionRecord.canceled_at === "number" ? subscriptionRecord.canceled_at : null;
 
   const db = getFirebaseAdminDb();
   await db.doc(`users/${uid}`).set(
@@ -38,6 +50,11 @@ async function syncTierFromSubscription(
       tier: isPlusStatus(status) ? "plus" : "free",
       stripeSubscriptionId: subscriptionId,
       stripeSubscriptionStatus: status,
+      stripeCurrentPeriodEnd: currentPeriodEnd,
+      stripeCancelAt: cancelAt,
+      stripeCancelAtPeriodEnd: cancelAtPeriodEnd,
+      stripeCanceledAt: canceledAt,
+      stripeLastSyncedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true },
@@ -102,7 +119,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           typeof session.subscription === "string"
         ) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription);
-          await syncTierFromSubscription(session.customer, subscription.id, subscription.status);
+          await syncTierFromSubscription(session.customer, subscription.id, subscription.status, subscription);
         }
         break;
       }
@@ -113,7 +130,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         const customerId =
           typeof subscription.customer === "string" ? subscription.customer : null;
         if (customerId) {
-          await syncTierFromSubscription(customerId, subscription.id, subscription.status);
+          await syncTierFromSubscription(customerId, subscription.id, subscription.status, subscription);
         }
         break;
       }

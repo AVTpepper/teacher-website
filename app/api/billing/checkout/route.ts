@@ -87,7 +87,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       uiMode === "embedded"
         ? {
             ...baseParams,
-            ui_mode: "embedded" as unknown as Stripe.Checkout.SessionCreateParams.UiMode,
+            ui_mode: "embedded_page" as unknown as Stripe.Checkout.SessionCreateParams.UiMode,
             return_url: `${origin}/account?billing=success&session_id={CHECKOUT_SESSION_ID}`,
           }
         : {

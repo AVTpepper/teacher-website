@@ -37,6 +37,11 @@ service cloud.firestore {
                       'stripeCustomerId',
                       'stripeSubscriptionId',
                       'stripeSubscriptionStatus',
+                      'stripeCurrentPeriodEnd',
+                      'stripeCancelAt',
+                      'stripeCancelAtPeriodEnd',
+                      'stripeCanceledAt',
+                      'stripeLastSyncedAt',
                       'deletionStatus',
                       'deletionRequestedAt'
                     ])
@@ -52,6 +57,11 @@ service cloud.firestore {
                                 'stripeCustomerId',
                                 'stripeSubscriptionId',
                                 'stripeSubscriptionStatus',
+                                'stripeCurrentPeriodEnd',
+                                'stripeCancelAt',
+                                'stripeCancelAtPeriodEnd',
+                                'stripeCanceledAt',
+                                'stripeLastSyncedAt',
                                 'deletionStatus',
                                 'deletionRequestedAt'
                               ]))
