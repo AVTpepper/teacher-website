@@ -24,13 +24,13 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 24,
-    borderBottom: "2 solid #7c1d1d",
+    borderBottom: "2 solid #0F4C5C",
     paddingBottom: 12,
   },
   title: {
     fontSize: 22,
     fontFamily: "Helvetica-Bold",
-    color: "#7c1d1d",
+    color: "#0F4C5C",
     marginBottom: 6,
   },
   metaRow: {
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontFamily: "Helvetica-Bold",
-    color: "#374151",
+    color: "#0F4C5C",
   },
   section: {
     marginBottom: 16,
@@ -53,9 +53,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontFamily: "Helvetica-Bold",
-    color: "#374151",
+    color: "#0F4C5C",
     marginBottom: 6,
-    borderBottom: "1 solid #e5e7eb",
+    borderBottom: "1 solid #9BB1A7",
     paddingBottom: 3,
   },
   body: {
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   stepBox: {
     marginBottom: 12,
     paddingLeft: 10,
-    borderLeft: "2 solid #d1d5db",
+    borderLeft: "2 solid #9BB1A7",
   },
   stepTitle: {
     fontSize: 11,
@@ -200,7 +200,7 @@ export default function LessonPDFDocument({ lesson, authorName }: LessonPDFDocum
 
         <View fixed style={styles.footer}>
           <Text style={{ fontSize: 8, color: "#9ca3af", textAlign: "center" }}>
-            © {new Date().getFullYear()} {authorName}. All rights reserved. Created on TeacherlyConnect.
+            © {new Date().getFullYear()} {authorName} — All rights reserved. Created on VistaTeacher.
           </Text>
         </View>
       </Page>

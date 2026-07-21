@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import type { LessonStep } from "@/lib/firestore/lessons";
 import { SPECIFIC_GRADE_LEVELS } from "@/lib/constants";
 import Modal from "@/components/ui/Modal";
@@ -196,7 +197,7 @@ export default function AIAssistantPanel({
       }
     } catch (err) {
       let msg: string;
-      if (err instanceof Error && err.name === "AbortError") {
+      if (err instanceof Error && (err.name === "AbortError" || err.name === "TimeoutError")) {
         msg = "The AI took too long to respond. Please try again.";
       } else if (err instanceof TypeError) {
         msg = "Could not reach the AI service. Check your connection and try again.";
@@ -546,9 +547,15 @@ export default function AIAssistantPanel({
                     </div>
                   </div>
                 ) : (
-                  <p className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
-                    Upgrade to Plus to access grade override and additional context fields.
-                  </p>
+                  <div className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
+                    <p>Upgrade to Plus to access grade override and additional context fields.</p>
+                    <Link
+                      href="/account/upgrade"
+                      className="mt-1 inline-block font-medium text-primary-800 hover:underline"
+                    >
+                      View Plus options →
+                    </Link>
+                  </div>
                 )}
 
                 {/* Error message */}
@@ -604,6 +611,12 @@ export default function AIAssistantPanel({
                       You&apos;ve used all 10 daily requests. Upgrade to Plus for
                       unlimited AI access.
                     </p>
+                    <Link
+                      href="/account/upgrade"
+                      className="mt-2 inline-block font-semibold text-warning-800 underline"
+                    >
+                      Upgrade now
+                    </Link>
                   </div>
                 )}
               </form>

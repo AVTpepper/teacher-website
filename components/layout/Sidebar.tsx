@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { TextButton } from "@/components/ui";
 import Card from "@/components/ui/Card";
 import { getPosts, type Post } from "@/lib/firestore/posts";
 import { getResources, type Resource } from "@/lib/firestore/resources";
@@ -12,14 +11,6 @@ import { getInspirationItems, type InspirationItem } from "@/lib/firestore/inspi
 
 interface SidebarContentsProps {
   onClose?: () => void;
-}
-
-function cleanDisplayText(value: string | null | undefined): string {
-  const trimmed = (value || "").trim();
-  if (!trimmed) return "";
-  // Treat placeholder-like punctuation-only values as empty.
-  if (/^[\W_]+$/.test(trimmed)) return "";
-  return trimmed;
 }
 
 function SidebarContents({ onClose }: SidebarContentsProps) {
@@ -84,7 +75,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
             {trendingPosts.map((post) => (
               <li key={post.id}>
                 <Link
-                  href={`/home?post=${post.id}`}
+                  href={`/?post=${post.id}`}
                   className="group block rounded-md hover:bg-surface-hover transition-colors -mx-1 px-1 py-0.5"
                 >
                   <p className="text-xs text-foreground line-clamp-2 leading-relaxed group-hover:text-primary-900">
@@ -130,7 +121,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
         )}
         <Link
           href="/resources"
-          className="text-xs text-primary-800 hover:text-primary-900 hover:underline mt-2 inline-block"
+          className="text-xs text-primary-900 hover:underline mt-2 inline-block"
         >
           Browse all resources →
         </Link>
@@ -166,7 +157,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
         )}
         <Link
           href="/lesson-builder"
-          className="text-xs text-primary-800 hover:text-primary-900 hover:underline mt-2 inline-block"
+          className="text-xs text-primary-900 hover:underline mt-2 inline-block"
         >
           Create a lesson →
         </Link>
@@ -189,30 +180,26 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
           <ul className="space-y-2">
             {inspirationItems.map((item) => (
               <li key={item.id}>
-                {(() => {
-                  const title = cleanDisplayText(item.title) || "Untitled inspiration";
-                  const creator = cleanDisplayText(item.creator) || "Community";
-                  const href = `/inspiration/${item.id}`;
-
-                  return (
-                    <>
-                <Link
-                  href={href}
+                <a
+                  href={item.sourceURL ?? "#"}
+                  target={item.sourceURL ? "_blank" : undefined}
+                  rel={item.sourceURL ? "noopener noreferrer" : undefined}
+                  aria-disabled={!item.sourceURL}
+                  onClick={(event) => {
+                    if (!item.sourceURL) event.preventDefault();
+                  }}
                   className="text-xs text-foreground hover:text-primary-900 hover:underline line-clamp-2 leading-relaxed"
                 >
-                  {title}
-                </Link>
-                <p className="text-xs text-muted mt-0.5">{creator}</p>
-                    </>
-                  );
-                })()}
+                  {item.title}
+                </a>
+                <p className="text-xs text-muted mt-0.5">{item.creator}</p>
               </li>
             ))}
           </ul>
         )}
         <Link
           href="/inspiration"
-          className="text-xs text-primary-800 hover:text-primary-900 hover:underline mt-2 inline-block"
+          className="text-xs text-primary-900 hover:underline mt-2 inline-block"
         >
           Explore inspiration →
         </Link>
@@ -283,7 +270,7 @@ export function SidebarDrawerButton() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open sidebar"
-        className="lg:hidden fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary-900 text-accent-100 shadow-lg hover:bg-primary-800 transition-colors"
+        className="xl:hidden fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary-900 text-white shadow-lg hover:bg-primary-800 transition-colors"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
@@ -293,7 +280,7 @@ export function SidebarDrawerButton() {
       {/* Backdrop */}
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/40 xl:hidden"
           onClick={handleClose}
           aria-hidden="true"
         />
@@ -304,20 +291,25 @@ export function SidebarDrawerButton() {
         role="dialog"
         aria-modal="true"
         aria-label="Sidebar"
-        className={`fixed inset-y-0 right-0 z-50 w-80 max-w-full overflow-y-auto border-l border-primary-300 bg-linear-to-b from-secondary-100 to-background shadow-xl transition-transform duration-300 lg:hidden ${open ? "translate-x-0" : "translate-x-full"}`}
+        className={`fixed inset-y-0 right-0 z-50 w-80 max-w-full overflow-y-auto border-l border-primary-100 bg-linear-to-b from-secondary-50 via-background to-background shadow-2xl transition-transform duration-300 xl:hidden ${open ? "translate-x-0" : "translate-x-full"}`}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="text-sm font-semibold text-foreground">Explore</span>
-          <TextButton
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-primary-100 bg-surface/95 px-4 py-3 backdrop-blur">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-400">
+              VistaTeacher
+            </p>
+            <span className="text-base font-semibold text-foreground">Explore</span>
+          </div>
+          <button
             type="button"
             onClick={handleClose}
             aria-label="Close sidebar"
-            className="p-0 text-muted hover:text-foreground"
+            className="rounded-lg p-1 text-muted hover:bg-surface-hover hover:text-foreground transition-colors cursor-pointer"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
-          </TextButton>
+          </button>
         </div>
         <div className="p-4">
           <SidebarContents onClose={handleClose} />
@@ -333,7 +325,7 @@ export function SidebarDrawerButton() {
 
 export default function Sidebar() {
   return (
-    <aside className="hidden lg:block w-72 shrink-0 rounded-2xl border border-primary-100/70 bg-linear-to-b from-secondary-100/60 to-transparent p-3">
+    <aside className="hidden xl:block w-72 shrink-0">
       <SidebarContents />
     </aside>
   );

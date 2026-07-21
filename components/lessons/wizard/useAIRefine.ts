@@ -187,7 +187,7 @@ export function useAIRefine(
       onSuccess();
     } catch (err) {
       let msg: string;
-      if (err instanceof Error && err.name === "AbortError") {
+      if (err instanceof Error && (err.name === "AbortError" || err.name === "TimeoutError")) {
         msg = "The AI took too long to respond. Please try again.";
       } else if (err instanceof TypeError) {
         msg = "Could not reach the AI service. Check your connection and try again.";

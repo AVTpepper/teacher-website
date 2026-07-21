@@ -61,7 +61,7 @@ export function parseJobSlug(slug: string): string {
 export const JOB_TYPE_COLOR: Record<JobType, string> = {
   "full-time": "bg-emerald-100 text-emerald-700",
   "part-time": "bg-blue-100 text-blue-700",
-  contract: "bg-amber-100 text-amber-700",
+  contract: "bg-accent-100 text-accent-700",
   substitute: "bg-purple-100 text-purple-700",
 };
 

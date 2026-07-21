@@ -127,11 +127,11 @@ function LoginForm() {
   }
 
   return (
-    <Card padding="lg" className="border-primary-300/60 bg-surface/95">
+    <Card padding="lg">
       {showForgot ? (
         /* ===== Forgot Password View ===== */
         <>
-          <h1 className="text-2xl font-bold text-foreground text-center">
+          <h1 className="text-3xl font-bold text-foreground text-center sm:text-4xl">
             Reset Password
           </h1>
           <p className="mt-1 text-sm text-muted text-center">
@@ -159,7 +159,7 @@ function LoginForm() {
                   autoComplete="email"
                   required
                 />
-                <Button type="submit" variant="secondary" className="w-full" isLoading={forgotLoading}>
+                <Button type="submit" className="w-full" isLoading={forgotLoading}>
                   Send Reset Link
                 </Button>
               </form>
@@ -169,7 +169,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => { setShowForgot(false); setForgotSent(false); setForgotError(""); }}
-            className="mt-5 w-full text-center text-sm text-primary-900 hover:text-primary-700 font-semibold"
+            className="mt-5 w-full text-center text-sm text-primary-900 hover:text-primary-700 font-medium"
           >
             ← Back to Sign In
           </button>
@@ -177,11 +177,11 @@ function LoginForm() {
       ) : (
         /* ===== Login View ===== */
         <>
-      <h1 className="text-2xl font-bold text-foreground text-center">
+      <h1 className="text-3xl font-bold text-foreground text-center sm:text-4xl">
         Sign In
       </h1>
       <p className="mt-1 text-sm text-muted text-center">
-        Welcome back. Sign in to your TeacherlyConnect account.
+        Welcome back. Sign in to your VistaTeacher account.
       </p>
 
       {error && (
@@ -233,7 +233,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => { setShowForgot(true); setForgotEmail(email); }}
-            className="text-xs text-primary-900 hover:text-primary-700 font-semibold cursor-pointer"
+            className="text-xs text-primary-900 hover:text-primary-700 font-medium"
           >
             Forgot password?
           </button>
@@ -241,7 +241,6 @@ function LoginForm() {
 
         <Button
           type="submit"
-          variant="secondary"
           className="w-full"
           isLoading={loading}
         >
@@ -287,7 +286,7 @@ function LoginForm() {
         Don&apos;t have an account?{" "}
         <Link
           href="/auth/signup"
-          className="font-semibold text-primary-900 hover:text-primary-700"
+          className="font-medium text-primary-900 hover:text-primary-700"
         >
           Create one
         </Link>

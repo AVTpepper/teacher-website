@@ -43,10 +43,10 @@ export default function Tabs({
             role="tab"
             aria-selected={active === tab.value}
             onClick={() => handleSelect(tab.value)}
-            className={`rounded-full px-3 py-1 text-sm font-medium transition-colors cursor-pointer ${
+            className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors cursor-pointer ${
               active === tab.value
-                ? "bg-primary-900 text-white"
-                : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
+                ? "border-accent-300 bg-accent-50 text-primary-900"
+                : "border-primary-100 bg-surface text-primary-800 hover:border-primary-200 hover:bg-surface-hover"
             }`}
           >
             {tab.label}

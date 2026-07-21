@@ -16,7 +16,7 @@ const variantClasses: Record<BadgeVariant, string> = {
   default: "bg-secondary-100 text-secondary-700",
   primary: "bg-primary-100 text-primary-800",
   success: "bg-success-50 text-success-700",
-  warning: "bg-warning-50 text-warning-700",
+  warning: "bg-accent-50 text-accent-700",
   error: "bg-error-50 text-error-700",
   info: "bg-info-50 text-info-700",
 };

@@ -1,14 +1,11 @@
 export default function CookiesPage() {
   const lastUpdated = "May 12, 2026";
   return (
-    <div className="pb-12 space-y-8">
-      <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
-        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Legal</p>
-        <h1 className="mt-1 text-3xl font-bold">Cookie Policy</h1>
-        <p className="mt-2 text-xs text-primary-200/90">Last updated: {lastUpdated}</p>
+    <div className="max-w-3xl mx-auto py-12 space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground">Cookie Policy</h1>
+        <p className="mt-2 text-xs text-muted">Last updated: {lastUpdated}</p>
       </div>
-
-      <div className="max-w-3xl mx-auto space-y-8">
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">What Are Cookies?</h2>
@@ -36,14 +33,13 @@ export default function CookiesPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Managing Cookies</h2>
-        <p className="text-muted leading-relaxed">You can control cookies through your browser settings. Note that disabling cookies may affect your ability to log in and use TeacherlyConnect.</p>
+        <p className="text-muted leading-relaxed">You can control cookies through your browser settings. Note that disabling cookies may affect your ability to log in and use VistaTeacher.</p>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Contact</h2>
         <p className="text-muted leading-relaxed">Questions about our use of cookies? <a href="/contact" className="text-primary-900 hover:underline">Contact us</a>.</p>
       </section>
-      </div>
     </div>
   );
 }

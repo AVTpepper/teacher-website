@@ -8,6 +8,7 @@ import Image from "next/image";
 
 import { useAuth } from "@/lib/auth-context";
 import { storage } from "@/lib/firebase";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
 import {
   getUser,
   createUser,
@@ -49,6 +50,11 @@ export default function EditProfilePage() {
       router.push("/");
     }
   }, [authLoading, user, router]);
+
+  // Ensure route transitions to this page start at the top.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, []);
 
   // Load existing profile
   useEffect(() => {
@@ -206,17 +212,19 @@ export default function EditProfilePage() {
   const currentPhoto = photoPreview || photoURL;
 
   return (
-    <div className="mx-auto max-w-2xl py-8">
-      <h1 className="text-2xl font-bold text-foreground">
-        {isExisting ? "Edit Profile" : "Complete Your Profile"}
-      </h1>
-      <p className="mt-1 text-sm text-muted">
-        {isExisting
-          ? "Update your profile information."
-          : "Tell the community about yourself to get started."}
-      </p>
+    <div className="mx-auto max-w-2xl pt-2 pb-8 space-y-6">
+      <DiscoveryShell
+        title={isExisting ? "Edit Profile" : "Complete Your Profile"}
+        subtitle={
+          isExisting
+            ? "Update your profile information."
+            : "Tell the community about yourself to get started."
+        }
+        eyebrow="Profile"
+        className="mb-0"
+      />
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* Profile Photo */}
         <Card className="flex items-center gap-6">
           <button
@@ -230,6 +238,7 @@ export default function EditProfilePage() {
                 src={currentPhoto}
                 alt="Profile photo"
                 fill
+                sizes="80px"
                 className="object-cover"
               />
             ) : (
@@ -380,7 +389,7 @@ export default function EditProfilePage() {
         <div className="flex items-center justify-end gap-3">
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             onClick={() => router.back()}
             disabled={saving || uploadProgress !== null}
           >

@@ -9,17 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
-import Button from "@/components/ui/Button";
-import {
-  WIZARD_STEPS,
-  REQUIRED_WIZARD_STEPS,
-  type WizardLessonState,
-  type WizardStepKey,
-  emptyWizardState,
-  getStepAttention,
-  type StepAttention,
-  type ValidationError,
-} from "./LessonWizardState";
+import { WIZARD_STEPS, type WizardLessonState, type WizardStepKey, emptyWizardState, validateStep, type ValidationError } from "./LessonWizardState";
 import { createLesson, getLesson, updateLesson, type LessonInput } from "@/lib/firestore/lessons";
 import ReviewPage from "./ReviewPage";
 import { useAIRefine, type AIRefineState, REFINE_LABEL_MAP } from "./useAIRefine";
@@ -47,16 +37,16 @@ interface WizardShellProps {
   isAvailable?: boolean;
 }
 
-type StepState = "pending" | "active" | "completed";
+type StepState = "locked" | "active" | "completed";
 
 function getStepState(
   stepId: number,
   activeStep: number,
-  isResolved: boolean,
+  completedSteps: Set<number>
 ): StepState {
+  if (completedSteps.has(stepId)) return "completed";
   if (stepId === activeStep) return "active";
-  if (isResolved) return "completed";
-  return "pending";
+  return "locked";
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -74,9 +64,9 @@ export default function WizardShell({
     () => initialState ?? emptyWizardState()
   );
   const [activeStep, setActiveStep] = useState(startAtStep ?? 1);
-  const [highestVisitedStep, setHighestVisitedStep] = useState(startAtStep ?? 1);
-  const [touchedSteps, setTouchedSteps] = useState<Set<number>>(() => new Set());
-  const [, setCompletedSteps] = useState<Set<number>>(() => initialCompletedSteps ?? new Set());
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(
+    () => initialCompletedSteps ?? new Set()
+  );
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [draftLoaded, setDraftLoaded] = useState(false);
@@ -97,8 +87,9 @@ export default function WizardShell({
   // Ref to suppress IntersectionObserver updates during programmatic scrolls
   const isProgrammaticScrollRef = useRef(false);
 
-  // Throttle scroll-driven active step updates to one per animation frame
-  const scrollSpyFrameRef = useRef<number | null>(null);
+  // Ref so the IntersectionObserver callback can read completedSteps without stale closure
+  const completedStepsRef = useRef<Set<number>>(new Set());
+  completedStepsRef.current = completedSteps;
 
   const setSectionRef = useCallback(
     (index: number) => (el: HTMLDivElement | null) => {
@@ -116,76 +107,52 @@ export default function WizardShell({
 
   const onChange = useCallback((patch: Partial<WizardLessonState>) => {
     setLesson((prev) => ({ ...prev, ...patch }));
-    setTouchedSteps((prev) => {
-      const next = new Set(prev);
-      next.add(activeStepRef.current);
-      return next;
-    });
   }, []);
 
   // AI refine/elaborate/undo state shared across all steps
   const ai = useAIRefine(lesson, onChange, user, isAvailable);
 
-  // ── Scroll sync ────────────────────────────────────────────────────────────
-
-  const updateActiveStepFromScroll = useCallback(() => {
-    if (isProgrammaticScrollRef.current) return;
-
-    const stickyOffset = 120;
-    let nextStep = 1;
-
-    for (let index = 0; index < sectionRefs.current.length; index += 1) {
-      const section = sectionRefs.current[index];
-      if (!section) continue;
-
-      const top = section.getBoundingClientRect().top;
-
-      // Use the last section whose top has crossed the sticky offset.
-      // This avoids border flicker when adjacent sections are both visible.
-      if (top <= stickyOffset) {
-        nextStep = index + 1;
-      } else {
-        break;
-      }
-    }
-
-    if (nextStep !== activeStepRef.current) {
-      setActiveStep(nextStep);
-      setHighestVisitedStep((prev) => Math.max(prev, nextStep));
-    }
-  }, []);
+  // ── Intersection Observer for scroll sync ──────────────────────────────────
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (scrollSpyFrameRef.current !== null) return;
+    const refs = sectionRefs.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Find the entry with the highest intersection ratio
+        const visible = entries
+          .filter((e) => e.isIntersecting && e.intersectionRatio >= 0.25)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
 
-      scrollSpyFrameRef.current = window.requestAnimationFrame(() => {
-        scrollSpyFrameRef.current = null;
-        updateActiveStepFromScroll();
-      });
-    };
+        if (visible.length === 0) return;
+        // Ignore observer updates triggered by programmatic scrolls
+        if (isProgrammaticScrollRef.current) return;
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleScroll);
+        const topEntry = visible[0];
+        const idx = refs.findIndex((r) => r === topEntry.target);
+        if (idx !== -1) {
+          const stepId = idx + 1;
+          // Only update activeStep if the step is already completed or currently active.
+          // This prevents jumping to locked sections (e.g., skipping Assessments to Review).
+          const cs = completedStepsRef.current;
+          if (cs.has(stepId) || stepId === activeStepRef.current) {
+            setActiveStep(stepId);
+          }
+        }
+      },
+      { threshold: [0.25, 0.5], rootMargin: "-96px 0px 0px 0px" }
+    );
 
-    // Prime the active step on mount and when layout changes.
-    handleScroll();
+    refs.forEach((ref) => {
+      if (ref) observer.observe(ref);
+    });
 
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleScroll);
-      if (scrollSpyFrameRef.current !== null) {
-        window.cancelAnimationFrame(scrollSpyFrameRef.current);
-        scrollSpyFrameRef.current = null;
-      }
-    };
-  }, [updateActiveStepFromScroll]);
+    return () => observer.disconnect();
+  }, []);
 
   // ── Navigation ─────────────────────────────────────────────────────────────
 
   function goToStep(stepId: number, focusHeading = false) {
     setActiveStep(stepId);
-    setHighestVisitedStep((prev) => Math.max(prev, stepId));
     const idx = stepId - 1;
     // Suppress observer for the duration of the scroll animation (~600ms)
     isProgrammaticScrollRef.current = true;
@@ -204,14 +171,18 @@ export default function WizardShell({
     if (next > 7) return;
 
     const currentKey = WIZARD_STEPS[activeStep - 1].key;
+    const errors = validateStep(currentKey, lesson);
+
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+
     setValidationErrors([]);
     setCompletedSteps((prev) => {
-      const updated = new Set(prev);
-      if (getStepAttention(currentKey, lesson).length === 0) {
-        updated.add(activeStep);
-      } else {
-        updated.delete(activeStep);
-      }
+      const updated = new Set([...prev, activeStep]);
+      // Mark Review as reachable permanently once the user navigates to it
+      if (next === 7) updated.add(7);
       return updated;
     });
     goToStep(next, true);
@@ -300,8 +271,10 @@ export default function WizardShell({
   }
 
   function handleStepperClick(stepId: number) {
-    setValidationErrors([]);
-    goToStep(stepId);
+    if (completedSteps.has(stepId)) {
+      goToStep(stepId);
+    }
+    // Locked steps: do nothing
   }
 
   // ── Draft restore on mount ─────────────────────────────────────────────────
@@ -330,38 +303,22 @@ export default function WizardShell({
           assessments: draft.assessments.length > 0 ? draft.assessments : [""],
         });
 
-        const restoredState = {
-          title: draft.title,
-          gradeLevel: draft.gradeLevel,
-          subject: draft.subject,
-          duration: draft.duration,
-          objectives: draft.objectives.length > 0 ? draft.objectives : [""],
-          materials: draft.materials.length > 0 ? draft.materials : [""],
-          steps: draft.steps.length > 0 ? draft.steps : [{ title: "", description: "" }],
-          checkForUnderstanding:
-            draft.checkForUnderstanding.length > 0 ? draft.checkForUnderstanding : [""],
-          assessments: draft.assessments.length > 0 ? draft.assessments : [""],
-        } satisfies WizardLessonState;
-
         const completed = new Set<number>();
-        WIZARD_STEPS.forEach((step) => {
-          if (getStepAttention(step.key, restoredState).length === 0) {
-            completed.add(step.id);
-          }
-        });
+        if (draft.title.trim()) completed.add(1); // basicInfo
+        if (draft.objectives.some((o) => o.trim())) completed.add(2); // objectives
+        if (draft.steps.some((s) => s.title.trim())) completed.add(4); // lessonSteps
+        // Note: materials (3), CFU (5), assessments (6) are optional sections.
+        // Only mark them complete if the user explicitly clicked Next past them
+        // (which we can't know from the draft data alone), so leave them unset.
 
         setCompletedSteps(completed);
 
+        // Resume at the first sequential step not yet completed
         let resumeStep = 1;
-        for (const step of WIZARD_STEPS) {
-          if (getStepAttention(step.key, restoredState).length > 0) {
-            resumeStep = step.id;
-            break;
-          }
-          resumeStep = step.id;
+        for (let s = 1; s <= 7; s++) {
+          if (!completed.has(s)) { resumeStep = s; break; }
         }
         setActiveStep(resumeStep);
-        setHighestVisitedStep(resumeStep);
 
         setDraftLoaded(true);
         setTimeout(() => setDraftLoaded(false), 3000);
@@ -376,28 +333,20 @@ export default function WizardShell({
 
   // ── Step state helpers ─────────────────────────────────────────────────────
 
-  const stepStates = useMemo(() => {
-    return WIZARD_STEPS.map((step) => {
-      const attention = getStepAttention(step.key, lesson);
-      const isResolved = attention.length === 0;
-      const isRequired = REQUIRED_WIZARD_STEPS.includes(step.key);
-      const shouldSurfaceAttention =
-        !isResolved && (highestVisitedStep > step.id || touchedSteps.has(step.id));
-
-      return {
-        ...step,
-        attention: shouldSurfaceAttention ? attention : [],
-        isResolved,
-        isRequired,
-        state: getStepState(step.id, activeStep, isResolved),
-      };
-    });
-  }, [activeStep, highestVisitedStep, lesson, touchedSteps]);
+  const stepStates = useMemo(
+    () =>
+      WIZARD_STEPS.map((s) => ({
+        ...s,
+        state: getStepState(s.id, activeStep, completedSteps),
+      })),
+    [activeStep, completedSteps]
+  );
 
   // ── Progress bar values ────────────────────────────────────────────────────
 
-  const resolvedCount = stepStates.filter((step) => step.isResolved).length;
-  const progressPercent = Math.round((resolvedCount / 7) * 100);
+  const progressPercent = Math.round(
+    ((completedSteps.size + (activeStep <= 7 ? 0 : 1)) / 7) * 100
+  );
   const currentStepLabel =
     WIZARD_STEPS.find((s) => s.id === activeStep)?.label ?? "";
 
@@ -416,25 +365,20 @@ export default function WizardShell({
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="py-6 px-4 max-w-6xl mx-auto">
+    <div className="px-4 pb-6 max-w-6xl mx-auto">
       {/* Mobile: compact top bar */}
       <div className="md:hidden mb-4">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-sm font-medium text-foreground">
             Step {activeStep} of 7: {currentStepLabel}
           </span>
-          <Button
+          <button
             type="button"
-            variant="outline"
-            size="sm"
             onClick={onExit}
-            className="gap-1.5"
+            className="text-sm text-muted hover:text-foreground transition-colors"
           >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-            </svg>
-            Back
-          </Button>
+            ← Back
+          </button>
         </div>
         <div
           role="progressbar"
@@ -465,39 +409,31 @@ export default function WizardShell({
             <span className="text-xs font-semibold uppercase tracking-wider text-muted">
               Progress
             </span>
-            <Button
+            <button
               type="button"
               onClick={onExit}
-              variant="outline"
-              size="sm"
-              className="gap-1.5 px-2.5"
+              className="text-xs text-muted hover:text-foreground transition-colors"
             >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-              </svg>
-              Back
-            </Button>
+              ← Exit
+            </button>
           </div>
 
           {stepStates.map((s) => {
             const isCompleted = s.state === "completed";
             const isActive = s.state === "active";
-            const needsAttention = s.attention.length > 0;
-            const attentionKind = s.attention.some((issue) => issue.kind === "required")
-              ? "required"
-              : "recommended";
+            const isLocked = s.state === "locked";
 
             return (
               <button
                 key={s.id}
                 type="button"
                 onClick={() => handleStepperClick(s.id)}
+                disabled={isLocked}
                 aria-current={isActive ? "step" : undefined}
+                aria-disabled={isLocked ? "true" : undefined}
                 aria-label={
                   isCompleted
                     ? `Step ${s.id}: ${s.label}, completed`
-                    : needsAttention
-                    ? `Step ${s.id}: ${s.label}, needs attention`
                     : `Step ${s.id}: ${s.label}${isActive ? ", current" : ""}`
                 }
                 className={[
@@ -506,9 +442,7 @@ export default function WizardShell({
                     ? "hover:bg-surface-hover cursor-pointer text-foreground"
                     : isActive
                     ? "bg-primary-50 text-primary-900 cursor-default"
-                    : needsAttention
-                    ? "hover:bg-amber-50 cursor-pointer text-foreground"
-                    : "hover:bg-surface-hover cursor-pointer text-muted",
+                    : "cursor-default text-muted opacity-60",
                 ]
                   .filter(Boolean)
                   .join(" ")}
@@ -520,8 +454,6 @@ export default function WizardShell({
                     "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
                     isCompleted
                       ? "bg-green-500 text-white"
-                      : needsAttention
-                      ? "bg-amber-100 text-amber-700"
                       : isActive
                       ? "bg-primary-900 text-white"
                       : "bg-border text-muted",
@@ -541,29 +473,11 @@ export default function WizardShell({
                         d="m4.5 12.75 6 6 9-13.5"
                       />
                     </svg>
-                  ) : needsAttention ? (
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2.5}
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4.5m0 3h.008v.008H12V16.5Z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M10.29 3.86 1.82 18a2.25 2.25 0 0 0 1.93 3.38h16.5A2.25 2.25 0 0 0 22.18 18l-8.47-14.14a2.25 2.25 0 0 0-3.42 0Z" />
-                    </svg>
                   ) : (
                     s.id
                   )}
                 </span>
-                <span className="min-w-0">
-                  <span className="block leading-snug">{s.label}</span>
-                  {needsAttention && (
-                    <span className="block text-xs text-amber-700">
-                      {attentionKind === "required" ? "Required" : "Needs review"}
-                    </span>
-                  )}
-                </span>
+                <span className="leading-snug">{s.label}</span>
               </button>
             );
           })}
@@ -588,9 +502,8 @@ export default function WizardShell({
           {/* Step 1: Basic Info */}
           <SectionCard
             stepId={1}
-            stepState={stepStates[0].state}
-            attention={stepStates[0].attention}
-            isRequired={stepStates[0].isRequired}
+            activeStep={activeStep}
+            completedSteps={completedSteps}
             sectionRef={setSectionRef(0)}
             headingRef={setHeadingRef(0)}
             onNext={handleNext}
@@ -602,9 +515,8 @@ export default function WizardShell({
           {/* Step 2: Objectives */}
           <SectionCard
             stepId={2}
-            stepState={stepStates[1].state}
-            attention={stepStates[1].attention}
-            isRequired={stepStates[1].isRequired}
+            activeStep={activeStep}
+            completedSteps={completedSteps}
             sectionRef={setSectionRef(1)}
             headingRef={setHeadingRef(1)}
             onNext={handleNext}
@@ -617,9 +529,8 @@ export default function WizardShell({
           {/* Step 3: Materials */}
           <SectionCard
             stepId={3}
-            stepState={stepStates[2].state}
-            attention={stepStates[2].attention}
-            isRequired={stepStates[2].isRequired}
+            activeStep={activeStep}
+            completedSteps={completedSteps}
             sectionRef={setSectionRef(2)}
             headingRef={setHeadingRef(2)}
             onNext={handleNext}
@@ -632,9 +543,8 @@ export default function WizardShell({
           {/* Step 4: Lesson Steps */}
           <SectionCard
             stepId={4}
-            stepState={stepStates[3].state}
-            attention={stepStates[3].attention}
-            isRequired={stepStates[3].isRequired}
+            activeStep={activeStep}
+            completedSteps={completedSteps}
             sectionRef={setSectionRef(3)}
             headingRef={setHeadingRef(3)}
             onNext={handleNext}
@@ -647,9 +557,8 @@ export default function WizardShell({
           {/* Step 5: CFU */}
           <SectionCard
             stepId={5}
-            stepState={stepStates[4].state}
-            attention={stepStates[4].attention}
-            isRequired={stepStates[4].isRequired}
+            activeStep={activeStep}
+            completedSteps={completedSteps}
             sectionRef={setSectionRef(4)}
             headingRef={setHeadingRef(4)}
             onNext={handleNext}
@@ -662,9 +571,8 @@ export default function WizardShell({
           {/* Step 6: Assessments */}
           <SectionCard
             stepId={6}
-            stepState={stepStates[5].state}
-            attention={stepStates[5].attention}
-            isRequired={stepStates[5].isRequired}
+            activeStep={activeStep}
+            completedSteps={completedSteps}
             sectionRef={setSectionRef(5)}
             headingRef={setHeadingRef(5)}
             onNext={handleNext}
@@ -677,9 +585,8 @@ export default function WizardShell({
           {/* Step 7: Review & Publish */}
           <SectionCard
             stepId={7}
-            stepState={stepStates[6].state}
-            attention={stepStates[6].attention}
-            isRequired={stepStates[6].isRequired}
+            activeStep={activeStep}
+            completedSteps={completedSteps}
             sectionRef={setSectionRef(6)}
             headingRef={setHeadingRef(6)}
             onNext={handleNext}
@@ -688,18 +595,12 @@ export default function WizardShell({
           >
             <ReviewPage
               lesson={lesson}
-              onChange={(patch) => {
-                setLesson((prev) => ({ ...prev, ...patch }));
-                setTouchedSteps((prev) => {
-                  const next = new Set(prev);
-                  next.add(7);
-                  return next;
-                });
-              }}
+              onChange={(patch) => setLesson((prev) => ({ ...prev, ...patch }))}
               onSaveDraft={() => saveDraft(lesson)}
               onPublish={handlePublish}
               isSaving={saveState === "saving"}
               saveState={saveState}
+              onBackToEdit={handleBack}
               user={user}
               isAvailable={isAvailable}
             />
@@ -836,9 +737,8 @@ function StepAIBar({ sectionKey, label, ai }: StepAIBarProps) {
 
 interface SectionCardProps {
   stepId: number;
-  stepState: StepState;
-  attention: StepAttention[];
-  isRequired: boolean;
+  activeStep: number;
+  completedSteps: Set<number>;
   sectionRef: (el: HTMLDivElement | null) => void;
   headingRef: (el: HTMLHeadingElement | null) => void;
   onNext: () => void;
@@ -849,9 +749,8 @@ interface SectionCardProps {
 
 function SectionCard({
   stepId,
-  stepState,
-  attention,
-  isRequired,
+  activeStep,
+  completedSteps,
   sectionRef,
   headingRef,
   onNext,
@@ -860,9 +759,9 @@ function SectionCard({
   children,
 }: SectionCardProps) {
   const stepInfo = WIZARD_STEPS[stepId - 1];
-  const isActive = stepState === "active";
-  const needsAttention = attention.length > 0;
-  const primaryAttention = attention[0];
+  const state = getStepState(stepId, activeStep, completedSteps);
+  const isActive = state === "active";
+  const isLocked = state === "locked";
 
   const headingId = `wizard-step-${stepId}-heading`;
 
@@ -871,12 +770,13 @@ function SectionCard({
       ref={sectionRef}
       role="region"
       aria-labelledby={headingId}
+      inert={isLocked || undefined}
       className={[
-        "rounded-xl border bg-surface transition-colors duration-200 scroll-mt-28",
+        "rounded-xl border bg-surface transition-all duration-200 scroll-mt-28",
         isActive
-          ? "border-primary-300 shadow-sm"
-          : needsAttention
-          ? "border-amber-200"
+          ? "ring-2 ring-primary-500 border-primary-300 shadow-sm"
+          : isLocked
+          ? "border-border opacity-60 pointer-events-none"
           : "border-border",
       ].join(" ")}
     >
@@ -887,16 +787,14 @@ function SectionCard({
             aria-hidden="true"
             className={[
               "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-              stepState === "completed"
+              state === "completed"
                 ? "bg-green-500 text-white"
-                : needsAttention
-                ? "bg-amber-100 text-amber-700"
                 : isActive
                 ? "bg-primary-900 text-white"
                 : "bg-border text-muted",
             ].join(" ")}
           >
-            {stepState === "completed" ? (
+            {state === "completed" ? (
               <svg
                 className="h-4 w-4"
                 fill="none"
@@ -910,46 +808,18 @@ function SectionCard({
                   d="m4.5 12.75 6 6 9-13.5"
                 />
               </svg>
-            ) : needsAttention ? (
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2.5}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4.5m0 3h.008v.008H12V16.5Z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.29 3.86 1.82 18a2.25 2.25 0 0 0 1.93 3.38h16.5A2.25 2.25 0 0 0 22.18 18l-8.47-14.14a2.25 2.25 0 0 0-3.42 0Z" />
-              </svg>
             ) : (
               stepId
             )}
           </span>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2
-                ref={headingRef}
-                id={headingId}
-                tabIndex={-1}
-                className="text-base font-semibold text-foreground focus:outline-none"
-              >
-                {stepInfo.label}
-              </h2>
-              <span className={[
-                "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
-                isRequired
-                  ? "bg-amber-100 text-amber-800"
-                  : "bg-secondary-100 text-secondary-700",
-              ].join(" ")}>
-                {isRequired ? "Required" : "Optional"}
-              </span>
-            </div>
-            {primaryAttention && (
-              <p className="mt-1 text-sm text-amber-700">
-                {primaryAttention.message}
-              </p>
-            )}
-          </div>
+          <h2
+            ref={headingRef}
+            id={headingId}
+            tabIndex={-1}
+            className="text-base font-semibold text-foreground focus:outline-none"
+          >
+            {stepInfo.label}
+          </h2>
         </div>
       </div>
 
@@ -1082,8 +952,8 @@ function SaveIndicator({ state }: { state: "idle" | "saving" | "saved" | "error"
 
   // error state
   return (
-    <span role="alert" className="text-xs text-amber-600">
-      Draft could not be saved. Your changes are still here.
+    <span role="alert" className="text-xs text-accent-700">
+      Draft could not be saved - your changes are still here
     </span>
   );
 }

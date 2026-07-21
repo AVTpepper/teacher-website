@@ -14,6 +14,7 @@ import {
   type SearchEducatorsFilters,
 } from "@/lib/firestore/users";
 import { Avatar, Badge, Button, Card, Input, Select } from "@/components/ui";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
 import { notifyNewFollower } from "@/lib/notifications";
 import { db } from "@/lib/firebase";
 
@@ -141,23 +142,12 @@ export default function EducatorsPage() {
   }
 
   return (
-    <div className="flex-1 min-w-0 space-y-6 pb-8">
-      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
-        {/* Header */}
-        <div className="-mx-4 -mt-4 mb-6 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
-          <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Directory</p>
-          <h1 className="text-2xl font-bold">
-            Discover Educators
-          </h1>
-          <p className="mt-1 text-sm text-primary-100/90">
-            Find and connect with educators by grade level, subject, and more.
-          </p>
-        </div>
-
-        {/* Filters */}
-        <Card>
+    <div className="space-y-6 pb-8">
+      <DiscoveryShell
+        title="Discover Educators"
+        subtitle="Built for educators who plan boldly, share generously, and grow together."
+        controls={
           <div className="flex flex-col gap-4">
-            {/* Name search row */}
             <div>
               <Input
                 label="Search by name"
@@ -167,7 +157,6 @@ export default function EducatorsPage() {
                 type="search"
               />
             </div>
-            {/* Grade + Subject + Country row */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
               <div className="flex-1">
                 <Select
@@ -212,11 +201,10 @@ export default function EducatorsPage() {
               )}
             </div>
           </div>
-        </Card>
-      </div>
+        }
+      />
 
       {/* Results */}
-      <div>
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
@@ -244,16 +232,6 @@ export default function EducatorsPage() {
               ? "Try adjusting your search or filters."
               : "Be the first to create a profile!"}
           </p>
-          {!user && (
-            <div className="mt-4 flex justify-center gap-2">
-              <Link href="/auth/signup">
-                <Button variant="secondary" size="sm">Create Account</Button>
-              </Link>
-              <Link href="/auth/login">
-                <Button variant="outline" size="sm">Sign In</Button>
-              </Link>
-            </div>
-          )}
         </div>
       ) : (
         <>
@@ -283,7 +261,6 @@ export default function EducatorsPage() {
           )}
         </>
       )}
-      </div>
     </div>
   );
 }
@@ -314,16 +291,18 @@ function EducatorCard({
   }
 
   return (
-    <Card hoverable className="flex flex-col items-center text-center">
-      <Link href={`/educators/${educator.uid}`} className="flex flex-col items-center w-full">
+    <Card hoverable className="flex h-full flex-col overflow-hidden border-primary-200 bg-linear-to-b from-surface to-secondary-50/35 p-0 text-center">
+      <div className="h-2 w-full bg-linear-to-r from-primary-400 via-primary-600 to-primary-800" />
+      <Link href={`/educators/${educator.uid}`} className="flex h-full flex-col items-center px-5 pt-6 pb-4 w-full min-w-0">
         <Avatar
           src={educator.photoURL}
           alt={educator.displayName}
           size="xl"
+          className="ring-4 ring-surface shadow-[0_10px_24px_rgba(15,76,92,0.12)]"
         />
 
-        <div className="mt-3 flex items-center gap-1.5">
-          <h3 className="font-semibold text-foreground">
+        <div className="mt-4 flex min-h-8 items-center justify-center gap-1.5">
+          <h3 className="line-clamp-2 text-xl font-semibold leading-tight text-foreground">
             {educator.displayName}
           </h3>
           {educator.isVerified && (
@@ -344,66 +323,80 @@ function EducatorCard({
           )}
         </div>
 
-        {educator.gradeLevel && (
-          <p className="mt-1 text-xs text-muted">{educator.gradeLevel}</p>
-        )}
+        <div className="mt-2 min-h-11 space-y-1 rounded-xl px-3 py-2">
+          {educator.gradeLevel && (
+            <p className="text-sm font-medium text-muted">{educator.gradeLevel}</p>
+          )}
 
-        {educator.country && (
-          <p className="mt-0.5 text-xs text-muted flex items-center gap-1">
-            <svg
-              className="h-3 w-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0 1 15 0Z"
-              />
-            </svg>
-            {educator.country}
-          </p>
-        )}
+          {educator.country && (
+            <p className="flex items-center justify-center gap-1 text-sm text-muted">
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0 1 15 0Z"
+                />
+              </svg>
+              {educator.country}
+            </p>
+          )}
+        </div>
 
-        {educator.subjects.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap justify-center gap-1">
-            {educator.subjects.slice(0, 3).map((s) => (
-              <Badge key={s} variant="primary">
-                {s}
-              </Badge>
-            ))}
-            {educator.subjects.length > 3 && (
-              <Badge variant="default">
-                +{educator.subjects.length - 3}
-              </Badge>
-            )}
-          </div>
-        )}
+        <div className="mt-3 flex min-h-16 flex-wrap content-start justify-center gap-1.5">
+          {educator.subjects.length > 0 ? (
+            <>
+              {educator.subjects.slice(0, 3).map((s) => (
+                <Badge key={s} variant="primary" className="bg-primary-50 text-primary-800">
+                  {s}
+                </Badge>
+              ))}
+              {educator.subjects.length > 3 && (
+                <Badge variant="default" className="bg-secondary-50 text-secondary-800">
+                  +{educator.subjects.length - 3}
+                </Badge>
+              )}
+            </>
+          ) : (
+            <span className="rounded-full bg-secondary-50 px-3 py-1 text-xs text-muted">No subjects added yet</span>
+          )}
+        </div>
       </Link>
 
-      <p className="mt-2 text-xs text-muted">
-        {educator.followerCount}{" "}
-        {educator.followerCount === 1 ? "follower" : "followers"}
-      </p>
+      <div className="mt-auto border-t border-primary-100/80 px-5 pb-5 pt-4">
+        <p className="mb-4 text-sm text-muted">
+          {educator.followerCount}{" "}
+          {educator.followerCount === 1 ? "follower" : "followers"}
+        </p>
 
-      {currentUid && !isOwnProfile && (
-        <Button
-          size="sm"
-          variant={isFollowed ? "outline" : "primary"}
-          className="mt-3 w-full"
-          onClick={handleFollow}
-          isLoading={loading}
-        >
-          {isFollowed ? "Following" : "Follow"}
-        </Button>
-      )}
+        {currentUid && !isOwnProfile && (
+          <Button
+            size="sm"
+            variant={isFollowed ? "outline" : "primary"}
+            className={`w-full ${isFollowed ? "border-primary-200 bg-primary-50 text-primary-900 hover:bg-primary-100" : "bg-primary-700 text-white hover:bg-primary-800 active:bg-primary-900"}`}
+            onClick={handleFollow}
+            isLoading={loading}
+          >
+            {isFollowed ? "Following" : "Follow"}
+          </Button>
+        )}
+
+        {isOwnProfile && (
+          <div className="w-full rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-900">
+            Your profile
+          </div>
+        )}
+      </div>
     </Card>
   );
 }

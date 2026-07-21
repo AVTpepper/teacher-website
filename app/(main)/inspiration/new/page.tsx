@@ -197,7 +197,7 @@ export default function NewInspirationPage() {
       </div>
 
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Submit Inspiration Content</h1>
+        <h1 className="text-3xl font-bold text-foreground sm:text-4xl">Submit Inspiration Content</h1>
         <p className="mt-1 text-sm text-muted">
           Share a podcast, article, video, or story that has inspired your teaching.
         </p>

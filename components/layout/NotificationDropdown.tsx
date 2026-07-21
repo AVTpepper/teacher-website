@@ -14,7 +14,6 @@ import {
   type NotificationType,
 } from "@/lib/notifications";
 import Avatar from "@/components/ui/Avatar";
-import { TextButton } from "@/components/ui";
 import { timeAgo } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -175,7 +174,7 @@ export default function NotificationDropdown() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative rounded-lg p-2 transition-colors cursor-pointer text-primary-100 hover:bg-primary-800 hover:text-white"
+        className="relative rounded-lg p-2 transition-colors cursor-pointer hover:bg-white/10 text-white"
         aria-label="Notifications"
         aria-expanded={open}
         aria-haspopup="true"
@@ -208,7 +207,7 @@ export default function NotificationDropdown() {
                     type="button"
                     onClick={handleMarkAllRead}
                     disabled={markingAll}
-                    className="text-xs text-primary-700 hover:underline disabled:opacity-50 cursor-pointer"
+                    className="text-xs text-primary hover:underline disabled:opacity-50 cursor-pointer"
                   >
                     {markingAll ? "Marking..." : "Mark all as read"}
                   </button>
@@ -244,7 +243,7 @@ export default function NotificationDropdown() {
                   >
                     {/* Avatar / type icon */}
                     <div className="shrink-0 mt-0.5">
-                      {n.actorPhotoURL || n.actorName !== "TeacherlyConnect" ? (
+                      {n.actorPhotoURL || n.actorName !== "VistaTeacher" ? (
                         <Avatar src={n.actorPhotoURL} alt={n.actorName} size="sm" />
                       ) : (
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary-100 text-base">
@@ -290,16 +289,16 @@ export default function NotificationDropdown() {
                       {!n.read && (
                         <span className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
                       )}
-                      <TextButton
+                      <button
                         type="button"
                         onClick={(e) => handleDismiss(e, n)}
                         aria-label="Dismiss notification"
-                        className="p-0 text-muted hover:text-foreground"
+                        className="text-muted hover:text-foreground transition-colors cursor-pointer"
                       >
                         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>
-                      </TextButton>
+                      </button>
                     </div>
                   </li>
                 ))}
@@ -312,7 +311,7 @@ export default function NotificationDropdown() {
             <Link
               href="/notifications"
               onClick={() => setOpen(false)}
-              className="inline-flex items-center gap-1.5 text-xs text-primary-700 hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
             >
               View all notifications
               {extraUnread > 0 && (

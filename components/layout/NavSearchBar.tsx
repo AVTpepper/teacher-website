@@ -330,7 +330,7 @@ export default function NavSearchBar({
           autoComplete="off"
           aria-autocomplete="list"
           aria-haspopup="listbox"
-          className="w-full rounded-lg border border-border bg-surface pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-ring hover:border-border-strong"
+          className="w-full rounded-lg border border-border bg-white pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-ring hover:border-border-strong"
         />
       </div>
 

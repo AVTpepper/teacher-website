@@ -14,7 +14,7 @@ import type { DocumentSnapshot } from "firebase/firestore";
 import CreatePost from "@/components/posts/CreatePost";
 import PostCard from "@/components/posts/PostCard";
 import Button from "@/components/ui/Button";
-import HorizontalScrollHint from "@/components/ui/HorizontalScrollHint";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
 
 const TYPE_FILTERS: { label: string; value: PostType | "" }[] = [
   { label: "All", value: "" },
@@ -118,45 +118,44 @@ function HomePageInner() {
   const showGuestWall = !user && feedPosts.length > 0;
 
   return (
-    <div className="flex-1 min-w-0 space-y-6">
-      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
-        <div className="space-y-4">
-          <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:p-6">
-            <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Daily Hub</p>
-            <h1 className="mt-1 text-2xl font-bold">Home Feed</h1>
-            <p className="mt-2 text-sm text-primary-100/90">
-              Your personalized educator feed with posts, trending discussions, and
-              more.
-            </p>
+    <div className="space-y-6">
+      <DiscoveryShell
+        title="Home Feed"
+        subtitle="Your personalized educator feed - posts, trending discussions, and more."
+        eyebrow="Daily Hub"
+        controls={
+          <div className="space-y-4">
+            {user && <CreatePost embedded onPostCreated={() => loadPosts(true, typeFilter)} />}
+            <div className="relative">
+              <div className="flex gap-2 overflow-x-auto pb-0.5 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {TYPE_FILTERS.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => handleTypeChange(f.value)}
+                    className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-1.5 text-sm font-medium transition-colors cursor-pointer ${
+                      typeFilter === f.value
+                        ? "border-primary-300 bg-primary-50 text-primary-900"
+                        : "border-primary-100 bg-surface text-primary-800 hover:border-primary-200 hover:bg-surface-hover"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <div className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 sm:hidden">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full border border-primary-100 bg-surface/95 text-primary-500 shadow-sm">
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m9 5 7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
           </div>
+        }
+      />
 
-          {/* Create post (logged in only) */}
-          {user && <CreatePost onPostCreated={() => loadPosts(true, typeFilter)} />}
-
-          {/* Type filters */}
-          <HorizontalScrollHint
-            innerClassName="flex gap-2 pb-0.5"
-            nudgeKey="home-feed-type-filters"
-          >
-            {TYPE_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => handleTypeChange(f.value)}
-                className={`shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
-                  typeFilter === f.value
-                    ? "bg-accent-300 text-primary-950 border-accent-400"
-                    : "bg-surface/90 border-primary-200 text-primary-800 hover:border-primary-500 hover:text-primary-900 hover:bg-primary-50"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </HorizontalScrollHint>
-        </div>
-      </div>
-
-      {/* Shared / linked post - rendered as part of feed cards */}
+      {/* Shared / linked post - pinned below the create form */}
       {pinnedPostId && (
         <div ref={sharedPostRef} className="scroll-mt-28">
           {sharedPostLoading ? (
@@ -242,7 +241,7 @@ function HomePageInner() {
                 Create a free account to view the full educator feed and join the conversation.
               </p>
               <div className="mt-4 flex justify-center gap-3">
-                <Button variant="secondary" onClick={() => router.push("/auth/signup")}>
+                <Button variant="primary" onClick={() => router.push("/auth/signup")}>
                   Create Account
                 </Button>
                 <Button variant="outline" onClick={() => router.push("/auth/login")}>

@@ -1,8 +1,7 @@
 import Navbar from "@/components/layout/Navbar";
 import Sidebar, { SidebarDrawerButton } from "@/components/layout/Sidebar";
 import Footer from "@/components/layout/Footer";
-import MainDetailBackButton from "@/components/layout/MainDetailBackButton";
-import MainContentShell from "@/components/layout/MainContentShell";
+import SiteMessageBanner from "@/components/layout/SiteMessageBanner";
 
 export default function MainLayout({
   children,
@@ -12,15 +11,13 @@ export default function MainLayout({
   return (
     <>
       <Navbar />
-      <div className="mx-auto w-full max-w-7xl flex-1 px-4 sm:px-6 py-6">
-        <div className="mb-6 rounded-2xl border border-primary-200/70 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 px-4 py-4 text-accent-100 shadow-lg sm:px-6">
-          <p className="text-xs font-semibold tracking-widest uppercase text-accent-300">TeacherlyConnect</p>
-          <p className="mt-1 text-sm text-accent-100/90">Plan with purpose, share what works, spark new ideas, and grow alongside educators who love what they do.</p>
-        </div>
-        <MainDetailBackButton />
-        <div className="flex gap-6">
-          <MainContentShell>{children}</MainContentShell>
-          <Sidebar />
+      <div className="flex-1 bg-linear-to-b from-background via-secondary-50 to-background">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 py-6">
+          <SiteMessageBanner />
+          <div className="flex gap-6">
+            <div className="flex-1 min-w-0">{children}</div>
+            <Sidebar />
+          </div>
         </div>
       </div>
       <Footer />

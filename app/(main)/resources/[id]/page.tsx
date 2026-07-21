@@ -284,7 +284,7 @@ export default function ResourceDetailPage({
     return (
       <div className="text-center py-16">
         <div className="text-5xl mb-4">📄</div>
-        <h1 className="text-2xl font-bold text-foreground">
+        <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
           Resource Not Found
         </h1>
         <p className="text-sm text-muted mt-2">
@@ -336,7 +336,7 @@ export default function ResourceDetailPage({
               )}
             </div>
 
-            <h1 className="text-2xl font-bold text-foreground">
+            <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
               {resource.title}
             </h1>
 
@@ -390,7 +390,7 @@ export default function ResourceDetailPage({
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-info-50 text-info-700 border border-info-200 hover:bg-info-100 transition-colors max-w-[260px] truncate"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-info-50 text-info-700 border border-info-200 hover:bg-info-100 transition-colors max-w-65 truncate"
                     title={link.url}
                   >
                     <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -418,9 +418,9 @@ export default function ResourceDetailPage({
                     <svg
                       className={`h-5 w-5 transition-colors ${
                         star <= (userRating ?? 0)
-                          ? "text-warning-500"
+                          ? "text-primary-400"
                           : star <= Math.round(avgRating)
-                            ? "text-warning-300"
+                            ? "text-primary-300"
                             : "text-secondary-200"
                       }`}
                       fill="currentColor"

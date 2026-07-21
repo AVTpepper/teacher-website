@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { type DocumentSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
-import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
+import { GRADE_LEVELS, SUBJECTS, getUser } from "@/lib/firestore/users";
 import {
   getJobs,
   jobSlug,
@@ -15,6 +15,9 @@ import {
   type JobType,
 } from "@/lib/firestore/jobs";
 import { Badge, Button, Card, Input, Select } from "@/components/ui";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
+
+// --- Job Card ---
 
 function JobCard({ job }: { job: Job }) {
   return (
@@ -47,12 +50,17 @@ function JobCard({ job }: { job: Job }) {
   );
 }
 
+// --- Main page ---
+
 export default function JobsPage() {
   const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
   const [jobType, setJobType] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
+
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -67,7 +75,6 @@ export default function JobsPage() {
       } else {
         setLoadingMore(true);
       }
-
       try {
         const filters: JobFilters = {
           gradeLevel: gradeLevel || undefined,
@@ -93,6 +100,23 @@ export default function JobsPage() {
     fetchJobs(true);
   }, [fetchJobs]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) return;
+
+    getUser(user.uid)
+      .then((profile) => {
+        if (!cancelled) setIsAdmin(profile?.role === "admin");
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   const visibleJobs = jobs.filter((j) => {
     if (gradeLevel && j.gradeLevel !== gradeLevel) return false;
     if (subject && j.subject !== subject) return false;
@@ -111,30 +135,27 @@ export default function JobsPage() {
   const hasFilters = !!(gradeLevel || subject || jobType || locationQuery);
 
   return (
-    <div className="flex-1 min-w-0 space-y-6 pb-8">
-      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
-        <div className="-mx-4 -mt-4 flex flex-col gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Opportunities</p>
-            <h1 className="text-2xl font-bold">Job Board</h1>
-            <p className="mt-1 text-sm text-primary-100/90">
-              Find education job opportunities for full time, part time, contract, and substitute positions.
-            </p>
-          </div>
-          {user ? (
+    <div className="space-y-6">
+      <DiscoveryShell
+        title="Job Board"
+        subtitle="Built for educators who plan boldly, share generously, and grow together."
+        action={
+          user && isAdmin ? (
             <Link href="/jobs/new">
-              <Button variant="secondary">+ Post Job</Button>
+              <Button className="bg-primary-700 text-white hover:bg-primary-800">+ Post Job</Button>
             </Link>
+          ) : user ? (
+            <p className="text-sm text-white/80">
+              Job posting is restricted to admin accounts.
+            </p>
           ) : (
-            <div className="flex items-center gap-2 text-sm text-primary-100/90">
-              <Link href="/auth/signup"><Button variant="secondary" size="sm">Create Account</Button></Link>
-              <Link href="/auth/login"><Button variant="outline" size="sm">Sign In</Button></Link>
-            </div>
-          )}
-        </div>
-
-        <Card className="mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <p className="text-sm text-white/80">
+              <a href="/auth/login" className="text-primary-100 underline">Sign in</a> to post a job.
+            </p>
+          )
+        }
+        controls={
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Input
               label="Location"
               value={locationQuery}
@@ -159,28 +180,30 @@ export default function JobsPage() {
               onChange={(e) => setJobType(e.target.value)}
               options={[{ value: "", label: "All types" }, ...JOB_TYPES.map((t) => ({ value: t.value, label: t.label }))]}
             />
+            {hasFilters && (
+              <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  Clear Filters
+                </Button>
+              </div>
+            )}
           </div>
-          {hasFilters && (
-            <div className="mt-3 flex justify-end">
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Clear Filters
-              </Button>
-            </div>
-          )}
-        </Card>
-      </div>
+        }
+      />
 
-      <div>
-
+      {/* Loading */}
       {loading && (
         <div className="py-16 text-center text-sm text-muted">Loading jobs…</div>
       )}
 
+      {/* Empty */}
       {!loading && visibleJobs.length === 0 && (
         <div className="py-16 text-center">
           <p className="text-4xl mb-3">💼</p>
-          <p className="text-foreground font-medium">Job portal is under construction.</p>
-          <p className="text-sm text-muted mt-1">Please check back soon.</p>
+          <p className="text-foreground font-medium">No jobs found</p>
+          <p className="text-sm text-muted mt-1">
+            {hasFilters ? "Try adjusting your filters." : "No job listings yet - be the first to post one!"}
+          </p>
           {hasFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters} className="mt-3">
               Clear Filters
@@ -189,27 +212,24 @@ export default function JobsPage() {
         </div>
       )}
 
+      {/* Job list */}
       {!loading && visibleJobs.length > 0 && (
-        <div className="space-y-6 pb-8">
-          <div className="space-y-3">
-            {visibleJobs.map((job) => (
-              <div key={job.id}>
-                <JobCard job={job} />
-              </div>
-            ))}
-          </div>
-
-          {hasMore && (
-            <div className="flex justify-center pt-2">
-              <Button variant="outline" onClick={() => fetchJobs(false)} disabled={loadingMore}>
-                {loadingMore ? "Loading…" : "Load More"}
-              </Button>
-            </div>
-          )}
+        <div className="space-y-3">
+          {visibleJobs.map((job) => (
+            <JobCard key={job.id} job={job} />
+          ))}
         </div>
       )}
 
-      </div>
+      {/* Load more */}
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <Button variant="outline" onClick={() => fetchJobs(false)} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : "Load More"}
+          </Button>
+        </div>
+      )}
+
     </div>
   );
 }

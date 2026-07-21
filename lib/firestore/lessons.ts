@@ -1,7 +1,6 @@
 import {
   doc,
   getDoc,
-  getCountFromServer,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -11,20 +10,13 @@ import {
   query,
   where,
   orderBy,
-  limit,
-  startAfter,
   getDocs,
   type DocumentSnapshot,
   type Timestamp,
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { byUpdatedAtDesc } from "@/lib/utils";
-import {
-  deleteCommentWithReplies,
-  type DeleteCommentResult,
-  migrateLegacyCommentFields,
-} from "@/lib/firestore/commentThreads";
+import { byCreatedAtDesc, byUpdatedAtDesc } from "@/lib/utils";
 
 // --- Lesson types ---
 
@@ -55,7 +47,6 @@ export interface Lesson {
   attachments: LessonAttachment[];
   checkForUnderstanding: string[];
   assessments: string[];
-  linkedResourceIds?: string[];
   isPublic: boolean;
   remixedFromId: string | null;
   createdAt: Timestamp | null;
@@ -80,7 +71,6 @@ export interface LessonInput {
   attachments: LessonAttachment[];
   checkForUnderstanding: string[];
   assessments: string[];
-  linkedResourceIds?: string[];
   isPublic: boolean;
   remixedFromId?: string | null;
 }
@@ -98,7 +88,6 @@ export async function createLesson(data: LessonInput): Promise<string> {
     ...data,
     titleLower: data.title.toLowerCase(),
     id: ref.id,
-    linkedResourceIds: data.linkedResourceIds ?? [],
     remixedFromId: data.remixedFromId ?? null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -142,15 +131,16 @@ export interface GetLessonsResult {
   lastDoc: DocumentSnapshot | null;
 }
 
-export type LessonLibrarySortBy = "newest" | "oldest" | "rating" | "downloads" | "bookmarks";
-
 export async function getPublicLessons(
-  filters?: { gradeLevel?: string; subject?: string; sortBy?: LessonLibrarySortBy },
-  cursor?: DocumentSnapshot | null,
-  pageSize = PAGE_SIZE
+  filters?: { gradeLevel?: string; subject?: string },
+  // cursor param kept for API compatibility but pagination is handled client-side
+  _cursor?: DocumentSnapshot | null
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
+  void _cursor;
 
+  // Only equality where() filters - no composite index required.
+  // orderBy is done client-side to avoid needing a composite index.
   const constraints: QueryConstraint[] = [
     where("isPublic", "==", true),
   ];
@@ -162,35 +152,14 @@ export async function getPublicLessons(
     constraints.push(where("subject", "==", filters.subject));
   }
 
-  if (filters?.sortBy === "oldest") {
-    constraints.push(orderBy("createdAt", "asc"));
-  } else if (filters?.sortBy === "rating") {
-    constraints.push(orderBy("ratingAverage", "desc"));
-  } else if (filters?.sortBy === "downloads") {
-    constraints.push(orderBy("downloadCount", "desc"));
-  } else if (filters?.sortBy === "bookmarks") {
-    constraints.push(orderBy("bookmarkCount", "desc"));
-  } else {
-    constraints.push(orderBy("createdAt", "desc"));
-  }
-
-  constraints.push(limit(pageSize));
-
-  if (cursor) {
-    constraints.push(startAfter(cursor));
-  }
-
   const q = query(collection(db, "lessons"), ...constraints);
   const snapshot = await getDocs(q);
 
-  const lessons = snapshot.docs.map((d) => d.data() as Lesson);
+  const lessons = snapshot.docs
+    .map((d) => d.data() as Lesson)
+    .sort(byCreatedAtDesc);
 
-  const lastDoc =
-    snapshot.docs.length === pageSize
-      ? snapshot.docs[snapshot.docs.length - 1]
-      : null;
-
-  return { lessons, lastDoc };
+  return { lessons, lastDoc: null };
 }
 
 export async function getLessonsByAuthor(
@@ -198,17 +167,17 @@ export async function getLessonsByAuthor(
   includePrivate = false,
   // cursor + pageSize params kept for API compatibility
   _cursor?: DocumentSnapshot | null,
-  maxResults = 100,
+  _pageSize = PAGE_SIZE
 ): Promise<GetLessonsResult> {
   if (!db) throw new Error("Firestore is not initialized");
   void _cursor;
+  void _pageSize;
 
   // Single equality where() - no composite index required.
   // Filtering by isPublic and sorting are done client-side.
   const q = query(
     collection(db, "lessons"),
-    where("authorId", "==", authorId),
-    limit(Math.max(1, maxResults))
+    where("authorId", "==", authorId)
   );
 
   const snapshot = await getDocs(q);
@@ -226,21 +195,10 @@ export async function getLessonsByAuthor(
 
 export async function getLessonCountByAuthor(
   authorId: string,
-  includePrivate = false
+  includePrivate = false,
 ): Promise<number> {
-  if (!db) throw new Error("Firestore is not initialized");
-
-  const constraints: QueryConstraint[] = [where("authorId", "==", authorId)];
-
-  if (!includePrivate) {
-    constraints.push(where("isPublic", "==", true));
-  }
-
-  const snapshot = await getCountFromServer(
-    query(collection(db, "lessons"), ...constraints)
-  );
-
-  return snapshot.data().count;
+  const { lessons } = await getLessonsByAuthor(authorId, includePrivate);
+  return lessons.length;
 }
 
 // --- Download tracking ---
@@ -272,9 +230,6 @@ export interface LessonComment {
   content: string;
   mentionedUsers?: { uid: string; displayName: string }[];
   createdAt: Timestamp | null;
-  editedAt?: Timestamp | null;
-  deleted?: boolean;
-  likesCount: number;
 }
 
 export interface LessonCommentInput {
@@ -300,7 +255,6 @@ export async function addLessonComment(
     lessonId,
     parentId: data.parentId ?? null,
     mentionedUsers: data.mentionedUsers ?? [],
-    likesCount: 0,
     createdAt: serverTimestamp(),
   });
 
@@ -318,12 +272,7 @@ export async function getLessonComments(
   );
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((d) =>
-    migrateLegacyCommentFields(
-      doc(db!, "lessons", lessonId, "comments", d.id),
-      d.data() as LessonComment
-    )
-  );
+  return snapshot.docs.map((d) => d.data() as LessonComment);
 }
 
 export async function updateLessonComment(
@@ -338,51 +287,10 @@ export async function updateLessonComment(
   });
 }
 
-export async function likeLessonComment(
-  lessonId: string,
-  commentId: string,
-  userId: string
-): Promise<void> {
-  if (!db) throw new Error("Firestore is not initialized");
-
-  await setDoc(doc(db, "lessons", lessonId, "comments", commentId, "likes", userId), {
-    likedAt: serverTimestamp(),
-  });
-  await updateDoc(doc(db, "lessons", lessonId, "comments", commentId), {
-    likesCount: increment(1),
-  });
-}
-
-export async function unlikeLessonComment(
-  lessonId: string,
-  commentId: string,
-  userId: string
-): Promise<void> {
-  if (!db) throw new Error("Firestore is not initialized");
-
-  await deleteDoc(doc(db, "lessons", lessonId, "comments", commentId, "likes", userId));
-  await updateDoc(doc(db, "lessons", lessonId, "comments", commentId), {
-    likesCount: increment(-1),
-  });
-}
-
-export async function hasLikedLessonComment(
-  lessonId: string,
-  commentId: string,
-  userId: string
-): Promise<boolean> {
-  if (!db) throw new Error("Firestore is not initialized");
-
-  const snap = await getDoc(doc(db, "lessons", lessonId, "comments", commentId, "likes", userId));
-  return snap.exists();
-}
-
 export async function deleteLessonComment(
   lessonId: string,
   commentId: string
-): Promise<DeleteCommentResult> {
-  return deleteCommentWithReplies({
-    collectionPath: ["lessons", lessonId, "comments"],
-    commentId,
-  });
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+  await deleteDoc(doc(db, "lessons", lessonId, "comments", commentId));
 }

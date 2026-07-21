@@ -1,6 +1,5 @@
-"use client";
+﻿"use client";
 
-import Link from "next/link";
 import { Suspense } from "react";
 import { useRef, useState, useEffect, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -45,9 +44,6 @@ function UploadResourceForm() {
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
   const [resType, setResType] = useState<string>("");
-  const [isPublic, setIsPublic] = useState(true);
-  const [sourceLessonId, setSourceLessonId] = useState<string | null>(null);
-  const [sourceLessonTitle, setSourceLessonTitle] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [links, setLinks] = useState<AttachedLink[]>([]);
@@ -66,18 +62,11 @@ function UploadResourceForm() {
       try {
         const resource = await getResource(editId!);
         if (cancelled || !resource) return;
-        if (user && resource.authorId !== user.uid) {
-          setError("You can only edit resources you created.");
-          return;
-        }
         setTitle(resource.title ?? "");
         setDescription(resource.description ?? "");
         setGradeLevel(resource.gradeLevel ?? "");
         setSubject(resource.subject ?? "");
         setResType(resource.type ?? "");
-        setIsPublic(resource.isPublic !== false);
-        setSourceLessonId(resource.sourceLessonId ?? null);
-        setSourceLessonTitle(resource.sourceLessonTitle ?? null);
         setTags(resource.tags ?? []);
         setLinks((resource.links as AttachedLink[]) ?? []);
       } catch {
@@ -88,21 +77,17 @@ function UploadResourceForm() {
     }
     load();
     return () => { cancelled = true; };
-  }, [editId, user]);
+  }, [editId]);
 
   if (!user) {
     return (
       <div className="py-20 text-center">
-        <h2 className="text-lg font-semibold text-foreground">
+        <h2 className="text-xl font-semibold text-foreground">
           Sign in to upload a resource
         </h2>
         <p className="mt-1 text-sm text-muted">
           You need to be logged in to share resources with the community.
         </p>
-        <div className="mt-4 flex justify-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => router.push("/auth/signup?redirect=/resources/upload")}>Create Account</Button>
-          <Button variant="outline" size="sm" onClick={() => router.push("/auth/login?redirect=/resources/upload")}>Sign In</Button>
-        </div>
       </div>
     );
   }
@@ -218,7 +203,6 @@ function UploadResourceForm() {
           gradeLevel,
           subject,
           type: resType as ResourceType,
-          isPublic,
           tags,
           links,
           ...(fileURL ? { fileURL, fileName } : {}),
@@ -236,9 +220,6 @@ function UploadResourceForm() {
           type: resType as ResourceType,
           fileURL,
           fileName,
-          isPublic,
-          sourceLessonId,
-          sourceLessonTitle,
           tags,
           links,
         });
@@ -263,24 +244,15 @@ function UploadResourceForm() {
   );
 
   return (
-    <div className="mx-auto max-w-2xl pb-8">
-      <div className="mb-4">
-        <Link href="/resources">
-          <Button type="button" variant="outline" size="sm">
-            Back to Resources
-          </Button>
-        </Link>
-      </div>
-
-      <div className="-mx-4 -mt-4 mb-6 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
-        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Creator Studio</p>
-        <h1 className="text-2xl font-bold">
+    <div className="mx-auto max-w-2xl py-8">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
           {isEditMode ? "Edit Resource" : "Upload Resource"}
         </h1>
-        <p className="mt-1 text-sm text-primary-100/90">
+        <p className="mt-1 text-sm text-muted">
           {isEditMode
             ? "Update your resource details below."
-            : "Share a teaching resource with the TeacherlyConnect community."}
+            : "Share a teaching resource with the VistaTeacher community."}
         </p>
       </div>
 
@@ -304,7 +276,7 @@ function UploadResourceForm() {
 
           <Textarea
             label="Description"
-            placeholder="Describe what this resource covers and how to use it..."
+            placeholder="Describe what this resource covers and how to use it…"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
@@ -342,30 +314,6 @@ function UploadResourceForm() {
             error={fieldErrors.resType ? "Resource type is required" : undefined}
           />
 
-          <div className="space-y-1.5">
-            <label htmlFor="resource-visibility" className="text-sm font-medium text-foreground">
-              Visibility
-            </label>
-            <select
-              id="resource-visibility"
-              value={isPublic ? "published" : "draft"}
-              onChange={(e) => setIsPublic(e.target.value === "published")}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground transition-colors focus-ring cursor-pointer"
-            >
-              <option value="published">Published to resource library</option>
-              <option value="draft">Keep as private draft</option>
-            </select>
-            <p className="text-xs text-muted">
-              Draft resources stay private to you until you publish them.
-            </p>
-          </div>
-
-          {sourceLessonId && sourceLessonTitle && (
-            <div className="rounded-lg border border-border bg-secondary-50 px-4 py-3 text-sm text-secondary-900">
-              Linked to lesson: <Link href={`/lesson-builder/${sourceLessonId}`} className="font-medium underline underline-offset-2">{sourceLessonTitle}</Link>
-            </div>
-          )}
-
           {/* Tags */}
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">
@@ -373,7 +321,7 @@ function UploadResourceForm() {
             </label>
             <div className="flex gap-2">
               <Input
-                placeholder="Add a tag..."
+                placeholder="Add a tag…"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => {

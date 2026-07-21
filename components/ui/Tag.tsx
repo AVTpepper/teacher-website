@@ -30,8 +30,8 @@ export default function Tag({
       }}
       className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
         selected
-          ? "bg-primary-900 text-white"
-          : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
+          ? "border border-primary-300 bg-primary-50 text-primary-900"
+          : "border border-primary-100 bg-surface text-primary-800 hover:border-primary-200 hover:bg-surface-hover"
       } ${onToggle ? "cursor-pointer" : ""} ${className}`}
     >
       {label}

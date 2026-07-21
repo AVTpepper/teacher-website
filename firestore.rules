@@ -15,10 +15,10 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
-    function canReadResourceDoc(resourceId) {
-      let resourceDoc = get(/databases/$(database)/documents/resources/$(resourceId));
-      return resourceDoc.data.isPublic != false
-        || (isAuth() && resourceDoc.data.authorId == request.auth.uid);
+    function isAdmin() {
+      return isAuth()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     // -----------------------------------------------------------------------
@@ -29,42 +29,14 @@ service cloud.firestore {
       allow read: if true;
       // Only the owner can create or update their own profile
       allow create: if isOwner(userId)
-                    && request.resource.data.tier == "free"
-                    && request.resource.data.isVerified == false
-                    && request.resource.data.followerCount == 0
-                    && request.resource.data.followingCount == 0
-                    && !request.resource.data.keys().hasAny([
-                      'stripeCustomerId',
-                      'stripeSubscriptionId',
-                      'stripeSubscriptionStatus',
-                      'stripeCurrentPeriodEnd',
-                      'stripeCancelAt',
-                      'stripeCancelAtPeriodEnd',
-                      'stripeCanceledAt',
-                      'stripeLastSyncedAt',
-                      'deletionStatus',
-                      'deletionRequestedAt'
-                    ])
-                    && !request.resource.data.keys().hasAny(['role']);
-      // Owner can update their profile but cannot change protected fields (tier, createdAt, role)
+            && request.resource.data.role == 'user'
+            && request.resource.data.tier == 'free'
+            && !request.resource.data.keys().hasAny(['stripeCustomerId', 'stripeSubscriptionId', 'billingStatus', 'billingUpdatedAt']);
+      // Owner can update their profile but cannot change protected fields (tier, role, billing)
       // Any authenticated user can increment/decrement followerCount (follow/unfollow)
       allow update: if (isOwner(userId)
                         && !request.resource.data.diff(resource.data)
-                              .affectedKeys().hasAny([
-                                'tier',
-                                'createdAt',
-                                'role',
-                                'stripeCustomerId',
-                                'stripeSubscriptionId',
-                                'stripeSubscriptionStatus',
-                                'stripeCurrentPeriodEnd',
-                                'stripeCancelAt',
-                                'stripeCancelAtPeriodEnd',
-                                'stripeCanceledAt',
-                                'stripeLastSyncedAt',
-                                'deletionStatus',
-                                'deletionRequestedAt'
-                              ]))
+              .affectedKeys().hasAny(['tier', 'createdAt', 'role', 'stripeCustomerId', 'stripeSubscriptionId', 'billingStatus', 'billingUpdatedAt']))
                     || (isAuth() && request.resource.data.diff(resource.data)
                            .affectedKeys().hasOnly(['followerCount']));
       // Only the owner can delete their own profile (account deletion)
@@ -83,37 +55,17 @@ service cloud.firestore {
       }
 
       // aiUsage sub-collection — users/{userId}/aiUsage/{dateKey}
-      // Stores daily AI request counts. Clients can only increment by exactly 1.
+      // Stores daily AI request counts; only the owner may read or write
       match /aiUsage/{dateKey} {
         allow read: if isOwner(userId);
-        allow create: if isOwner(userId)
-                      && request.resource.data.keys().hasOnly(['count'])
-                      && request.resource.data.count is int
-                      && request.resource.data.count == 1;
-        allow update: if isOwner(userId)
-                      && request.resource.data.diff(resource.data)
-                           .affectedKeys().hasOnly(['count'])
-                      && request.resource.data.count is int
-                      && resource.data.count is int
-                      && request.resource.data.count == resource.data.count + 1;
-        allow delete: if false;
+        allow write: if isOwner(userId);
       }
 
       // aiRefineUsage sub-collection — users/{userId}/aiRefineUsage/{monthKey}
-      // Stores monthly AI refine counts. Clients can only increment by exactly 1.
+      // Stores monthly AI refine counts; only the owner may read or write
       match /aiRefineUsage/{monthKey} {
         allow read: if isOwner(userId);
-        allow create: if isOwner(userId)
-                      && request.resource.data.keys().hasOnly(['count'])
-                      && request.resource.data.count is int
-                      && request.resource.data.count == 1;
-        allow update: if isOwner(userId)
-                      && request.resource.data.diff(resource.data)
-                           .affectedKeys().hasOnly(['count'])
-                      && request.resource.data.count is int
-                      && resource.data.count is int
-                      && request.resource.data.count == resource.data.count + 1;
-        allow delete: if false;
+        allow write: if isOwner(userId);
       }
     }
 
@@ -168,8 +120,7 @@ service cloud.firestore {
     // resources/{resourceId}
     // -----------------------------------------------------------------------
     match /resources/{resourceId} {
-      allow read: if resource.data.isPublic != false
-                  || (isAuth() && resource.data.authorId == request.auth.uid);
+      allow read: if true;
       allow create: if isAuth()
                     && request.resource.data.authorId == request.auth.uid;
       allow update: if isAuth()
@@ -183,19 +134,19 @@ service cloud.firestore {
 
       // ratings sub-collection — resources/{resourceId}/ratings/{userId}
       match /ratings/{userId} {
-        allow read: if canReadResourceDoc(resourceId);
+        allow read: if true;
         allow write: if isOwner(userId);
       }
 
       // saves sub-collection — resources/{resourceId}/saves/{userId}
       match /saves/{userId} {
-        allow read: if canReadResourceDoc(resourceId);
+        allow read: if true;
         allow write: if isOwner(userId);
       }
 
       // comments sub-collection — resources/{resourceId}/comments/{commentId}
       match /comments/{commentId} {
-        allow read: if canReadResourceDoc(resourceId);
+        allow read: if true;
         allow create: if isAuth()
                       && request.resource.data.authorId == request.auth.uid;
         allow update: if isAuth()
@@ -204,11 +155,6 @@ service cloud.firestore {
                            .affectedKeys().hasOnly(['content', 'editedAt']);
         allow delete: if isAuth()
                       && resource.data.authorId == request.auth.uid;
-
-        match /likes/{userId} {
-          allow read: if canReadResourceDoc(resourceId);
-          allow write: if isOwner(userId);
-        }
       }
     }
 
@@ -305,28 +251,9 @@ service cloud.firestore {
     // -----------------------------------------------------------------------
     match /inspiration/{itemId} {
       allow read: if true;
-      allow create: if isAuth()
-                    && request.resource.data.submittedBy == request.auth.uid;
+      allow create: if isAuth();
       allow update, delete: if isAuth()
                             && resource.data.submittedBy == request.auth.uid;
-
-      // comments sub-collection — inspiration/{itemId}/comments/{commentId}
-      match /comments/{commentId} {
-        allow read: if true;
-        allow create: if isAuth()
-                      && request.resource.data.authorId == request.auth.uid;
-        allow update: if isAuth()
-                      && resource.data.authorId == request.auth.uid
-                      && request.resource.data.diff(resource.data)
-                           .affectedKeys().hasOnly(['content', 'editedAt']);
-        allow delete: if isAuth()
-                      && resource.data.authorId == request.auth.uid;
-
-        match /likes/{userId} {
-          allow read: if true;
-          allow write: if isOwner(userId);
-        }
-      }
     }
 
     // -----------------------------------------------------------------------
@@ -334,16 +261,7 @@ service cloud.firestore {
     // -----------------------------------------------------------------------
     match /jobs/{jobId} {
       allow read: if true;
-      allow create: if isAuth()
-                    && (
-                      request.resource.data.postedBy == request.auth.uid
-                      || request.resource.data.postedById == request.auth.uid
-                    );
-      allow update, delete: if isAuth()
-                            && (
-                              resource.data.postedBy == request.auth.uid
-                              || resource.data.postedById == request.auth.uid
-                            );
+      allow create, update, delete: if isAdmin();
     }
 
     // -----------------------------------------------------------------------

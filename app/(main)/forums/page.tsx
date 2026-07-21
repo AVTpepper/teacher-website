@@ -20,6 +20,7 @@ import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
 import { timeAgo } from "@/lib/utils";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
 
 export default function ForumsPage() {
   const { user } = useAuth();
@@ -100,26 +101,17 @@ export default function ForumsPage() {
   );
 
   return (
-    <div className="flex-1 min-w-0 space-y-6 pb-8">
-      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
-        {/* Header */}
-        <div className="-mx-4 -mt-4 flex items-center justify-between flex-wrap gap-3 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-5 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl sm:p-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Community Voice</p>
-            <h1 className="mt-1 text-2xl font-bold">Forums</h1>
-            <p className="mt-2 text-sm text-primary-100/90">
-              Browse discussion categories and join conversations with fellow
-              educators.
-            </p>
-          </div>
-          {user && (
+    <div className="space-y-6">
+      <DiscoveryShell
+        title="Forums"
+        subtitle="Browse discussion categories and join conversations with fellow educators."
+        action={
+          user ? (
             <Button
-              variant="secondary"
               onClick={() => {
                 if (selectedCategory) {
                   openNewThread();
                 } else {
-                  // If no category selected, pick the first one by default
                   openNewThread(FORUM_CATEGORIES[0].id);
                 }
               }}
@@ -139,52 +131,11 @@ export default function ForumsPage() {
               </svg>
               New Discussion
             </Button>
-          )}
-        </div>
-
-        {selectedCategory && (
-          <div className="mt-4 space-y-3">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={backToCategories}
-                className="flex items-center gap-1 text-sm text-primary-800 hover:text-primary-950 transition-colors cursor-pointer"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-                All Categories
-              </button>
-            </div>
-
-            {selectedCategoryData && (
-              <div className="flex items-center gap-3 rounded-xl border border-primary-100 bg-secondary-50/70 p-4">
-                <span className="text-3xl">{selectedCategoryData.icon}</span>
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">
-                    {selectedCategoryData.name}
-                  </h2>
-                  <p className="text-sm text-muted">
-                    {selectedCategoryData.description}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          ) : null
+        }
+      />
 
       {/* Category Grid or Thread Listing */}
-      <div>
       {!selectedCategory ? (
         /* ===== Category Cards ===== */
         loadingCategories ? (
@@ -192,7 +143,7 @@ export default function ForumsPage() {
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="rounded-xl border border-primary-100 bg-secondary-50 shadow-card p-5 animate-pulse"
+                className="rounded-xl border border-border bg-surface shadow-card p-5 animate-pulse"
               >
                 <div className="h-10 w-10 rounded-lg bg-secondary-100 mb-3" />
                 <div className="h-4 w-2/3 bg-secondary-100 rounded mb-2" />
@@ -208,7 +159,6 @@ export default function ForumsPage() {
                 key={cat.id}
                 padding="lg"
                 hoverable
-                className="border-primary-100 bg-secondary-50/70"
                 onClick={() => selectCategory(cat.id)}
               >
                 <div className="text-3xl mb-3">{cat.icon}</div>
@@ -237,6 +187,43 @@ export default function ForumsPage() {
       ) : (
         /* ===== Thread Listing for Selected Category ===== */
         <div className="space-y-4">
+          {/* Back button + category header */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={backToCategories}
+              className="flex items-center gap-1 text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              All Categories
+            </button>
+          </div>
+
+          {selectedCategoryData && (
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{selectedCategoryData.icon}</span>
+              <div>
+                <h2 className="text-xl font-bold text-foreground">
+                  {selectedCategoryData.name}
+                </h2>
+                <p className="text-sm text-muted">
+                  {selectedCategoryData.description}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Thread list */}
           {loadingThreads && threads.length === 0 ? (
             <div className="space-y-3">
@@ -380,7 +367,6 @@ export default function ForumsPage() {
           )}
         </div>
       )}
-      </div>
     </div>
   );
 }

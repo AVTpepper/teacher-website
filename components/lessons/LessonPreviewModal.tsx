@@ -250,7 +250,7 @@ export default function LessonPreviewModal({
 
           {/* Copyright footer */}
           <div className="border-t border-secondary-200 pt-4 text-center text-xs text-secondary-400">
-            © {year} {authorName}. All rights reserved. Created on TeacherlyConnect.
+            © {year} {authorName} — All rights reserved. Created on VistaTeacher.
           </div>
         </div>
       </div>

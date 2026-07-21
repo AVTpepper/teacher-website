@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { getUser } from "@/lib/firestore/users";
 import NavSearchBar from "@/components/layout/NavSearchBar";
 import Avatar from "@/components/ui/Avatar";
 import Dropdown from "@/components/ui/Dropdown";
@@ -26,6 +27,24 @@ export default function Navbar() {
   const { user, loading, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) return;
+
+    getUser(user.uid)
+      .then((profile) => {
+        if (!cancelled) setIsAdmin(profile?.role === "admin");
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
@@ -47,16 +66,16 @@ export default function Navbar() {
       confirmLabel="Sign out"
       isDestructive={false}
     />
-    <header className="sticky top-0 z-50 border-b border-primary-700/60 bg-primary-950/95 text-primary-50 backdrop-blur supports-backdrop-filter:bg-primary-950/90 shadow-md">
+    <header className="sticky top-0 z-50 border-b border-primary-900/80 bg-primary-950 text-white backdrop-blur supports-backdrop-filter:bg-primary-950/95">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* Top row: Logo + Search + Actions */}
         <div className="flex h-14 items-center justify-between gap-4">
           {/* Logo */}
           <Link
             href={user ? "/home" : "/"}
-            className="shrink-0 text-lg font-bold text-accent-300"
+            className="shrink-0 text-lg font-bold text-white"
           >
-            TeacherlyConnect
+            VistaTeacher
           </Link>
 
           {/* Search - hidden on mobile, shown md+ */}
@@ -95,6 +114,16 @@ export default function Navbar() {
                           router.push("/account");
                         },
                       },
+                      ...(isAdmin
+                        ? [
+                            {
+                              label: "Admin Console",
+                              onClick: () => {
+                                router.push("/admin");
+                              },
+                            },
+                          ]
+                        : []),
                       {
                         label: "Sign out",
                         onClick: () => setSignOutOpen(true),
@@ -105,7 +134,7 @@ export default function Navbar() {
                 ) : (
                   <Link
                     href="/auth/login"
-                    className="rounded-lg bg-accent-400 px-3.5 py-1.5 text-sm font-semibold text-primary-950 hover:bg-accent-300 transition-colors"
+                    className="rounded-lg bg-primary-700 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-primary-800 transition-colors"
                   >
                     Sign in
                   </Link>
@@ -117,7 +146,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden rounded-lg p-2 text-primary-100 hover:bg-primary-800 hover:text-white transition-colors cursor-pointer"
+              className="lg:hidden rounded-lg p-2 text-white/90 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
               aria-label="Toggle menu"
               aria-expanded={mobileMenuOpen}
             >
@@ -162,8 +191,8 @@ export default function Navbar() {
               href={link.href}
               className={`px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 isActive(link.href)
-                  ? "border-accent-400 text-accent-200"
-                  : "border-transparent text-primary-100 hover:text-accent-100 hover:border-primary-600"
+                  ? "border-white text-white"
+                  : "border-transparent text-white/75 hover:text-white hover:border-white/40"
               }`}
             >
               {link.label}
@@ -175,16 +204,16 @@ export default function Navbar() {
 
     {/* Mobile menu - rendered outside header to avoid stacking context issues */}
     {mobileMenuOpen && (
-      <div className="fixed inset-0 top-14 z-40 overflow-y-auto lg:hidden">
+      <div className="fixed inset-0 top-14 z-40 lg:hidden">
         {/* Backdrop overlay - below header */}
         <div
-          className="absolute inset-0 bg-primary-950/65"
+          className="absolute inset-0 bg-black/40"
           onClick={() => setMobileMenuOpen(false)}
           aria-hidden="true"
         />
 
         {/* Menu panel */}
-        <div className="absolute left-0 right-0 top-0 border-t border-primary-700 bg-primary-900 shadow-lg max-h-[calc(100dvh-3.5rem)] overflow-y-auto">
+        <div className="absolute left-0 right-0 top-0 border-t border-primary-900/50 bg-primary-950 shadow-lg">
           {/* Mobile search */}
           <div className="px-4 py-3 md:hidden">
             <NavSearchBar
@@ -193,16 +222,16 @@ export default function Navbar() {
             />
           </div>
 
-          <nav className="px-2 pb-6 space-y-1" aria-label="Mobile">
+          <nav className="px-2 pb-3 space-y-1" aria-label="Mobile">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`block w-max rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   isActive(link.href)
-                      ? "bg-accent-300 text-primary-950"
-                      : "text-primary-100 hover:bg-primary-800 hover:text-accent-100"
+                    ? "bg-white/10 text-white"
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {link.label}

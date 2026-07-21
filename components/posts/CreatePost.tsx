@@ -43,9 +43,10 @@ const GRADE_OPTIONS = [
 
 interface CreatePostProps {
   onPostCreated?: () => void;
+  embedded?: boolean;
 }
 
-export default function CreatePost({ onPostCreated }: CreatePostProps) {
+export default function CreatePost({ onPostCreated, embedded = false }: CreatePostProps) {
   const { user } = useAuth();
   const mentionInputRef = useRef<MentionInputHandle>(null);
   const [content, setContent] = useState("");
@@ -114,7 +115,9 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface shadow-card p-4">
+    <div className={embedded
+      ? "rounded-2xl border border-secondary-200 bg-surface-hover/85 p-4"
+      : "rounded-xl border border-border bg-surface shadow-card p-4"}>
       <div className="flex gap-3">
         <Avatar
           src={user.photoURL}
@@ -131,7 +134,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
             onFocus={() => setExpanded(true)}
             placeholder="Share an idea, resource, or start a discussion... (type @ to mention someone)"
             rows={expanded ? 4 : 2}
-            className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-ring hover:border-border-strong"
+            className={`w-full resize-none rounded-lg border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${embedded ? "border-secondary-200 bg-white hover:border-border-strong focus-visible:border-primary-300" : "border-border bg-white hover:border-border-strong focus-visible:border-primary-300"}`}
           />
         </div>
       </div>
@@ -159,10 +162,10 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                 key={pt.value}
                 type="button"
                 onClick={() => setType(pt.value)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors cursor-pointer ${
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
                   type === pt.value
-                    ? "bg-primary-900 text-white"
-                    : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
+                    ? "border-primary-300 bg-primary-50 text-primary-900"
+                    : "border-primary-100 bg-surface text-primary-800 hover:border-primary-200 hover:bg-surface-hover"
                 }`}
               >
                 {pt.label}
@@ -181,10 +184,10 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                   key={g}
                   type="button"
                   onClick={() => setGradeLevel(gradeLevel === g ? "" : g)}
-                  className={`px-2.5 py-1 text-xs rounded-full transition-colors cursor-pointer ${
+                  className={`rounded-full border px-2.5 py-1 text-xs transition-colors cursor-pointer ${
                     gradeLevel === g
-                      ? "bg-primary-900 text-white"
-                      : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
+                      ? "border-primary-300 bg-primary-50 text-primary-900"
+                      : "border-primary-100 bg-surface text-primary-800 hover:border-primary-200 hover:bg-surface-hover"
                   }`}
                 >
                   {g}
@@ -231,6 +234,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
             </Button>
             <Button
               size="sm"
+              className="bg-primary-700 text-white hover:bg-primary-800 active:bg-primary-900"
               onClick={handleSubmit}
               isLoading={submitting}
               disabled={!content.trim()}

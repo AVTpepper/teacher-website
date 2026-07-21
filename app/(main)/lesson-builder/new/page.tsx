@@ -17,6 +17,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
 import { checkAndAwardBadges } from "@/lib/badges";
 import {
   createLesson,
@@ -27,7 +28,7 @@ import {
   type LessonStep,
   type LessonAttachment,
 } from "@/lib/firestore/lessons";
-import { Badge, Button, Card, Input, Select, Spinner, Textarea, TextButton } from "@/components/ui";
+import { Badge, Button, Card, Input, Select, Spinner, Textarea } from "@/components/ui";
 import AIAssistantPanel, { type LessonFormState, type ApplySuggestionPayload } from "@/components/lessons/AIAssistantPanel";
 import WizardShell from "@/components/lessons/wizard/WizardShell";
 import AIGenerateScreen from "@/components/lessons/wizard/AIGenerateScreen";
@@ -57,7 +58,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
-      reject(new Error("Upload timed out. Please try again."));
+      reject(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
     }, timeoutMs);
   });
   try {
@@ -119,123 +120,29 @@ function LessonBuilderNewEntry() {
 
   useEffect(() => {
     if (!isCompleteFlow || !draftParam) return;
-    let cancelled = false;
-
-    async function loadCompleteDraft() {
-      if (!user) {
-        if (!cancelled) {
-          setCompleteLoadError("Sign in to continue a draft.");
-          setCompleteLoading(false);
-        }
-        return;
-      }
-
-      if (!draftParam) {
-        if (!cancelled) {
-          setCompleteLoadError("Draft not found.");
-          setCompleteLoading(false);
-        }
-        return;
-      }
-
-      if (!cancelled) {
-        setCompleteLoading(true);
-        setCompleteLoadError(null);
-      }
-
-      try {
-        const lesson = await getLesson(draftParam);
-        if (cancelled) return;
-        if (!lesson) {
-          setCompleteLoadError("Draft not found.");
-          return;
-        }
-        if (lesson.authorId !== user.uid) {
-          setCompleteLoadError("You can only continue drafts you created.");
-          return;
-        }
+    setCompleteLoading(true);
+    getLesson(draftParam)
+      .then((lesson) => {
+        if (!lesson) { setCompleteLoadError("Draft not found."); return; }
         setCompleteLoadedState(lessonToWizardState(lesson));
-      } catch {
-        if (!cancelled) {
-          setCompleteLoadError("Failed to load draft. Please try again.");
-        }
-      } finally {
-        if (!cancelled) {
-          setCompleteLoading(false);
-        }
-      }
-    }
-
-    void loadCompleteDraft();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isCompleteFlow, draftParam, user]);
+      })
+      .catch(() => setCompleteLoadError("Failed to load draft. Please try again."))
+      .finally(() => setCompleteLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!isEditOrRemix || !user) return;
     const lessonId = editingLessonId ?? remixLessonId;
     if (!lessonId) return;
-    let cancelled = false;
-
-    async function loadEditOrRemixLesson() {
-      if (!user) {
-        if (!cancelled) {
-          setEditLoadError("Sign in to edit or remix lessons.");
-          setEditLoading(false);
-        }
-        return;
-      }
-
-      if (!lessonId) {
-        if (!cancelled) {
-          setEditLoadError("Lesson not found.");
-          setEditLoading(false);
-        }
-        return;
-      }
-
-      if (!cancelled) {
-        setEditLoading(true);
-        setEditLoadError(null);
-      }
-
-      try {
-        const lesson = await getLesson(lessonId);
-        if (cancelled) return;
-        if (!lesson) {
-          setEditLoadError("Lesson not found.");
-          return;
-        }
-        if (lesson.authorId !== user.uid) {
-          if (editingLessonId) {
-            setEditLoadError("You can only edit lessons you created.");
-            return;
-          }
-          // Remix is allowed for public lessons only.
-          if (!lesson.isPublic) {
-            setEditLoadError("You can only remix public lessons.");
-            return;
-          }
-        }
+    setEditLoading(true);
+    getLesson(lessonId)
+      .then((lesson) => {
+        if (!lesson) { setEditLoadError("Lesson not found."); return; }
         setEditLoadedState(lessonToWizardState(lesson));
-      } catch {
-        if (!cancelled) {
-          setEditLoadError("Failed to load lesson. Please try again.");
-        }
-      } finally {
-        if (!cancelled) {
-          setEditLoading(false);
-        }
-      }
-    }
-
-    void loadEditOrRemixLesson();
-
-    return () => {
-      cancelled = true;
-    };
+      })
+      .catch(() => setEditLoadError("Failed to load lesson. Please try again."))
+      .finally(() => setEditLoading(false));
   }, [isEditOrRemix, user, editingLessonId, remixLessonId]);
 
   // Detect existing draft for the current user (skip when bypassing for edit/remix)
@@ -358,7 +265,7 @@ function LessonBuilderNewEntry() {
         user={user}
         initialDraftId={resumeDraftId}
         isAvailable={process.env.NEXT_PUBLIC_AI_AVAILABLE === "true"}
-        onExit={() => { setWizardPath(null); setResumeDraftId(null); }}
+        onExit={() => router.push("/lesson-builder")}
       />
     );
   }
@@ -375,11 +282,7 @@ function LessonBuilderNewEntry() {
           initialCompletedSteps={new Set([1, 2, 3, 4, 5, 6, 7])}
           startAtStep={7}
           isAvailable={process.env.NEXT_PUBLIC_AI_AVAILABLE === "true"}
-          onExit={() => {
-            setWizardPath(null);
-            setAiGeneratedState(null);
-            setAiDraftId(null);
-          }}
+          onExit={() => router.push("/lesson-builder")}
         />
       );
     }
@@ -391,63 +294,53 @@ function LessonBuilderNewEntry() {
           setAiGeneratedState(state);
           setAiDraftId(draftId);
         }}
-        onBack={() => router.push("/lesson-builder")}
+          onBack={() => router.push("/lesson-builder")}
       />
     );
   }
 
   // Entry screen
   return (
-    <main className="space-y-5">
-      <section className="-mx-4 -mt-4 rounded-t-2xl border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 px-5 py-4 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 sm:px-6">
-        <div className="mx-auto w-full max-w-4xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent-300">
-            Lesson Builder
+    <main className="pb-8 px-4">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
+      {/* AC-5: Draft resume banner */}
+      {!bannerDismissed && draft && (
+        <div
+          role="alert"
+          className="w-full max-w-2xl rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="text-sm font-medium text-primary-800">
+            You have an unfinished lesson draft
+            {draft.title ? `: "${draft.title}"` : ""}
           </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">
-            How would you like to create your lesson?
-          </h1>
-          <p className="mt-2 text-base text-primary-100/90">
-            Choose the path that fits your workflow, then build from there.
-          </p>
-        </div>
-      </section>
-
-      <div className="mx-auto w-full max-w-4xl space-y-5">
-
-        {/* AC-5: Draft resume banner */}
-        {!bannerDismissed && draft && (
-          <div
-            role="alert"
-            className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <p className="text-sm font-medium text-amber-800">
-              You have an unfinished lesson draft
-              {draft.title ? `: "${draft.title}"` : ""}
-            </p>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                size="sm"
-                onClick={() => {
-                  setResumeDraftId(draft.id);
-                  setWizardPath("manual");
-                }}
-              >
-                Resume
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setBannerDismissed(true)}
-              >
-                Start fresh
-              </Button>
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              onClick={() => {
+                setResumeDraftId(draft.id);
+                setWizardPath("manual");
+              }}
+            >
+              Resume
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBannerDismissed(true)}
+            >
+              Start fresh
+            </Button>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* AC-1: Two path cards */}
-        <div className="grid w-full gap-4 sm:grid-cols-2">
+      <DiscoveryShell
+        title="Lesson Builder"
+        subtitle="How would you like to create your lesson?"
+      />
+
+      {/* AC-1: Two path cards */}
+      <div className="grid w-full max-w-2xl gap-4 sm:grid-cols-2">
         {/* Create My Own */}
         <button
           type="button"
@@ -497,7 +390,7 @@ function LessonBuilderNewEntry() {
 // Existing editor (edit / remix bypass - retained for US-13)
 // ------------------------------------------------------------
 
-export function LessonBuilderNewInner() {
+function LessonBuilderNewInner() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -690,14 +583,10 @@ export function LessonBuilderNewInner() {
           existingContent,
           lessonContext: {
             title: title.trim() || undefined,
-            duration: duration.trim() || undefined,
             objectives: objectives.filter((o) => o.trim()),
-            materials: materials.filter((m) => m.trim()),
             steps: steps
-              .filter((s) => s.title.trim() || s.description.trim())
+              .filter((s) => s.title.trim())
               .map((s) => ({ title: s.title, description: s.description })),
-            checkForUnderstanding: checkForUnderstanding.filter((c) => c.trim()),
-            assessments: assessments.filter((a) => a.trim()),
           },
         }),
         signal: controller.signal,
@@ -723,7 +612,7 @@ export function LessonBuilderNewInner() {
       else if (remField === null) setRemainingRequests(null);
     } catch (err) {
       let msg: string;
-      if (err instanceof Error && err.name === "AbortError") {
+      if (err instanceof Error && (err.name === "AbortError" || err.name === "TimeoutError")) {
         msg = "The AI took too long to respond. Please try again.";
       } else if (err instanceof TypeError) {
         msg = "Could not reach the AI service. Check your connection and try again.";
@@ -915,8 +804,9 @@ export function LessonBuilderNewInner() {
       const url = await withTimeout(getDownloadURL(storageRef), UPLOAD_TIMEOUT_MS);
       setAttachments((prev) => [...prev, { name: file.name, url }]);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "";
-      if (message.toLowerCase().includes("timed out")) {
+      const message = err instanceof Error ? err.message.toLowerCase() : "";
+      const name = err instanceof Error ? err.name : "";
+      if (name === "TimeoutError" || message.includes("timeout") || message.includes("timed out")) {
         setError("Upload timed out. If Storage is not active yet, skip attachments for now.");
       } else {
         setError("Failed to upload file. If Storage is not active yet, skip attachments for now.");
@@ -1024,9 +914,9 @@ export function LessonBuilderNewInner() {
     const cleanAssessments = assessments.map((a) => a.trim()).filter(Boolean);
 
     return (
-      <div className="py-8 max-w-3xl mx-auto">
+      <div className="mx-auto max-w-3xl space-y-6 pb-8">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="text-xl font-semibold text-foreground">
             Lesson Preview
           </h2>
           <Button variant="outline" size="sm" onClick={() => setPreview(false)}>
@@ -1040,7 +930,7 @@ export function LessonBuilderNewInner() {
               {gradeLevel && <Badge variant="default">{gradeLevel}</Badge>}
               {subject && <Badge variant="info">{subject}</Badge>}
             </div>
-            <h1 className="text-2xl font-bold text-foreground">
+            <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
               {title || "Untitled Lesson"}
             </h1>
             <div className="mt-2 flex items-center gap-2 text-sm text-muted">
@@ -1193,7 +1083,7 @@ export function LessonBuilderNewInner() {
   // --- Editor mode ---
 
   return (
-    <div className="py-8 flex items-start gap-6">
+    <div className="flex items-start gap-6 pb-8">
       {/* Floating AI button - mobile only, replaces the sidebar drawer button */}
       {!aiPanelOpen && isAvailable && (
         <button
@@ -1230,12 +1120,13 @@ export function LessonBuilderNewInner() {
         </div>
         <div className="flex items-center gap-2">
           {/* AI Assistant toggle */}
-          <TextButton
+          <button
             ref={aiToggleButtonRef}
+            type="button"
             onClick={() => setAiPanelOpen((prev) => !prev)}
             aria-expanded={aiPanelOpen}
             aria-controls="ai-assistant-panel"
-            className="gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-primary-800 hover:bg-primary-100 focus-visible:ring-primary-500"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-800 hover:bg-primary-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer"
           >
             <svg
               className="h-4 w-4"
@@ -1252,7 +1143,7 @@ export function LessonBuilderNewInner() {
               />
             </svg>
             AI Assistant
-          </TextButton>
+          </button>
           <Link href="/lesson-builder/drafts">
             <Button variant="outline" size="sm" type="button">
               View Drafts
@@ -1286,7 +1177,7 @@ export function LessonBuilderNewInner() {
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Basic info */}
         <Card padding="lg" className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Basic Info</h2>
+          <h2 className="text-xl font-semibold text-foreground">Basic Info</h2>
 
           <Input
             label="Lesson Title"
@@ -1326,7 +1217,7 @@ export function LessonBuilderNewInner() {
         {/* Learning objectives */}
         <Card padding="lg" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-xl font-semibold text-foreground">
               🎯 Learning Objectives
             </h2>
             <div className="flex items-center gap-2">
@@ -1404,7 +1295,7 @@ export function LessonBuilderNewInner() {
         {/* Materials needed */}
         <Card padding="lg" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-xl font-semibold text-foreground">
               📦 Materials Needed
             </h2>
             <div className="flex items-center gap-2">
@@ -1482,7 +1373,7 @@ export function LessonBuilderNewInner() {
         {/* Step-by-step plan */}
         <Card padding="lg" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-xl font-semibold text-foreground">
               📋 Step-by-Step Plan
             </h2>
             {aiPanelOpen && isAvailable && (
@@ -1613,7 +1504,7 @@ export function LessonBuilderNewInner() {
         {/* Check for Understanding */}
         <Card padding="lg" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-xl font-semibold text-foreground">
               ❓ Check for Understanding
             </h2>
             <div className="flex items-center gap-2">
@@ -1694,7 +1585,7 @@ export function LessonBuilderNewInner() {
         {/* Suggested Assessments */}
         <Card padding="lg" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-xl font-semibold text-foreground">
               📝 Suggested Assessments
             </h2>
             <div className="flex items-center gap-2">
@@ -1774,7 +1665,7 @@ export function LessonBuilderNewInner() {
 
         {/* Attachments */}
         <Card padding="lg" className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="text-xl font-semibold text-foreground">
             📎 Attachments
           </h2>
 
@@ -1820,7 +1711,7 @@ export function LessonBuilderNewInner() {
             <p className="mt-1 text-xs text-muted">
               {!STORAGE_CONFIGURED
                 ? "File uploads are disabled until Firebase Storage is activated."
-                : `Max file size: 25 MB${uploading ? ". Uploading..." : ""}`}
+                : `Max file size: 25 MB${uploading ? " - Uploading..." : ""}`}
             </p>
           </div>
         </Card>
@@ -1869,3 +1760,5 @@ export function LessonBuilderNewInner() {
     </div>
   );
 }
+
+void LessonBuilderNewInner;

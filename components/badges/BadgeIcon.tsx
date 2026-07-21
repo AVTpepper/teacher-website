@@ -7,14 +7,14 @@ import { getBadge, type BadgeDefinition } from "@/lib/badges";
 // ---------------------------------------------------------------------------
 
 const COLOR_CLASSES: Record<BadgeDefinition["color"], string> = {
-  blue: "bg-blue-100 text-blue-700 border-blue-200",
-  green: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  purple: "bg-purple-100 text-purple-700 border-purple-200",
-  amber: "bg-amber-100 text-amber-700 border-amber-200",
-  teal: "bg-teal-100 text-teal-700 border-teal-200",
-  pink: "bg-pink-100 text-pink-700 border-pink-200",
-  gold: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  maroon: "bg-red-100 text-red-900 border-red-200",
+  blue: "bg-info-50 text-info-700 border-info-500/25",
+  green: "bg-success-50 text-success-700 border-success-500/25",
+  purple: "bg-primary-100 text-primary-800 border-primary-500/25",
+  amber: "bg-accent-50 text-accent-700 border-accent-500/25",
+  teal: "bg-secondary-100 text-secondary-800 border-secondary-500/25",
+  pink: "bg-accent-100 text-accent-800 border-accent-500/25",
+  gold: "bg-accent-50 text-accent-700 border-accent-500/25",
+  maroon: "bg-error-50 text-error-700 border-error-500/25",
 };
 
 // ---------------------------------------------------------------------------

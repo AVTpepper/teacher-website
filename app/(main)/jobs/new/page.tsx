@@ -1,16 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
+import { GRADE_LEVELS, SUBJECTS, getUser } from "@/lib/firestore/users";
 import { createJob, JOB_TYPES, jobSlug, type JobType } from "@/lib/firestore/jobs";
 import { Button, Card, Input, Select, Textarea } from "@/components/ui";
 
 export default function PostJobPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingRole, setCheckingRole] = useState(true);
 
   const [title, setTitle] = useState("");
   const [organization, setOrganization] = useState("");
@@ -23,14 +24,48 @@ export default function PostJobPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) return;
+
+    getUser(user.uid)
+      .then((profile) => {
+        if (!cancelled) setIsAdmin(profile?.role === "admin");
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingRole(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   if (!user) {
     return (
       <div className="py-16 text-center">
         <p className="text-foreground font-medium">You must be signed in to post a job.</p>
-        <div className="mt-4 flex justify-center gap-2">
-          <Button variant="secondary" onClick={() => router.push("/auth/signup?redirect=/jobs/new")}>Create Account</Button>
-          <Button variant="primary" onClick={() => router.push("/auth/login?redirect=/jobs/new")}>Sign In</Button>
-        </div>
+        <Button variant="primary" className="mt-4" onClick={() => router.push("/auth/login")}>
+          Sign In
+        </Button>
+      </div>
+    );
+  }
+
+  if (checkingRole) {
+    return (
+      <div className="py-16 text-center text-sm text-muted">Checking permissions…</div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="py-16 text-center">
+        <p className="text-foreground font-medium">Only admin users can post jobs.</p>
+        <Button variant="outline" className="mt-4" onClick={() => router.push("/jobs")}>Back to Jobs</Button>
       </div>
     );
   }
@@ -68,19 +103,10 @@ export default function PostJobPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-8">
+    <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <Link href="/jobs">
-          <Button type="button" variant="outline" size="sm">
-            Back to Jobs
-          </Button>
-        </Link>
-      </div>
-
-      <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
-        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Hiring</p>
-        <h1 className="text-2xl font-bold">Post a Job</h1>
-        <p className="mt-1 text-sm text-primary-100/90">
+        <h1 className="text-3xl font-bold text-foreground sm:text-4xl">Post a Job</h1>
+        <p className="mt-1 text-sm text-muted">
           Share a teaching or education-related position with the community.
         </p>
       </div>

@@ -94,12 +94,12 @@ export default function SignupPage() {
   }
 
   return (
-    <Card padding="lg" className="border-primary-300/60 bg-surface/95">
-      <h1 className="text-2xl font-bold text-foreground text-center">
+    <Card padding="lg">
+      <h1 className="text-3xl font-bold text-foreground text-center sm:text-4xl">
         Create Account
       </h1>
       <p className="mt-1 text-sm text-muted text-center">
-        Join TeacherlyConnect and connect with educators worldwide.
+        Join VistaTeacher and connect with educators worldwide.
       </p>
 
       {error && (
@@ -140,7 +140,7 @@ export default function SignupPage() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-[38px] text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute right-3 top-9.5 text-muted-foreground hover:text-foreground transition-colors"
             tabIndex={-1}
           >
             {showPassword ? (
@@ -168,7 +168,7 @@ export default function SignupPage() {
           <button
             type="button"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute right-3 top-[38px] text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute right-3 top-9.5 text-muted-foreground hover:text-foreground transition-colors"
             tabIndex={-1}
           >
             {showConfirmPassword ? (
@@ -184,7 +184,7 @@ export default function SignupPage() {
           </button>
         </div>
 
-        <Button type="submit" variant="secondary" className="w-full" isLoading={loading}>
+        <Button type="submit" className="w-full" isLoading={loading}>
           Create Account
         </Button>
       </form>
@@ -227,7 +227,7 @@ export default function SignupPage() {
         Already have an account?{" "}
         <Link
           href="/auth/login"
-          className="font-semibold text-primary-900 hover:text-primary-700"
+          className="font-medium text-primary-900 hover:text-primary-700"
         >
           Sign in
         </Link>

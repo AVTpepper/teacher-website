@@ -2,15 +2,19 @@
 
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   updateProfile,
   reauthenticateWithCredential,
   EmailAuthProvider,
   updatePassword,
+  deleteUser,
 } from "firebase/auth";
+import { doc, deleteDoc, collection, getDocs } from "firebase/firestore";
 
 import { useAuth } from "@/lib/auth-context";
-import { getUser, updateUser, type UserProfile } from "@/lib/firestore/users";
+import { db } from "@/lib/firebase";
+import { getUser, updateUser } from "@/lib/firestore/users";
 import { Button, Input, Card, Badge, ConfirmDialog } from "@/components/ui";
 
 interface Toast {
@@ -25,95 +29,9 @@ interface PasswordErrors {
   confirmPassword?: string;
 }
 
-type BillingProfileSnapshot = Pick<
-  UserProfile,
-  | "stripeCustomerId"
-  | "stripeSubscriptionId"
-  | "stripeSubscriptionStatus"
-  | "stripeCurrentPeriodEnd"
-  | "stripeCancelAt"
-  | "stripeCancelAtPeriodEnd"
-  | "stripeCanceledAt"
-  | "stripeLastSyncedAt"
-  | "updatedAt"
->;
-
-function maskStripeId(value?: string): string {
-  if (!value) return "Not linked";
-  if (value.length <= 10) return value;
-  return `${value.slice(0, 6)}...${value.slice(-4)}`;
-}
-
-function formatBillingStatus(status?: string): string {
-  if (!status) return "No subscription yet";
-  return status
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function formatDateTime(value: unknown): string {
-  if (!value) return "Not available";
-
-  let date: Date | null = null;
-
-  if (typeof value === "number") {
-    date = new Date(value * 1000);
-  } else if (value instanceof Date) {
-    date = value;
-  } else if (typeof value === "string") {
-    const parsed = new Date(value);
-    date = Number.isNaN(parsed.getTime()) ? null : parsed;
-  } else if (
-    typeof value === "object" &&
-    value !== null &&
-    "seconds" in value &&
-    typeof (value as { seconds?: unknown }).seconds === "number"
-  ) {
-    date = new Date(((value as { seconds: number }).seconds) * 1000);
-  } else if (
-    typeof value === "object" &&
-    value !== null &&
-    "toDate" in value &&
-    typeof (value as { toDate?: unknown }).toDate === "function"
-  ) {
-    date = (value as { toDate: () => Date }).toDate();
-  }
-
-  if (!date || Number.isNaN(date.getTime())) return "Not available";
-
-  return date.toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function getBillingCycleLabel(profile: BillingProfileSnapshot | null, tier: "free" | "plus" | null): string {
-  if (!profile) return "No billing cycle yet";
-
-  const cycleEnd = profile.stripeCurrentPeriodEnd ?? profile.stripeCancelAt ?? profile.stripeCanceledAt;
-  if (!cycleEnd) {
-    return tier === "plus" ? "Awaiting Stripe sync" : "No active billing cycle";
-  }
-
-  if (profile.stripeCancelAtPeriodEnd) {
-    return `Access ends ${formatDateTime(cycleEnd)}`;
-  }
-
-  if (tier === "plus") {
-    return `Renews ${formatDateTime(cycleEnd)}`;
-  }
-
-  return `Ended ${formatDateTime(cycleEnd)}`;
-}
-
 export default function AccountManagementPage() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const isSandboxBilling = (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "").startsWith("pk_test_");
 
   // Display name state
   const [displayName, setDisplayName] = useState("");
@@ -122,8 +40,6 @@ export default function AccountManagementPage() {
   // Tier state
   const [tier, setTier] = useState<"free" | "plus" | null>(null);
   const [loadingTier, setLoadingTier] = useState(true);
-  const [billingLoading, setBillingLoading] = useState(false);
-  const [billingProfile, setBillingProfile] = useState<BillingProfileSnapshot | null>(null);
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -135,12 +51,10 @@ export default function AccountManagementPage() {
   // Delete account state
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [cancelSubscriptionOpen, setCancelSubscriptionOpen] = useState(false);
 
   // Toast state
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastCounter = useRef(0);
-  const tierRefreshTimerRef = useRef<number | null>(null);
 
   function addToast(message: string, type: "success" | "error" = "success") {
     const id = ++toastCounter.current;
@@ -160,110 +74,17 @@ export default function AccountManagementPage() {
   // Pre-fill display name and load tier from Firestore
   useEffect(() => {
     if (!user) return;
-
-    let cancelled = false;
-    const userId = user.uid;
-
-    function applyProfile(profile: UserProfile | null) {
-      if (profile) {
-        setTier(profile.tier ?? "free");
-        setBillingProfile({
-          stripeCustomerId: profile.stripeCustomerId,
-          stripeSubscriptionId: profile.stripeSubscriptionId,
-          stripeSubscriptionStatus: profile.stripeSubscriptionStatus,
-          stripeCurrentPeriodEnd: profile.stripeCurrentPeriodEnd,
-          stripeCancelAt: profile.stripeCancelAt,
-          stripeCancelAtPeriodEnd: profile.stripeCancelAtPeriodEnd,
-          stripeCanceledAt: profile.stripeCanceledAt,
-          stripeLastSyncedAt: profile.stripeLastSyncedAt,
-          updatedAt: profile.updatedAt,
-        });
-      } else {
-        setTier("free");
-        setBillingProfile(null);
-      }
-    }
-
-    async function loadTier() {
-      try {
-        const profile = await getUser(userId);
-        if (cancelled) return;
-        applyProfile(profile);
-      } catch {
-        if (!cancelled) {
-          setTier("free");
-          setBillingProfile(null);
-        }
-      } finally {
-        if (!cancelled) setLoadingTier(false);
-      }
-    }
-
     setDisplayName(user.displayName || "");
-    setLoadingTier(true);
-    void loadTier();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const billing = params.get("billing");
-
-    const clearTierRefreshTimer = () => {
-      if (tierRefreshTimerRef.current !== null) {
-        window.clearTimeout(tierRefreshTimerRef.current);
-        tierRefreshTimerRef.current = null;
-      }
-    };
-
-    const refreshTierFromFirestore = async () => {
-      if (!user) return;
-      try {
-        const profile = await getUser(user.uid);
-        setTier(profile?.tier ?? "free");
-        setBillingProfile(
-          profile
-            ? {
-                stripeCustomerId: profile.stripeCustomerId,
-                stripeSubscriptionId: profile.stripeSubscriptionId,
-                stripeSubscriptionStatus: profile.stripeSubscriptionStatus,
-                stripeCurrentPeriodEnd: profile.stripeCurrentPeriodEnd,
-                stripeCancelAt: profile.stripeCancelAt,
-                stripeCancelAtPeriodEnd: profile.stripeCancelAtPeriodEnd,
-                stripeCanceledAt: profile.stripeCanceledAt,
-                stripeLastSyncedAt: profile.stripeLastSyncedAt,
-                updatedAt: profile.updatedAt,
-              }
-            : null,
-        );
-      } catch {
-        // Ignore - the normal account view already has a fallback state.
-      }
-    };
-
-    if (billing === "success") {
-      addToast("Subscription updated. Your Plus access will refresh shortly.");
-      params.delete("billing");
-      const qs = params.toString();
-      window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
-
-      clearTierRefreshTimer();
-      void refreshTierFromFirestore();
-
-      tierRefreshTimerRef.current = window.setTimeout(() => {
-        void refreshTierFromFirestore();
-      }, 2500);
-    } else if (billing === "cancelled") {
-      addToast("Checkout was cancelled.", "error");
-      params.delete("billing");
-      const qs = params.toString();
-      window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
-    }
-
-    return clearTierRefreshTimer;
+    getUser(user.uid)
+      .then((profile) => {
+        if (profile) {
+          setTier(profile.tier ?? "free");
+        } else {
+          setTier("free");
+        }
+      })
+      .catch(() => setTier("free"))
+      .finally(() => setLoadingTier(false));
   }, [user]);
 
   if (authLoading || !user) {
@@ -362,20 +183,20 @@ export default function AccountManagementPage() {
     if (!user) return;
     setDeleting(true);
     try {
-      const token = await user.getIdToken();
-      const res = await fetch("/api/account/delete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // Delete Firebase Auth account first (most likely to require recent login).
+      // If this throws, Firestore data is untouched and the user can retry.
+      await deleteUser(user);
 
-      if (!res.ok) {
-        throw new Error("delete_queue_failed");
+      // Auth deletion succeeded — now clean up Firestore data.
+      if (db) {
+        const uid = user.uid;
+        const SUBCOLLECTIONS = ["aiUsage", "aiRefineUsage", "followers", "following", "notifications"];
+        for (const sub of SUBCOLLECTIONS) {
+          const snap = await getDocs(collection(db, "users", uid, sub));
+          await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+        }
+        await deleteDoc(doc(db, "users", uid));
       }
-
-      await signOut();
 
       // Clear session cookie and redirect to landing page.
       document.cookie = "__session=; path=/; max-age=0";
@@ -387,76 +208,6 @@ export default function AccountManagementPage() {
         "Failed to delete account. Please sign out, sign back in, and try again.",
         "error"
       );
-    }
-  }
-
-  async function beginCheckout() {
-    if (billingLoading) return;
-    setBillingLoading(true);
-    router.push("/account/upgrade");
-  }
-
-  async function openBillingPortal() {
-    if (!user || billingLoading) return;
-    setBillingLoading(true);
-    try {
-      const token = await user.getIdToken();
-      const res = await fetch("/api/billing/portal", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
-      if (!res.ok || !data.url) {
-        throw new Error(data.error ?? "portal_failed");
-      }
-
-      window.location.assign(data.url);
-    } catch {
-      addToast("Unable to open billing portal right now.", "error");
-      setBillingLoading(false);
-    }
-  }
-
-  async function cancelSubscription() {
-    if (!user || billingLoading) return;
-    setBillingLoading(true);
-    try {
-      const token = await user.getIdToken();
-      const res = await fetch("/api/billing/cancel", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        throw new Error(data.error ?? "cancel_failed");
-      }
-
-      setTier("free");
-      setBillingProfile((prev) => ({
-        stripeCustomerId: prev?.stripeCustomerId,
-        stripeSubscriptionId: prev?.stripeSubscriptionId,
-        stripeSubscriptionStatus: "canceled",
-        stripeCurrentPeriodEnd: prev?.stripeCurrentPeriodEnd ?? null,
-        stripeCancelAt: prev?.stripeCancelAt ?? null,
-        stripeCancelAtPeriodEnd: false,
-        stripeCanceledAt: Math.floor(Date.now() / 1000),
-        stripeLastSyncedAt: new Date(),
-        updatedAt: prev?.updatedAt,
-      }));
-      setCancelSubscriptionOpen(false);
-      addToast("Subscription canceled. Your account has been moved back to Free.");
-    } catch {
-      addToast("Unable to cancel subscription right now.", "error");
-    } finally {
-      setBillingLoading(false);
     }
   }
 
@@ -492,19 +243,6 @@ export default function AccountManagementPage() {
         confirmLabel="Delete Account"
         isDestructive
         isLoading={deleting}
-      />
-
-      <ConfirmDialog
-        isOpen={cancelSubscriptionOpen}
-        onClose={() => {
-          if (!billingLoading) setCancelSubscriptionOpen(false);
-        }}
-        onConfirm={cancelSubscription}
-        title="Cancel Plus subscription"
-        description="This immediately cancels the current Stripe subscription and moves the account back to the Free tier."
-        confirmLabel="Cancel Subscription"
-        isDestructive
-        isLoading={billingLoading}
       />
 
       <div className="max-w-2xl mx-auto space-y-6 pb-12">
@@ -557,75 +295,21 @@ export default function AccountManagementPage() {
           <h2 className="text-base font-semibold text-foreground mb-4">
             Subscription Tier
           </h2>
-          {isSandboxBilling && tier !== "plus" && (
-            <div className="mb-4 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
-              <p className="font-semibold">Sandbox early-access Plus</p>
-              <p className="mt-1">
-                This site is using Stripe test mode. Early users can upgrade themselves to Plus for free using the Stripe test card:
-                <span className="font-medium"> 4242 4242 4242 4242</span>.
-              </p>
-              <p className="mt-1 text-xs">
-                Use any future expiry date, any 3-digit CVC, and any ZIP/postcode.
-              </p>
-            </div>
-          )}
           {loadingTier ? (
             <div className="h-5 w-16 bg-secondary-100 rounded animate-pulse" />
           ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 flex-wrap">
-                <Badge variant={tier === "plus" ? "success" : "default"}>
-                  {tier === "plus" ? "Plus" : "Free"}
-                </Badge>
-                {tier !== "plus" ? (
-                  <Button size="sm" onClick={beginCheckout} isLoading={billingLoading}>
-                    Upgrade to Plus
-                  </Button>
-                ) : (
-                  <>
-                    <Button variant="outline" size="sm" onClick={openBillingPortal} isLoading={billingLoading}>
-                      Manage Billing
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => setCancelSubscriptionOpen(true)} isLoading={billingLoading}>
-                      Cancel Subscription
-                    </Button>
-                  </>
-                )}
-              </div>
-
-              <div className="rounded-lg border border-border bg-secondary-50/70 px-4 py-3">
-                <h3 className="text-sm font-semibold text-foreground">Billing Status</h3>
-                <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Mode</dt>
-                    <dd className="mt-1 text-foreground">{isSandboxBilling ? "Sandbox / Test" : "Live"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Subscription Status</dt>
-                    <dd className="mt-1 text-foreground">{formatBillingStatus(billingProfile?.stripeSubscriptionStatus)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Renews / Ends</dt>
-                    <dd className="mt-1 text-foreground">{getBillingCycleLabel(billingProfile, tier)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Customer Record</dt>
-                    <dd className="mt-1 text-foreground">{billingProfile?.stripeCustomerId ? "Linked" : "Not linked"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Customer ID</dt>
-                    <dd className="mt-1 font-mono text-foreground">{maskStripeId(billingProfile?.stripeCustomerId)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Subscription ID</dt>
-                    <dd className="mt-1 font-mono text-foreground">{maskStripeId(billingProfile?.stripeSubscriptionId)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">Last Stripe Sync</dt>
-                    <dd className="mt-1 text-foreground">{formatDateTime(billingProfile?.stripeLastSyncedAt)}</dd>
-                  </div>
-                </dl>
-              </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Badge variant={tier === "plus" ? "success" : "default"}>
+                {tier === "plus" ? "Plus" : "Free"}
+              </Badge>
+              {tier !== "plus" && (
+                <Link
+                  href="/account/upgrade"
+                  className="text-sm text-primary-900 hover:underline font-medium"
+                >
+                  Upgrade to Plus →
+                </Link>
+              )}
             </div>
           )}
         </Card>
@@ -699,8 +383,8 @@ export default function AccountManagementPage() {
             Danger Zone
           </h2>
           <p className="text-sm text-muted mb-4">
-            Submit a permanent account deletion request. Background cleanup will
-            remove your data and account shortly after confirmation.
+            Permanently delete your account and all associated data. This
+            action cannot be undone.
           </p>
           <button
             type="button"

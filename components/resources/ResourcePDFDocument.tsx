@@ -24,13 +24,13 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 24,
-    borderBottom: "2 solid #7c1d1d",
+    borderBottom: "2 solid #0F4C5C",
     paddingBottom: 12,
   },
   title: {
     fontSize: 22,
     fontFamily: "Helvetica-Bold",
-    color: "#7c1d1d",
+    color: "#0F4C5C",
     marginBottom: 6,
   },
   metaRow: {
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontFamily: "Helvetica-Bold",
-    color: "#374151",
+    color: "#0F4C5C",
   },
   section: {
     marginBottom: 16,
@@ -53,9 +53,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontFamily: "Helvetica-Bold",
-    color: "#374151",
+    color: "#0F4C5C",
     marginBottom: 6,
-    borderBottom: "1 solid #e5e7eb",
+    borderBottom: "1 solid #9BB1A7",
     paddingBottom: 3,
   },
   body: {
@@ -71,8 +71,8 @@ const styles = StyleSheet.create({
   },
   tag: {
     fontSize: 9,
-    backgroundColor: "#f3f4f6",
-    color: "#374151",
+    backgroundColor: "#E8EFEC",
+    color: "#0F4C5C",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
@@ -96,7 +96,6 @@ export interface ResourcePDFProps {
   type: string;
   tags: string[];
   authorName: string;
-  contentSections?: Array<{ heading: string; body: string }>;
 }
 
 export default function ResourcePDFDocument({
@@ -107,7 +106,6 @@ export default function ResourcePDFDocument({
   type,
   tags,
   authorName,
-  contentSections = [],
 }: ResourcePDFProps) {
   const date = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -151,13 +149,6 @@ export default function ResourcePDFDocument({
           <Text style={styles.body}>{description}</Text>
         </View>
 
-        {contentSections.map((section) => (
-          <View key={section.heading} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.heading}</Text>
-            <Text style={styles.body}>{section.body}</Text>
-          </View>
-        ))}
-
         {/* Tags */}
         {tags.length > 0 && (
           <View style={styles.section}>
@@ -174,7 +165,7 @@ export default function ResourcePDFDocument({
 
         {/* Footer */}
         <Text style={styles.footer} fixed>
-          Shared on TeacherlyConnect · {date}
+          Shared on VistaTeacher · {date}
         </Text>
       </Page>
     </Document>

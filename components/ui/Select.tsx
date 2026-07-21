@@ -26,10 +26,10 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <select
           ref={ref}
           id={selectId}
-          className={`w-full rounded-lg border bg-surface px-3 py-2 text-sm text-foreground transition-colors focus-ring cursor-pointer ${
+          className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-foreground transition-colors focus-ring cursor-pointer ${
             error
               ? "border-error-500 focus-visible:ring-error-500"
-              : "border-border hover:border-border-strong"
+              : "border-border hover:border-border-strong focus-visible:border-primary-300"
           } ${className}`}
           {...props}
         >

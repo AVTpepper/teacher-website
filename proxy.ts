@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Routes that require authentication
-const protectedPrefixes = ["/profile", "/lesson-builder"];
+const protectedPrefixes = ["/profile", "/lesson-builder", "/admin", "/account"];
 
 // Routes that authenticated users should be redirected away from
 const authRoutes = ["/auth/login", "/auth/signup"];

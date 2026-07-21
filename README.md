@@ -1,12 +1,12 @@
-# EduConnect
+# VistaTeacher
 
-A modern professional platform for educators to connect, collaborate, share resources, and grow professionally. EduConnect brings together a professional network, community forum, resource hub, and lesson planning tool - all in one place, built specifically for teachers.
+A modern professional platform for educators to connect, collaborate, share resources, and grow professionally. VistaTeacher brings together a professional network, community forum, resource hub, and lesson planning tool - all in one place, built specifically for teachers.
 
 ---
 
-## Why EduConnect?
+## Why VistaTeacher?
 
-Teachers are busy professionals who lack a dedicated space that combines professional networking, resource sharing, and community support. Existing tools are either too general (LinkedIn) or too fragmented (separate apps for lesson planning, forums, and job boards). EduConnect solves this by offering everything educators need in a single, intuitive platform designed around how teachers actually work.
+Teachers are busy professionals who lack a dedicated space that combines professional networking, resource sharing, and community support. Existing tools are either too general (LinkedIn) or too fragmented (separate apps for lesson planning, forums, and job boards). VistaTeacher solves this by offering everything educators need in a single, intuitive platform designed around how teachers actually work.
 
 ---
 
@@ -99,7 +99,7 @@ Teachers are busy professionals who lack a dedicated space that combines profess
 - Public landing page at `/` for unauthenticated visitors: hero section with tagline and sign-in/sign-up CTAs, responsive feature grid (Lesson Builder, AI Assistant, Forums, Resource Library, Community), social proof section with sample content cards, and site footer — fully static, no Firebase Auth dependency
 - Route restructuring: authenticated home feed moved to `/home`; unauthenticated users visiting `/` see the landing page; unauthenticated users hitting any protected route (`/profile`, `/lesson-builder`) are redirected to `/` (the landing page) rather than `/auth/login`; the Navbar logo links to `/home` for authenticated users and `/` for unauthenticated users
 - Account Management page at `/account`: read-only display of email address and account creation date; editable display name (synced to Firebase Auth and Firestore); subscription tier badge ("Free" / "Plus") with an upgrade prompt for free-tier users; change-password form with reauthentication, field-level validation, and human-readable Firebase error mapping; Danger Zone with a `ConfirmDialog`-gated account deletion flow that removes the Firestore profile document and Firebase Auth account then redirects to `/`; all nav references previously labelled "Settings" renamed to "Account Management"
-- Lesson Plan Preview Modal: authenticated users can open a full-screen, read-only preview of any lesson plan from the lesson detail page; the preview modal includes Download PDF and Print action buttons in a sticky header; Print targets only the lesson content via `@media print` (modal chrome hidden); the PDF export and the preview display the same copyright footer ("© [year] [Author Name] — All rights reserved. Created on EduConnect."); the modal is fully accessible (`role="dialog"`, `aria-modal="true"`, focus trap, Escape to close, focus restored to trigger on close)
+- Lesson Plan Preview Modal: authenticated users can open a full-screen, read-only preview of any lesson plan from the lesson detail page; the preview modal includes Download PDF and Print action buttons in a sticky header; Print targets only the lesson content via `@media print` (modal chrome hidden); the PDF export and the preview display the same copyright footer ("© [year] [Author Name] — All rights reserved. Created on VistaTeacher."); the modal is fully accessible (`role="dialog"`, `aria-modal="true"`, focus trap, Escape to close, focus restored to trigger on close)
 - Comment and reply edit/delete (posts and lessons): authenticated users see a three-dot overflow menu on their own comments and replies; "Edit" opens an inline textarea pre-filled with the original text, a live character counter (2 000-char limit), and Save/Cancel buttons; "Save" persists the update and shows an "(edited)" label; "Delete" opens a `ConfirmDialog` confirmation and removes the comment from the UI with a toast; Firestore security rules enforce author-only updates and deletes on all comment sub-collections; comments with replies show a "(Comment deleted)" placeholder rather than removing the thread
 
 ---
@@ -445,7 +445,7 @@ When `OPENAI_API_KEY` is absent or empty:
 - The AI assistant panel is hidden from the lesson builder UI
 - All "Generate" and "Suggest" buttons are removed
 - The `/api/ai/lesson` route returns HTTP 503 if called directly
-- Every other feature of EduConnect continues to work normally
+- Every other feature of VistaTeacher continues to work normally
 
 `NEXT_PUBLIC_AI_AVAILABLE` controls this behaviour and is **derived automatically** from `OPENAI_API_KEY` in `next.config.ts` — do not set it manually.
 

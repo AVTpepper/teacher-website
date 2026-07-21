@@ -24,9 +24,9 @@ export default function Card({
 }: CardProps) {
   return (
     <div
-      className={`rounded-xl border border-border-strong bg-surface/95 shadow-card ${
+      className={`rounded-xl border border-primary-100 bg-surface shadow-[0_12px_32px_rgba(15,76,92,0.10)] ${
         hoverable
-          ? "transition-shadow hover:shadow-card-hover cursor-pointer"
+          ? "transition-shadow hover:shadow-[0_16px_40px_rgba(15,76,92,0.14)] cursor-pointer"
           : ""
       } ${paddingClasses[padding]} ${className}`}
       onClick={onClick}

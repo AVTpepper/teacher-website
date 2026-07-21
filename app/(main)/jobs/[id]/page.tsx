@@ -119,7 +119,7 @@ export default function JobDetailPage({
               <Badge variant="default">{job.gradeLevel}</Badge>
               <Badge variant="default">{job.subject}</Badge>
             </div>
-            <h1 className="text-2xl font-bold text-foreground leading-snug">{job.title}</h1>
+            <h1 className="text-3xl font-bold text-foreground leading-snug sm:text-4xl">{job.title}</h1>
           </div>
 
           {/* Meta */}
@@ -210,7 +210,7 @@ export default function JobDetailPage({
 
       {/* Job description */}
       <Card>
-        <h2 className="text-lg font-semibold text-foreground mb-3">Job Description</h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Job Description</h2>
         <div className="prose prose-sm max-w-none text-foreground">
           {job.description.split("\n").map((para, i) =>
             para.trim() ? (

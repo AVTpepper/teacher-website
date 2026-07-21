@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -12,6 +12,7 @@ import {
   type Lesson,
 } from "@/lib/firestore/lessons";
 import { Avatar, Badge, Button, Card, ConfirmDialog, Select, Spinner } from "@/components/ui";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
 import { timeAgo } from "@/lib/utils";
 
 import { addBookmark, removeBookmark, getUserBookmarks } from "@/lib/firestore/bookmarks";
@@ -19,7 +20,7 @@ import { addBookmark, removeBookmark, getUserBookmarks } from "@/lib/firestore/b
 const LESSON_BUILDER_PREVIEW_LIMIT = 6;
 const OBJECTIVE_CHAR_LIMIT = 120;
 
-// --- Star display -------------------------------------------------------------
+// ─── Star display ─────────────────────────────────────────────────────────────
 
 function StarRating({ average, count }: { average: number; count: number }) {
   if (count === 0) return null;
@@ -29,7 +30,7 @@ function StarRating({ average, count }: { average: number; count: number }) {
         const filled = average >= star - 0.25;
         const half = !filled && average >= star - 0.75;
         return (
-          <svg key={star} className={`h-3.5 w-3.5 shrink-0 ${filled ? "text-amber-400" : half ? "text-amber-300" : "text-border"}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <svg key={star} className={`h-3.5 w-3.5 shrink-0 ${filled ? "text-primary-400" : half ? "text-primary-300" : "text-border"}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 0 .95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 0-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 0 0-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 0-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 0 0 .951-.69l1.07-3.292Z" />
           </svg>
         );
@@ -172,7 +173,7 @@ function LessonCard({ lesson, userId, initialBookmarked = false }: LessonCardPro
   );
 }
 
-// --- Published lesson row ----------------------------------------------------
+// ─── Published lesson row ────────────────────────────────────────────────────
 
 interface PublishedRowProps {
   lesson: Lesson;
@@ -249,7 +250,7 @@ function PublishedRow({ lesson, onDeleted }: PublishedRowProps) {
   );
 }
 
-// --- Bookmarked lesson row ---------------------------------------------------
+// ─── Bookmarked lesson row ───────────────────────────────────────────────────
 
 function BookmarkedRow({ lesson, onUnbookmarked }: { lesson: Lesson; onUnbookmarked: (id: string) => void }) {
   const { user } = useAuth();
@@ -288,7 +289,7 @@ function BookmarkedRow({ lesson, onUnbookmarked }: { lesson: Lesson; onUnbookmar
           onClick={handleRemove}
           disabled={removing}
           aria-label={`Remove bookmark for "${lesson.title || "Untitled"}"`}
-          className="inline-flex items-center justify-center rounded-lg p-1.5 text-amber-500 hover:text-muted hover:bg-secondary-100 transition-colors disabled:opacity-50 cursor-pointer"
+          className="inline-flex items-center justify-center rounded-lg p-1.5 text-primary-500 hover:text-muted hover:bg-secondary-100 transition-colors disabled:opacity-50 cursor-pointer"
           title="Remove bookmark"
         >
           {removing ? <Spinner size="sm" /> : (
@@ -302,7 +303,7 @@ function BookmarkedRow({ lesson, onUnbookmarked }: { lesson: Lesson; onUnbookmar
   );
 }
 
-// --- Draft row ----------------------------------------------------------------
+// ─── Draft row ────────────────────────────────────────────────────────────────
 
 interface DraftRowProps {
   draft: Lesson;
@@ -344,7 +345,7 @@ function DraftRow({ draft, isAvailable, onDeleted }: DraftRowProps) {
             Updated {timeAgo(draft.updatedAt as { seconds: number } | null)}
             {draft.gradeLevel && (
               <span className="ml-2">
-                {draft.gradeLevel}{draft.subject ? ` | ${draft.subject}` : ""}
+                {draft.gradeLevel}{draft.subject ? ` · ${draft.subject}` : ""}
               </span>
             )}
           </p>
@@ -353,7 +354,7 @@ function DraftRow({ draft, isAvailable, onDeleted }: DraftRowProps) {
           {isAvailable && (
             <Link href={`/lesson-builder/new?draft=${draft.id}&complete=true`}>
               <Button type="button" variant="outline" size="sm" className="gap-1.5">
-                <svg className="h-3.5 w-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                <svg className="h-3.5 w-3.5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
                 </svg>
                 AI Complete
@@ -385,7 +386,7 @@ function DraftRow({ draft, isAvailable, onDeleted }: DraftRowProps) {
   );
 }
 
-// --- Page ---------------------------------------------------------------------
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LessonBuilderPage() {
   const { user } = useAuth();
@@ -446,7 +447,7 @@ export default function LessonBuilderPage() {
       setBookmarkedLoading(true);
       try {
         const [lessonsResult, bookmarks] = await Promise.all([
-          getLessonsByAuthor(user.uid, true, null),
+          getLessonsByAuthor(user.uid, true, null, 200),
           getUserBookmarks(user.uid),
         ]);
         setDrafts(lessonsResult.lessons.filter((l) => !l.isPublic));
@@ -484,22 +485,19 @@ export default function LessonBuilderPage() {
   const latestDraft = drafts[0] ?? null;
 
   return (
-    <div className="flex-1 min-w-0 pb-8 space-y-6">
-      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
-      {/* Page header */}
-      <div className="-mx-4 -mt-4 mb-8 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-center text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
-        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Lesson Studio</p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight">Lesson Builder</h1>
-        <p className="mt-2 text-base text-primary-100/90">How would you like to create your lesson?</p>
-      </div>
+    <div className="space-y-6 pb-8">
+      <DiscoveryShell
+        title="Lesson Builder"
+        subtitle="How would you like to create your lesson?"
+      />
 
       {/* Draft resume banner */}
       {user && !bannerDismissed && latestDraft && !draftsLoading && (
         <div
           role="alert"
-          className="mb-6 w-full rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+          className="mb-6 w-full rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
         >
-          <p className="text-sm font-medium text-amber-800">
+          <p className="text-sm font-medium text-primary-800">
             You have an unfinished lesson draft{latestDraft.title ? `: "${latestDraft.title}"` : ""}
           </p>
           <div className="flex items-center gap-2 shrink-0">
@@ -518,7 +516,7 @@ export default function LessonBuilderPage() {
         {/* Create My Own */}
         <Link
           href="/lesson-builder/new?path=manual"
-          className="group flex flex-col items-center gap-3 rounded-xl border-2 border-primary-200 bg-secondary-50/70 p-8 text-center transition-colors hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+          className="group flex flex-col items-center gap-3 rounded-xl border-2 border-border bg-surface p-8 text-center transition-colors hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
         >
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-primary-700 group-hover:bg-primary-200 transition-colors" aria-hidden="true">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -533,7 +531,7 @@ export default function LessonBuilderPage() {
         {isAvailable ? (
           <Link
             href="/lesson-builder/new?path=ai"
-            className="group flex flex-col items-center gap-3 rounded-xl border-2 border-primary-200 bg-secondary-50/70 p-8 text-center transition-colors hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            className="group flex flex-col items-center gap-3 rounded-xl border-2 border-border bg-surface p-8 text-center transition-colors hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-primary-700 group-hover:bg-primary-200 transition-colors" aria-hidden="true">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -547,7 +545,7 @@ export default function LessonBuilderPage() {
           <div
             aria-disabled="true"
             title="AI features are not available in this environment"
-            className="flex flex-col items-center gap-3 rounded-xl border-2 border-primary-200 bg-secondary-50/70 p-8 text-center opacity-50 cursor-not-allowed"
+            className="flex flex-col items-center gap-3 rounded-xl border-2 border-border bg-surface p-8 text-center opacity-50 cursor-not-allowed"
           >
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-primary-700" aria-hidden="true">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -562,7 +560,7 @@ export default function LessonBuilderPage() {
 
       {/* My Lessons tabbed section */}
       {user && (
-        <Card padding="lg" className="mb-8 border-primary-200 bg-secondary-50/70">
+        <Card padding="lg" className="mb-8">
           {/* Tab bar */}
           <div className="flex items-center gap-1 border-b border-border mb-4 -mx-6 px-6" role="tablist" aria-label="My lessons">
             <button
@@ -750,9 +748,6 @@ export default function LessonBuilderPage() {
         )}
       </div>
 
-      </div>
-
-      <div>
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
@@ -794,7 +789,6 @@ export default function LessonBuilderPage() {
           </div>
         </>
       )}
-      </div>
     </div>
   );
 }

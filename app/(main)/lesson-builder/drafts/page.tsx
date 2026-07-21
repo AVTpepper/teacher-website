@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { getLessonsByAuthor, deleteLesson, type Lesson } from "@/lib/firestore/lessons";
 import { Badge, Button, Card, ConfirmDialog, Spinner } from "@/components/ui";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
 import { timeAgo } from "@/lib/utils";
 
 export default function LessonDraftsPage() {
@@ -26,7 +27,7 @@ export default function LessonDraftsPage() {
       setLoading(true);
       setError("");
       try {
-        const result = await getLessonsByAuthor(user.uid, true, null);
+        const result = await getLessonsByAuthor(user.uid, true, null, 100);
         setDrafts(result.lessons.filter((lesson) => !lesson.isPublic));
       } catch {
         setError("Failed to load drafts.");
@@ -48,30 +49,21 @@ export default function LessonDraftsPage() {
   }
 
   return (
-    <div className="py-8 max-w-4xl mx-auto space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Lesson Drafts</h1>
-          <p className="mt-1 text-sm text-muted">
-            Continue editing your saved lesson drafts.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/lesson-builder">
-            <Button type="button" variant="outline" size="sm">
-              Back to Lesson Builder
-            </Button>
-          </Link>
+    <div className="mx-auto max-w-4xl space-y-6 pb-8">
+      <DiscoveryShell
+        title="Lesson Drafts"
+        subtitle="Continue editing your saved lesson drafts."
+        action={
           <Link href="/lesson-builder/new">
-            <Button type="button" size="sm">
+            <Button type="button" size="sm" className="bg-primary-700 text-white hover:bg-primary-800">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
               New Lesson Plan
             </Button>
           </Link>
-        </div>
-      </div>
+        }
+      />
 
       {error && (
         <div className="rounded-lg bg-error-50 px-4 py-3 text-sm text-error-700">
@@ -163,7 +155,7 @@ function DraftRow({ draft, isAvailable, onDelete }: DraftRowProps) {
         {isAvailable && (
           <Link href={`/lesson-builder/new?draft=${draft.id}&complete=true`}>
             <Button type="button" variant="outline" size="sm" className="gap-1.5">
-              <svg className="h-3.5 w-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <svg className="h-3.5 w-3.5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
               </svg>
               AI Complete

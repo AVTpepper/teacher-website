@@ -62,7 +62,7 @@ export const BADGE_DEFINITIONS: Record<BadgeId, BadgeDefinition> = {
     label: "Verified Educator",
     icon: "✓",
     color: "blue",
-    description: "School credential verified by TeacherlyConnect.",
+    description: "School credential verified by VistaTeacher.",
     category: "verification",
   },
 
@@ -146,7 +146,7 @@ export const BADGE_DEFINITIONS: Record<BadgeId, BadgeDefinition> = {
     label: "1-Year Member",
     icon: "🎂",
     color: "purple",
-    description: "Been a member of TeacherlyConnect for one full year.",
+    description: "Been a member of VistaTeacher for one full year.",
     category: "milestone",
   },
 

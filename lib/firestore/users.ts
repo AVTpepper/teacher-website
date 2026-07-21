@@ -32,16 +32,11 @@ export interface UserProfile {
   yearsOfExperience: number;
   bio: string;
   isVerified: boolean;
+  role?: "user" | "admin";
   tier?: "free" | "plus";
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
-  stripeSubscriptionStatus?: string;
-  stripeCurrentPeriodEnd?: number | null;
-  stripeCancelAt?: number | null;
-  stripeCancelAtPeriodEnd?: boolean;
-  stripeCanceledAt?: number | null;
-  stripeLastSyncedAt?: unknown;
-  updatedAt?: unknown;
+  billingStatus?: string;
   createdAt: unknown;
   badges: string[];
   followerCount: number;
@@ -50,7 +45,7 @@ export interface UserProfile {
 
 export type UserProfileInput = Omit<
   UserProfile,
-  "createdAt" | "badges" | "followerCount" | "followingCount" | "isVerified" | "displayNameLower"
+  "createdAt" | "badges" | "followerCount" | "followingCount" | "isVerified" | "displayNameLower" | "role" | "tier" | "stripeCustomerId" | "stripeSubscriptionId" | "billingStatus"
 >;
 
 export { GRADE_LEVELS } from "@/lib/constants";
@@ -82,6 +77,7 @@ export async function createUser(data: UserProfileInput): Promise<void> {
     ...data,
     displayNameLower: data.displayName.toLowerCase(),
     isVerified: false,
+    role: "user",
     tier: "free",
     createdAt: serverTimestamp(),
     badges: [],

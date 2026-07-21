@@ -67,6 +67,24 @@ export function getFirebaseAdminDb() {
   return getFirestore(getFirebaseAdminApp());
 }
 
+// Backward-compatible lazy exports used by some route modules.
+// Proxy defers Firebase Admin initialization until a property is accessed.
+export const adminAuth = new Proxy({} as ReturnType<typeof getFirebaseAdminAuth>, {
+  get(_target, prop, receiver) {
+    const auth = getFirebaseAdminAuth() as unknown as Record<string, unknown>;
+    const value = Reflect.get(auth, prop, receiver);
+    return typeof value === "function" ? value.bind(auth) : value;
+  },
+});
+
+export const adminDb = new Proxy({} as ReturnType<typeof getFirebaseAdminDb>, {
+  get(_target, prop, receiver) {
+    const db = getFirebaseAdminDb() as unknown as Record<string, unknown>;
+    const value = Reflect.get(db, prop, receiver);
+    return typeof value === "function" ? value.bind(db) : value;
+  },
+});
+
 export function getFirebaseProjectId(): string {
   return getRequiredEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID");
 }

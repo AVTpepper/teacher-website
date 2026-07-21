@@ -10,29 +10,22 @@ import {
   trackLessonDownload,
   getLessonComments,
   addLessonComment,
-  likeLessonComment,
-  unlikeLessonComment,
-  hasLikedLessonComment,
   updateLessonComment,
   deleteLessonComment,
   type Lesson,
   type LessonComment,
 } from "@/lib/firestore/lessons";
-import {
-  getResourcesByIds,
-  resourceSlug,
-  RESOURCE_TYPES,
-  type Resource,
-} from "@/lib/firestore/resources";
 import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { getUserRating, submitRating } from "@/lib/firestore/ratings";
 import { Avatar, Badge, Button, Card, ConfirmDialog, IPNotice } from "@/components/ui";
-import ContentCommentSection from "@/components/comments/ContentCommentSection";
-import { type CommentData } from "@/components/comments/CommentThread";
+import CommentThread, {
+  type CommentData,
+} from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
-import { notifyLessonRated, notifyLessonDownloaded, notifyLessonShared } from "@/lib/notifications";
+import { notifyComment, notifyLessonRated, notifyLessonDownloaded, notifyLessonShared, notifyCommentReplied, notifyMention } from "@/lib/notifications";
 import { pdf } from "@react-pdf/renderer";
 import LessonPDFDocument from "@/components/lessons/LessonPDFDocument";
+import LessonPreviewModal from "@/components/lessons/LessonPreviewModal";
 
 export default function LessonDetailPage({
   params,
@@ -47,11 +40,13 @@ export default function LessonDetailPage({
   const [author, setAuthor] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [linkedResources, setLinkedResources] = useState<Resource[]>([]);
 
   // Download
   const [localDownloadCount, setLocalDownloadCount] = useState(0);
   const [copied, setCopied] = useState(false);
+
+  // Preview
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Delete
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -92,13 +87,6 @@ export default function LessonDetailPage({
         setLocalDownloadCount(res.downloadCount);
         setRatingAverage(res.ratingAverage ?? 0);
         setRatingCount(res.ratingCount ?? 0);
-
-        if (res.linkedResourceIds && res.linkedResourceIds.length > 0) {
-          const resources = await getResourcesByIds(res.linkedResourceIds);
-          setLinkedResources(resources);
-        } else {
-          setLinkedResources([]);
-        }
 
         const [authorData] = await Promise.all([
           getUser(res.authorId),
@@ -229,9 +217,6 @@ export default function LessonDetailPage({
     content: c.content,
     mentionedUsers: c.mentionedUsers,
     createdAt: c.createdAt as { seconds: number } | null,
-    editedAt: c.editedAt as { seconds: number } | null,
-    deleted: c.deleted,
-    likesCount: c.likesCount ?? 0,
   }));
 
   // ─── Loading ───
@@ -253,7 +238,7 @@ export default function LessonDetailPage({
     return (
       <div className="text-center py-16">
         <div className="text-5xl mb-4">📝</div>
-        <h1 className="text-2xl font-bold text-foreground">
+        <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
           Lesson Not Found
         </h1>
         <p className="text-sm text-muted mt-2">
@@ -269,18 +254,9 @@ export default function LessonDetailPage({
   }
 
   const isOwner = user?.uid === lesson.authorId;
-  const objectives = lesson.objectives ?? [];
-  const materials = lesson.materials ?? [];
-  const steps = lesson.steps ?? [];
-  const checkForUnderstanding = lesson.checkForUnderstanding ?? [];
-  const assessments = lesson.assessments ?? [];
-  const attachments = lesson.attachments ?? [];
-  const visibleLinkedResources = linkedResources.filter(
-    (resource) => resource.isPublic !== false || isOwner
-  );
 
   return (
-    <div className="py-8 space-y-8">
+    <div className="space-y-8 pb-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted">
         <Link
@@ -315,7 +291,7 @@ export default function LessonDetailPage({
                 )}
               </div>
 
-              <h1 className="text-2xl font-bold text-foreground">
+              <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
                 {lesson.title}
               </h1>
 
@@ -330,9 +306,9 @@ export default function LessonDetailPage({
                           key={star}
                           className={`h-4 w-4 shrink-0 ${
                             ratingAverage >= star - 0.25
-                              ? "text-amber-400"
+                              ? "text-primary-400"
                               : ratingAverage >= star - 0.75
-                              ? "text-amber-300"
+                              ? "text-primary-300"
                               : "text-border"
                           }`}
                           viewBox="0 0 20 20"
@@ -366,7 +342,7 @@ export default function LessonDetailPage({
                           className="cursor-pointer disabled:opacity-50 transition-transform hover:scale-110"
                         >
                           <svg
-                            className={`h-5 w-5 transition-colors ${active ? "text-amber-400" : "text-border"}`}
+                            className={`h-5 w-5 transition-colors ${active ? "text-primary-400" : "text-border"}`}
                             viewBox="0 0 20 20"
                             fill="currentColor"
                             aria-hidden="true"
@@ -412,13 +388,13 @@ export default function LessonDetailPage({
               <span className="font-medium text-foreground">{lesson.authorName}</span>. All rights reserved.
             </p>
 
-            {objectives.length > 0 && (
+            {lesson.objectives.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">
                   🎯 Learning Objectives
                 </h3>
                 <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                  {objectives.map((obj, i) => (
+                  {lesson.objectives.map((obj, i) => (
                     <li key={i}>{obj}</li>
                   ))}
                 </ul>
@@ -427,13 +403,13 @@ export default function LessonDetailPage({
 
             {/* Materials */}
             {user ? (
-              materials.length > 0 && (
+              lesson.materials.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-foreground mb-2">
                     📦 Materials Needed
                   </h3>
                   <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                    {materials.map((mat, i) => (
+                    {lesson.materials.map((mat, i) => (
                       <li key={i}>{mat}</li>
                     ))}
                   </ul>
@@ -445,7 +421,7 @@ export default function LessonDetailPage({
                 <p className="text-xs text-muted mb-3">Create a free account to view the full lesson plan.</p>
                 <div className="flex justify-center gap-2">
                   <Link href="/auth/signup">
-                    <Button variant="secondary" size="sm">Create Account</Button>
+                    <Button variant="primary" size="sm">Create Account</Button>
                   </Link>
                   <Link href="/auth/login">
                     <Button variant="outline" size="sm">Sign In</Button>
@@ -463,13 +439,13 @@ export default function LessonDetailPage({
             )}
 
             {/* Steps */}
-            {user && steps.length > 0 && (
+            {user && lesson.steps.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-3">
                   📋 Lesson Plan
                 </h3>
                 <div className="space-y-4">
-                  {steps.map((step, i) => (
+                  {lesson.steps.map((step, i) => (
                     <div
                       key={i}
                       className="border-l-2 border-primary-300 pl-4"
@@ -495,13 +471,13 @@ export default function LessonDetailPage({
             )}
 
             {/* Check for Understanding */}
-            {user && checkForUnderstanding.filter(Boolean).length > 0 && (
+            {user && lesson.checkForUnderstanding.filter(Boolean).length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">
                   🤔 Check for Understanding
                 </h3>
                 <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                  {checkForUnderstanding.filter(Boolean).map((item, i) => (
+                  {lesson.checkForUnderstanding.filter(Boolean).map((item, i) => (
                     <li key={i}>{item}</li>
                   ))}
                 </ul>
@@ -509,13 +485,13 @@ export default function LessonDetailPage({
             )}
 
             {/* Assessment */}
-            {user && assessments.filter(Boolean).length > 0 && (
+            {user && lesson.assessments.filter(Boolean).length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">
                   📝 Assessment
                 </h3>
                 <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                  {assessments.filter(Boolean).map((item, i) => (
+                  {lesson.assessments.filter(Boolean).map((item, i) => (
                     <li key={i}>{item}</li>
                   ))}
                 </ul>
@@ -523,13 +499,13 @@ export default function LessonDetailPage({
             )}
 
             {/* Attachments */}
-            {user && attachments.length > 0 && (
+            {user && lesson.attachments.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">
                   📎 Attachments
                 </h3>
                 <div className="space-y-1">
-                  {attachments.map((att, i) => (
+                  {lesson.attachments.map((att, i) => (
                     <a
                       key={i}
                       href={att.url}
@@ -557,37 +533,6 @@ export default function LessonDetailPage({
               </div>
             )}
 
-            {visibleLinkedResources.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold text-foreground mb-3">
-                  🧰 Linked Teaching Assets
-                </h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {visibleLinkedResources.map((resource) => {
-                    const typeLabel =
-                      RESOURCE_TYPES.find((type) => type.value === resource.type)?.label ?? resource.type;
-
-                    return (
-                      <Link
-                        key={resource.id}
-                        href={`/resources/${resourceSlug(resource.title, resource.id)}`}
-                        className="rounded-lg border border-border bg-surface-hover px-4 py-3 transition-colors hover:border-primary-300"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-foreground">{resource.title}</span>
-                          {resource.isPublic === false && <Badge variant="warning">Draft</Badge>}
-                        </div>
-                        <p className="mt-1 text-xs text-muted">{typeLabel}</p>
-                        <p className="mt-2 text-sm text-muted line-clamp-3">
-                          {resource.description}
-                        </p>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {/* Auth wall for guests */}
             {!user && !authLoading && (
               <div className="rounded-xl border border-border bg-secondary-50 p-6 text-center">
@@ -600,10 +545,10 @@ export default function LessonDetailPage({
                 </p>
                 <div className="flex justify-center gap-2">
                   <Link href="/auth/login">
-                    <Button variant="outline" size="sm">Sign In</Button>
+                    <Button size="sm">Sign In</Button>
                   </Link>
                   <Link href="/auth/signup">
-                    <Button variant="secondary" size="sm">Create Account</Button>
+                    <Button variant="outline" size="sm">Create Account</Button>
                   </Link>
                 </div>
               </div>
@@ -613,30 +558,27 @@ export default function LessonDetailPage({
             <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
               {user && (
                 <>
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push(`/lesson-builder/${lesson.id}/preview`, { scroll: true })}
-                  >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-                        />
-                      </svg>
-                      Preview
+                  <Button variant="outline" onClick={() => setPreviewOpen(true)}>
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                      />
+                    </svg>
+                    Preview
                   </Button>
 
                   <Button onClick={handleDownload}>
@@ -723,46 +665,70 @@ export default function LessonDetailPage({
 
           {/* Comments */}
           <Card padding="lg">
-            <ContentCommentSection
+            <h2 className="text-xl font-semibold text-foreground mb-4">
+              Discussion, Feedback & Suggestions
+            </h2>
+            <CommentThread
               comments={commentData}
               loading={commentsLoading}
-              title="Comments"
-              description="Ask a question, share how you'd use it, or suggest an improvement."
-              ownerId={lesson.authorId}
-              contentLabel={`your lesson "${lesson.title}"`}
-              linkURL={typeof window !== "undefined" ? window.location.href : `/lesson-builder/${lesson.id}`}
               mode="like"
-              maxDepth={1}
-              composerPlaceholder="Add a comment..."
-              addComment={async ({ parentId, authorId, authorName, authorPhotoURL, content, mentionedUsers }) => {
-                return addLessonComment(lesson.id, {
+              maxDepth={2}
+              onAddComment={async (content, parentId, mentionedUsers) => {
+                if (!user) throw new Error("Must be logged in");
+                const newId = await addLessonComment(lesson.id, {
                   parentId,
-                  authorId,
-                  authorName,
-                  authorPhotoURL,
+                  authorId: user.uid,
+                  authorName: user.displayName || "Anonymous",
+                  authorPhotoURL: user.photoURL,
                   content,
-                  mentionedUsers,
+                  mentionedUsers: mentionedUsers ?? [],
                 });
+                // Notify lesson author on top-level comment (fire-and-forget)
+                if (lesson.authorId !== user.uid && !parentId) {
+                  notifyComment({
+                    recipientId: lesson.authorId,
+                    actorId: user.uid,
+                    actorName: user.displayName || "Someone",
+                    actorPhotoURL: user.photoURL,
+                    contentLabel: `your lesson "${lesson.title}"`,
+                    linkURL: window.location.href,
+                  }).catch(() => {});
+                }
+                // Notify parent comment author on reply (fire-and-forget)
+                if (parentId) {
+                  const parentComment = comments.find((c) => c.id === parentId);
+                  if (parentComment && parentComment.authorId !== user.uid) {
+                    notifyCommentReplied({
+                      recipientId: parentComment.authorId,
+                      actorId: user.uid,
+                      actorName: user.displayName || "Someone",
+                      actorPhotoURL: user.photoURL,
+                      linkURL: window.location.href,
+                    }).catch(() => {});
+                  }
+                }
+                // Fire mention notifications (fire-and-forget)
+                if (mentionedUsers?.length) {
+                  mentionedUsers.forEach(({ uid }) => {
+                    if (uid !== user.uid) {
+                      notifyMention({
+                        recipientId: uid,
+                        actorId: user.uid,
+                        actorName: user.displayName || "Anonymous",
+                        actorPhotoURL: user.photoURL,
+                        linkURL: window.location.href,
+                      }).catch(() => {});
+                    }
+                  });
+                }
+                await loadComments();
+                return newId;
               }}
-              updateComment={async (commentId, text) => {
+              onUpdateComment={async (commentId, text) => {
                 await updateLessonComment(lesson.id, commentId, text);
               }}
-              deleteComment={async (commentId) => {
-                return deleteLessonComment(lesson.id, commentId);
-              }}
-              refreshComments={loadComments}
-              onLikeComment={async (commentId) => {
-                if (!user) return;
-                const alreadyLiked = await hasLikedLessonComment(lesson.id, commentId, user.uid);
-                if (alreadyLiked) {
-                  await unlikeLessonComment(lesson.id, commentId, user.uid);
-                } else {
-                  await likeLessonComment(lesson.id, commentId, user.uid);
-                }
-              }}
-              hasLikedComment={async (commentId) => {
-                if (!user) return false;
-                return hasLikedLessonComment(lesson.id, commentId, user.uid);
+              onDeleteComment={async (commentId) => {
+                await deleteLessonComment(lesson.id, commentId);
               }}
             />
           </Card>
@@ -877,6 +843,18 @@ export default function LessonDetailPage({
           </Card>
         </div>
       </div>
+
+      {/* Lesson Preview Modal */}
+      <LessonPreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        lesson={lesson}
+        authorName={lesson.authorName}
+        onDownload={() => {
+          setPreviewOpen(false);
+          handleDownload();
+        }}
+      />
 
       {/* Delete Confirmation */}
       <ConfirmDialog
