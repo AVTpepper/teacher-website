@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   getJob,
@@ -23,6 +24,7 @@ export default function JobDetailPage({
   const { id: rawId } = use(params);
   const id = parseJobSlug(rawId);
   const { user } = useAuth();
+  const router = useRouter();
 
   const [job, setJob] = useState<Job | null>(null);
   const [poster, setPoster] = useState<UserProfile | null>(null);
@@ -107,6 +109,29 @@ export default function JobDetailPage({
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Link href="/jobs" className="hover:text-foreground transition-colors">
+            Jobs
+          </Link>
+          <span>/</span>
+          <span className="text-foreground truncate">{job.title}</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+              return;
+            }
+            router.push("/jobs");
+          }}
+        >
+          Back
+        </Button>
+      </div>
+
       {/* Header card */}
       <Card>
         <div className="flex flex-col gap-4">

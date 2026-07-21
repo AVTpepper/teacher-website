@@ -5,6 +5,12 @@
   ======================================== */
 
 :root {
+  /* --- Font System --- */
+  --font-primary: var(--font-nunito-sans), system-ui, sans-serif;
+  --font-ui: var(--font-primary);
+  --font-display: var(--font-primary);
+  --font-mono-stack: var(--font-primary);
+
   /* --- Primary: Deep Teal (#0F4C5C) --- */
   --primary-50: #ebf2f4;
   --primary-100: #d0e1e6;
@@ -140,8 +146,8 @@
   --color-info-700: var(--info-700);
 
   /* --- Typography --- */
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-mono-stack);
 
   --text-xs: 0.75rem;
   --text-xs--line-height: 1rem;
@@ -192,7 +198,60 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-primary);
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+h1,
+h2 {
+  font-family: var(--font-primary);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-primary);
+  font-weight: 700;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-mono-stack);
+}
+
+/* Semantic helpers for intentional typography usage */
+.type-display {
+  font-family: var(--font-primary);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.type-ui {
+  font-family: var(--font-primary);
+}
+
+.type-mono {
+  font-family: var(--font-primary);
+}
+
+/* Single-family tuning helpers */
+.type-body-light {
+  font-weight: 300;
+}
+
+.type-body-medium {
+  font-weight: 500;
+}
+
+.type-heading-strong {
+  font-weight: 900;
+  letter-spacing: -0.015em;
 }
 
 /* ========================================

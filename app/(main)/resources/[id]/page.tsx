@@ -307,16 +307,31 @@ export default function ResourceDetailPage({
 
   return (
     <div className={`py-8 space-y-8 ${user ? "pb-24 sm:pb-8" : ""}`}>
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-muted">
-        <Link
-          href="/resources"
-          className="hover:text-foreground transition-colors"
+      {/* Breadcrumb + back */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Link
+            href="/resources"
+            className="hover:text-foreground transition-colors"
+          >
+            Resources
+          </Link>
+          <span>/</span>
+          <span className="text-foreground truncate">{resource.title}</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+              return;
+            }
+            router.push("/resources");
+          }}
         >
-          Resources
-        </Link>
-        <span>/</span>
-        <span className="text-foreground truncate">{resource.title}</span>
+          Back
+        </Button>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">

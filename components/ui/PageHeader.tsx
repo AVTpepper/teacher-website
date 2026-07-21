@@ -16,8 +16,8 @@ export default function PageHeader({
       className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${className}`}
     >
       <div>
-        <h1 className="text-3xl font-bold text-foreground sm:text-4xl">{title}</h1>
-        {subtitle && <p className="mt-2 text-base text-muted">{subtitle}</p>}
+        <h1 className="type-heading-strong text-3xl font-extrabold text-foreground sm:text-4xl">{title}</h1>
+        {subtitle && <p className="type-body-medium mt-2 text-base text-muted">{subtitle}</p>}
       </div>
       {action && <div>{action}</div>}
     </div>

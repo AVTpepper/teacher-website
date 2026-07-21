@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   findThreadById,
@@ -38,6 +39,7 @@ export default function ForumThreadPage({
   const { id: rawId } = use(params);
   const threadId = parseThreadSlug(rawId);
   const { user } = useAuth();
+  const router = useRouter();
 
   const [thread, setThread] = useState<ForumThread | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -214,22 +216,40 @@ export default function ForumThreadPage({
 
   return (
     <div className="flex-1 min-w-0 space-y-6 pb-8">
-      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
-        {/* Breadcrumb */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-muted">
           <Link href="/forums" className="hover:text-foreground transition-colors">
             Forums
           </Link>
-          <span>/</span>
           {categoryData && (
-            <Link href="/forums" className="hover:text-foreground transition-colors">
-              {categoryData.icon} {categoryData.name}
-            </Link>
+            <>
+              <span>/</span>
+              <Link href="/forums" className="hover:text-foreground transition-colors">
+                {categoryData.icon} {categoryData.name}
+              </Link>
+            </>
           )}
+          <span>/</span>
+          <span className="text-foreground truncate">{thread.title}</span>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+              return;
+            }
+            router.push("/forums");
+          }}
+        >
+          Back
+        </Button>
+      </div>
 
+      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
         {/* Thread card */}
-        <div className="mt-4 rounded-xl border border-border bg-surface shadow-card">
+        <div className="rounded-xl border border-border bg-surface shadow-card">
           <div className="p-6">
             {/* Title */}
             <h1 className="text-xl font-bold text-foreground">{thread.title}</h1>

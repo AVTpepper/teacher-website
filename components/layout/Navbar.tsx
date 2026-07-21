@@ -73,7 +73,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link
             href={user ? "/home" : "/"}
-            className="shrink-0 text-lg font-bold text-white"
+            className="type-heading-strong shrink-0 text-lg font-extrabold text-white"
           >
             VistaTeacher
           </Link>
@@ -134,7 +134,7 @@ export default function Navbar() {
                 ) : (
                   <Link
                     href="/auth/login"
-                    className="rounded-lg bg-primary-700 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-primary-800 transition-colors"
+                    className="type-body-medium rounded-lg bg-primary-700 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-primary-800 transition-colors"
                   >
                     Sign in
                   </Link>
@@ -189,7 +189,7 @@ export default function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              className={`type-body-medium px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 isActive(link.href)
                   ? "border-white text-white"
                   : "border-transparent text-white/75 hover:text-white hover:border-white/40"
@@ -222,7 +222,7 @@ export default function Navbar() {
             />
           </div>
 
-          <nav className="px-2 pb-3 space-y-1" aria-label="Mobile">
+          <nav className="px-2 pt-2 pb-3 space-y-1" aria-label="Mobile">
             {navLinks.map((link) => (
               <Link
                 key={link.href}

@@ -43,6 +43,41 @@ const features = [
   },
 ];
 
+const liveExamples = [
+  {
+    title: "Trending Discussions",
+    description:
+      "See the same live discussion stream educators use daily to swap ideas, ask classroom questions, and share quick wins.",
+    href: "/forums",
+    cta: "Join discussions",
+    tag: "Forums",
+  },
+  {
+    title: "Latest Resources",
+    description:
+      "Browse the current resource library, including worksheets, activities, and classroom-ready materials shared by the community.",
+    href: "/resources",
+    cta: "Browse resources",
+    tag: "Resource Library",
+  },
+  {
+    title: "Featured Lessons",
+    description:
+      "Open real lesson drafts and published plans, then remix structure, pacing, and activities in your own classroom workflow.",
+    href: "/lesson-builder",
+    cta: "Explore lessons",
+    tag: "Lesson Builder",
+  },
+  {
+    title: "Inspiration Picks",
+    description:
+      "Discover curated videos, articles, and stories teachers are using right now to spark engagement and new approaches.",
+    href: "/inspiration",
+    cta: "View inspiration",
+    tag: "Inspiration",
+  },
+];
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
@@ -81,7 +116,7 @@ export default function LandingPage() {
               href="/auth/signup"
               className="inline-flex items-center justify-center rounded-lg bg-accent-500 px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-accent-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white min-h-11 min-w-11"
             >
-              Get Started Free
+              Get Started
             </Link>
             <Link
               href="/auth/login"
@@ -90,6 +125,11 @@ export default function LandingPage() {
               Sign In
             </Link>
           </div>
+
+          <p className="mt-5 text-sm text-white/80">
+            Start on the <span className="font-semibold text-white">Free</span> plan and upgrade to
+            <span className="font-semibold text-white"> Plus</span> for expanded AI-powered lesson workflows.
+          </p>
         </div>
       </section>
 
@@ -139,9 +179,51 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Social Proof ─────────────────────────────────────────────────── */}
+      {/* ── Plans ────────────────────────────────────────────────────────── */}
       <section
         className="bg-secondary-50 py-16 sm:py-20"
+        aria-labelledby="plans-heading"
+      >
+        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+          <div className="text-center mb-10">
+            <h2
+              id="plans-heading"
+              className="text-3xl font-bold text-foreground sm:text-4xl"
+            >
+              Plans that grow with your teaching
+            </h2>
+            <p className="mt-4 text-base text-muted max-w-2xl mx-auto">
+              Start free and move to Plus when you want deeper AI-assisted planning and faster workflow support.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <article className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-900">Free</p>
+              <h3 className="mt-2 text-xl font-bold text-foreground">Great for getting started</h3>
+              <ul className="mt-4 space-y-2 text-sm text-muted leading-relaxed">
+                <li>Build and publish lesson plans</li>
+                <li>Share resources and participate in forums</li>
+                <li>Access core AI planning tools</li>
+              </ul>
+            </article>
+
+            <article className="rounded-xl border border-accent-200 bg-surface p-6 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-700">Plus</p>
+              <h3 className="mt-2 text-xl font-bold text-foreground">For high-volume planners</h3>
+              <ul className="mt-4 space-y-2 text-sm text-muted leading-relaxed">
+                <li>Expanded AI generation capacity</li>
+                <li>More advanced refine and planning support</li>
+                <li>Built for teams and power users</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Real Examples ────────────────────────────────────────────────── */}
+      <section
+        className="bg-background py-16 sm:py-20"
         aria-labelledby="social-proof-heading"
       >
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -150,145 +232,36 @@ export default function LandingPage() {
               id="social-proof-heading"
               className="text-3xl font-bold text-foreground sm:text-4xl"
             >
-              See what educators are sharing
+              Real examples from VistaTeacher
             </h2>
             <p className="mt-4 text-base text-muted max-w-xl mx-auto">
-              Real lesson plans, discussions, and resources — created by
-              teachers just like you.
+              Explore live sections used across the platform right now, from active discussions to featured lessons.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Sample: Lesson Plan Card */}
-            <div
-              className="rounded-xl border border-border bg-surface p-5 shadow-sm"
-              aria-label="Sample lesson plan: Introduction to Fractions"
-            >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className="h-9 w-9 rounded-full bg-primary-100 flex items-center justify-center shrink-0 text-sm font-bold text-primary-900"
-                    aria-hidden="true"
-                  >
-                    S
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      Sarah Mitchell
-                    </p>
-                    <p className="text-xs text-muted">2 days ago</p>
-                  </div>
-                </div>
-                <span className="shrink-0 inline-flex items-center rounded-full bg-info-50 px-2.5 py-0.5 text-xs font-medium text-info-700">
-                  Lesson Plan
-                </span>
-              </div>
-              <h3 className="text-base font-semibold text-foreground mb-1">
-                Introduction to Fractions
-              </h3>
-              <div className="flex gap-2 flex-wrap mb-3">
-                <span className="inline-flex items-center rounded-md bg-secondary-100 px-2 py-0.5 text-xs text-secondary-700">
-                  Grade 4
-                </span>
-                <span className="inline-flex items-center rounded-md bg-secondary-100 px-2 py-0.5 text-xs text-secondary-700">
-                  Math
-                </span>
-              </div>
-              <p className="text-sm text-muted line-clamp-2">
-                A hands-on introduction to fractions using fraction tiles and
-                real-world examples. Students explore halves, thirds, and
-                quarters through guided discovery activities.
-              </p>
-              <div className="mt-4 flex items-center gap-4 text-xs text-muted">
-                <span>❤️ 24 likes</span>
-                <span>💬 6 comments</span>
-              </div>
-            </div>
-
-            {/* Sample: Forum Post Card */}
-            <div
-              className="rounded-xl border border-border bg-surface p-5 shadow-sm"
-              aria-label="Sample forum post: Tips for classroom management"
-            >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className="h-9 w-9 rounded-full bg-accent-100 flex items-center justify-center shrink-0 text-sm font-bold text-accent-800"
-                    aria-hidden="true"
-                  >
-                    J
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      James Okafor
-                    </p>
-                    <p className="text-xs text-muted">5 hours ago</p>
-                  </div>
-                </div>
-                <span className="shrink-0 inline-flex items-center rounded-full bg-warning-50 px-2.5 py-0.5 text-xs font-medium text-warning-700">
-                  💬 Discussion
-                </span>
-              </div>
-              <h3 className="text-base font-semibold text-foreground mb-2">
-                Tips for classroom management in mixed-ability groups
-              </h3>
-              <p className="text-sm text-muted line-clamp-3">
-                I&apos;ve been experimenting with flexible seating and collaborative
-                roles in my Year 6 class. Would love to hear what strategies
-                others have found effective for keeping everyone engaged when
-                abilities vary so widely.
-              </p>
-              <div className="mt-4 flex items-center gap-4 text-xs text-muted">
-                <span>❤️ 17 likes</span>
-                <span>💬 14 comments</span>
-              </div>
-            </div>
-
-            {/* Sample: Resource Card */}
-            <div
-              className="rounded-xl border border-border bg-surface p-5 shadow-sm"
-              aria-label="Sample resource: Phonics Worksheet Pack"
-            >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className="h-9 w-9 rounded-full bg-success-50 flex items-center justify-center shrink-0 text-sm font-bold text-success-700"
-                    aria-hidden="true"
-                  >
-                    R
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      Rachel Tan
-                    </p>
-                    <p className="text-xs text-muted">1 week ago</p>
-                  </div>
-                </div>
-                <span className="shrink-0 inline-flex items-center rounded-full bg-success-50 px-2.5 py-0.5 text-xs font-medium text-success-700">
-                  📚 Resource
-                </span>
-              </div>
-              <h3 className="text-base font-semibold text-foreground mb-1">
-                Phonics Worksheet Pack — Blends &amp; Digraphs
-              </h3>
-              <div className="flex gap-2 flex-wrap mb-3">
-                <span className="inline-flex items-center rounded-md bg-secondary-100 px-2 py-0.5 text-xs text-secondary-700">
-                  Grade 1–2
-                </span>
-                <span className="inline-flex items-center rounded-md bg-secondary-100 px-2 py-0.5 text-xs text-secondary-700">
-                  English / Literacy
-                </span>
-              </div>
-              <p className="text-sm text-muted line-clamp-2">
-                20 printable worksheets covering common blends (bl, cl, fl)
-                and digraphs (sh, ch, th). Includes answer keys and a
-                suggested teaching sequence.
-              </p>
-              <div className="mt-4 flex items-center gap-4 text-xs text-muted">
-                <span>⭐ 4.8 / 5</span>
-                <span>📥 312 downloads</span>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {liveExamples.map((example) => (
+              <article
+                key={example.title}
+                className="rounded-xl border border-border bg-surface p-5 shadow-sm"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary-900">
+                  {example.tag}
+                </p>
+                <h3 className="mt-2 text-lg font-semibold text-foreground">
+                  {example.title}
+                </h3>
+                <p className="mt-3 text-sm text-muted leading-relaxed">
+                  {example.description}
+                </p>
+                <Link
+                  href={example.href}
+                  className="mt-4 inline-flex items-center text-sm font-semibold text-primary-900 hover:text-primary-800"
+                >
+                  {example.cta} →
+                </Link>
+              </article>
+            ))}
           </div>
         </div>
       </section>

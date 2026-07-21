@@ -257,16 +257,31 @@ export default function LessonDetailPage({
 
   return (
     <div className="space-y-8 pb-8">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-muted">
-        <Link
-          href="/lesson-builder"
-          className="hover:text-foreground transition-colors"
+      {/* Breadcrumb + back */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Link
+            href="/lesson-builder"
+            className="hover:text-foreground transition-colors"
+          >
+            Lesson Builder
+          </Link>
+          <span>/</span>
+          <span className="text-foreground truncate">{lesson.title}</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+              return;
+            }
+            router.push("/lesson-builder");
+          }}
         >
-          Lesson Builder
-        </Link>
-        <span>/</span>
-        <span className="text-foreground truncate">{lesson.title}</span>
+          Back
+        </Button>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">

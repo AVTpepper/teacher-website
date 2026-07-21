@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getLesson, trackLessonDownload, type Lesson } from "@/lib/firestore/lessons";
 import { Button, Card } from "@/components/ui";
@@ -15,6 +16,7 @@ export default function LessonPreviewPage({
 }) {
   const { id } = use(params);
   const { user } = useAuth();
+  const router = useRouter();
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,11 +93,35 @@ export default function LessonPreviewPage({
   return (
     <div className="mx-auto max-w-5xl py-8 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Link href="/lesson-builder" className="hover:text-foreground transition-colors">
+            Lesson Builder
+          </Link>
+          <span>/</span>
+          <Link href={`/lesson-builder/${lesson.id}`} className="hover:text-foreground transition-colors">
+            {lesson.title}
+          </Link>
+          <span>/</span>
+          <span className="text-foreground">Preview</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+              return;
+            }
+            router.push(`/lesson-builder/${lesson.id}`);
+          }}
+        >
+          Back
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-foreground">Preview: {lesson.title}</h1>
         <div className="flex items-center gap-2">
-          <Link href={`/lesson-builder/${lesson.id}`}>
-            <Button variant="outline" size="sm">Back to Lesson</Button>
-          </Link>
           <Button variant="outline" size="sm" onClick={handleDownload}>Download PDF</Button>
           <Button variant="secondary" size="sm" onClick={() => window.print()}>Print</Button>
         </div>

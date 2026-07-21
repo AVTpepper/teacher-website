@@ -21,10 +21,10 @@ export default function SearchResultCard({
       <Card className="hover:shadow-md transition-shadow">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-semibold text-foreground group-hover:underline truncate">
+            <p className="type-body-medium font-semibold text-foreground group-hover:underline truncate">
               {title}
             </p>
-            <p className="text-xs text-muted mt-0.5">{subtitle}</p>
+            <p className="type-body-light text-xs text-muted mt-0.5">{subtitle}</p>
             {badges && <div className="flex gap-2 mt-2">{badges}</div>}
           </div>
           <span className="text-2xl shrink-0">{icon}</span>

@@ -229,7 +229,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
           <div className="flex items-center gap-2 flex-wrap">
             <Link
               href={`/educators/${post.authorId}`}
-              className="text-sm font-semibold text-foreground hover:underline"
+              className="type-body-medium text-sm font-semibold text-foreground hover:underline"
             >
               {post.authorName}
             </Link>
@@ -238,7 +238,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
               <Badge variant="default">{post.gradeLevel}</Badge>
             )}
           </div>
-          <p className="text-xs text-muted mt-0.5">
+          <p className="type-body-light text-xs text-muted mt-0.5">
             {timeAgo(post.createdAt as { seconds: number } | null)}
           </p>
         </div>
@@ -311,7 +311,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
       {/* Content - click to expand comments */}
       {!editing && (
         <p
-          className="mt-3 text-sm text-foreground whitespace-pre-wrap cursor-pointer"
+          className="type-body-medium mt-3 text-sm text-foreground whitespace-pre-wrap cursor-pointer"
           onClick={toggleComments}
           title="Click to view comments"
         >
@@ -350,7 +350,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
       )}
 
       {/* Stats bar */}
-      <div className="mt-3 flex items-center gap-4 text-xs text-muted">
+      <div className="type-body-light mt-3 flex items-center gap-4 text-xs text-muted">
         {likesCount > 0 && (
           <span>
             {likesCount} {likesCount === 1 ? "like" : "likes"}

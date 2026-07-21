@@ -15,6 +15,7 @@ import { doc, deleteDoc, collection, getDocs } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
 import { getUser, updateUser } from "@/lib/firestore/users";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
 import { Button, Input, Card, Badge, ConfirmDialog } from "@/components/ui";
 
 interface Toast {
@@ -245,17 +246,38 @@ export default function AccountManagementPage() {
         isLoading={deleting}
       />
 
-      <div className="max-w-2xl mx-auto space-y-6 pb-12">
-        <h1 className="text-2xl font-bold text-foreground">
-          Account Management
-        </h1>
+      <div className="max-w-3xl mx-auto space-y-6 pb-12">
+        <DiscoveryShell
+          eyebrow="Account"
+          title="Account Management"
+          subtitle="Manage profile basics, security, and your plan in one place."
+          className="mb-0"
+        />
 
-        {/* Account Details */}
         <Card padding="lg">
           <h2 className="text-base font-semibold text-foreground mb-4">
-            Account Details
+            Quick Actions
           </h2>
-          <dl className="space-y-4">
+          <div className="flex flex-wrap gap-3">
+            <Link href="/profile/edit">
+              <Button variant="outline" size="sm">Edit profile</Button>
+            </Link>
+            <Link href="/account/plans">
+              <Button variant="outline" size="sm">Compare Free vs Plus</Button>
+            </Link>
+            {tier !== "plus" && (
+              <Link href="/account/upgrade">
+                <Button size="sm">Upgrade to Plus</Button>
+              </Link>
+            )}
+          </div>
+        </Card>
+
+        <Card padding="lg">
+          <h2 className="text-base font-semibold text-foreground mb-4">
+            Profile & Plan
+          </h2>
+          <dl className="space-y-3">
             <div>
               <dt className="text-sm font-medium text-muted">Email address</dt>
               <dd className="mt-1 text-sm text-foreground">{user.email}</dd>
@@ -264,15 +286,29 @@ export default function AccountManagementPage() {
               <dt className="text-sm font-medium text-muted">Account created</dt>
               <dd className="mt-1 text-sm text-foreground">{creationTime}</dd>
             </div>
+            <div>
+              <dt className="text-sm font-medium text-muted">Current plan</dt>
+              <dd className="mt-1">
+                {loadingTier ? (
+                  <div className="h-5 w-16 bg-secondary-100 rounded animate-pulse" />
+                ) : (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Badge variant={tier === "plus" ? "success" : "default"}>
+                      {tier === "plus" ? "Plus" : "Free"}
+                    </Badge>
+                    <Link
+                      href="/account/plans"
+                      className="text-sm text-primary-900 hover:underline font-medium"
+                    >
+                      View plan details
+                    </Link>
+                  </div>
+                )}
+              </dd>
+            </div>
           </dl>
-        </Card>
 
-        {/* Display Name */}
-        <Card padding="lg">
-          <h2 className="text-base font-semibold text-foreground mb-4">
-            Display Name
-          </h2>
-          <form onSubmit={handleSaveName} className="space-y-4">
+          <form onSubmit={handleSaveName} className="mt-5 space-y-4 border-t border-border pt-5">
             <Input
               label="Display name"
               value={displayName}
@@ -288,30 +324,6 @@ export default function AccountManagementPage() {
               Save name
             </Button>
           </form>
-        </Card>
-
-        {/* Subscription Tier */}
-        <Card padding="lg">
-          <h2 className="text-base font-semibold text-foreground mb-4">
-            Subscription Tier
-          </h2>
-          {loadingTier ? (
-            <div className="h-5 w-16 bg-secondary-100 rounded animate-pulse" />
-          ) : (
-            <div className="flex items-center gap-3 flex-wrap">
-              <Badge variant={tier === "plus" ? "success" : "default"}>
-                {tier === "plus" ? "Plus" : "Free"}
-              </Badge>
-              {tier !== "plus" && (
-                <Link
-                  href="/account/upgrade"
-                  className="text-sm text-primary-900 hover:underline font-medium"
-                >
-                  Upgrade to Plus →
-                </Link>
-              )}
-            </div>
-          )}
         </Card>
 
         {/* Change Password */}

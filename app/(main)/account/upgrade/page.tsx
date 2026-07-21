@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/lib/auth-context";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
 import { Button, Card } from "@/components/ui";
 
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
@@ -86,13 +88,34 @@ export default function AccountUpgradePage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-12">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Billing</p>
-        <h1 className="mt-1 text-3xl font-bold text-foreground">Upgrade to Plus</h1>
-        <p className="mt-2 text-sm text-muted">
-          Complete your subscription without leaving TeacherlyConnect.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Link href="/account" className="hover:text-foreground transition-colors">
+            Account
+          </Link>
+          <span>/</span>
+          <span className="text-foreground">Upgrade</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+              return;
+            }
+            router.push("/account");
+          }}
+        >
+          Back
+        </Button>
       </div>
+
+      <DiscoveryShell
+        eyebrow="Billing"
+        title="Upgrade to Plus"
+        subtitle="Complete your subscription without leaving VistaTeacher."
+      />
 
       {isSandboxBilling && (
         <Card padding="lg" className="border-warning-200 bg-warning-50 text-warning-900">

@@ -232,6 +232,19 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
 
   return (
     <div className="mx-auto max-w-5xl py-8">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Link href={`/educators/${userId}`} className="hover:text-foreground transition-colors">
+            Profile
+          </Link>
+          <span>/</span>
+          <span className="text-foreground">Achievements</span>
+        </div>
+        <Link href={`/educators/${userId}`}>
+          <Button variant="outline" size="sm">Back</Button>
+        </Link>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{profile.displayName}&apos;s Achievements</h1>
@@ -239,9 +252,6 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
             {earnedBadgeIds.length} earned of {BADGE_LIST.length} total
           </p>
         </div>
-        <Link href={`/educators/${userId}`}>
-          <Button variant="outline">Back to Profile</Button>
-        </Link>
       </div>
 
       <Card className="mt-5 p-5">

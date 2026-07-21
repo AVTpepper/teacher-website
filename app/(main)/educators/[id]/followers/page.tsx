@@ -153,6 +153,29 @@ export default function FollowersPage({
         </div>
       )}
 
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Link href={`/educators/${id}`} className="hover:text-foreground transition-colors">
+            Profile
+          </Link>
+          <span>/</span>
+          <span className="text-foreground">Followers</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+              return;
+            }
+            router.push(`/educators/${id}`);
+          }}
+        >
+          Back
+        </Button>
+      </div>
+
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">

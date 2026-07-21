@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   addInspirationComment,
@@ -134,6 +135,7 @@ export default function InspirationDetailPage({
 }) {
   const { id } = use(params);
   const { user } = useAuth();
+  const router = useRouter();
 
   const [item, setItem] = useState<InspirationItem | null>(null);
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -254,6 +256,29 @@ export default function InspirationDetailPage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Link href="/inspiration" className="hover:text-foreground transition-colors">
+            Inspiration
+          </Link>
+          <span>/</span>
+          <span className="text-foreground truncate">{displayTitle}</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+              return;
+            }
+            router.push("/inspiration");
+          }}
+        >
+          Back
+        </Button>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <Card className="overflow-hidden">
           <div

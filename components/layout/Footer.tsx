@@ -40,11 +40,11 @@ export default function Footer() {
           <div className="col-span-2 md:col-span-1">
             <Link
               href="/"
-              className="text-lg font-bold text-primary-900"
+              className="type-heading-strong text-lg font-extrabold text-primary-900"
             >
               VistaTeacher
             </Link>
-            <p className="mt-2 text-sm text-muted">
+            <p className="type-body-light mt-2 text-sm text-muted">
               The central hub for educators to connect, collaborate, and grow
               professionally.
             </p>
@@ -53,7 +53,7 @@ export default function Footer() {
           {/* Link columns */}
           {footerLinks.map((group) => (
             <div key={group.title}>
-              <h3 className="text-sm font-semibold text-foreground">
+              <h3 className="type-heading-strong text-xs font-extrabold uppercase tracking-[0.14em] text-primary-900">
                 {group.title}
               </h3>
               <ul className="mt-3 space-y-2">
@@ -61,7 +61,7 @@ export default function Footer() {
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-muted hover:text-foreground transition-colors"
+                      className="type-body-medium text-sm text-muted hover:text-foreground transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -72,7 +72,7 @@ export default function Footer() {
           ))}
         </div>
 
-        <div className="mt-8 border-t border-border pt-6 text-center text-xs text-muted-foreground">
+        <div className="type-body-light mt-8 border-t border-border pt-6 text-center text-xs text-muted-foreground">
           &copy; {new Date().getFullYear()} VistaTeacher. All rights reserved.
         </div>
       </div>

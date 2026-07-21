@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { updateProfile } from "firebase/auth";
 import Image from "next/image";
@@ -212,7 +213,33 @@ export default function EditProfilePage() {
   const currentPhoto = photoPreview || photoURL;
 
   return (
-    <div className="mx-auto max-w-2xl pt-2 pb-8 space-y-6">
+    <div className="pt-2 space-y-6 pb-8 sm:pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Link
+            href="/profile"
+            className="hover:text-foreground transition-colors"
+          >
+            Profile
+          </Link>
+          <span>/</span>
+          <span className="text-foreground">Edit Profile</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+              return;
+            }
+            router.push("/profile");
+          }}
+        >
+          Back
+        </Button>
+      </div>
+
       <DiscoveryShell
         title={isExisting ? "Edit Profile" : "Complete Your Profile"}
         subtitle={
