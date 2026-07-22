@@ -7,6 +7,7 @@ interface AvatarProps {
   alt: string;
   size?: AvatarSize;
   className?: string;
+  preferInitials?: boolean;
 }
 
 const sizeClasses: Record<AvatarSize, string> = {
@@ -37,14 +38,17 @@ export default function Avatar({
   alt,
   size = "md",
   className = "",
+  preferInitials = false,
 }: AvatarProps) {
+  const showImage = Boolean(src) && !preferInitials;
+
   return (
     <div
       className={`relative rounded-full overflow-hidden shrink-0 ${sizeClasses[size]} ${className}`}
     >
-      {src ? (
+      {showImage ? (
         <Image
-          src={src}
+          src={src!}
           alt={alt}
           width={sizePx[size]}
           height={sizePx[size]}

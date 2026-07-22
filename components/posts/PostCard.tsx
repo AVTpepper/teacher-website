@@ -9,7 +9,6 @@ import {
   hasLikedPost,
   commentOnPost,
   getPostComments,
-  getPostCommentsCount,
   likeComment,
   unlikeComment,
   hasLikedComment,
@@ -79,9 +78,10 @@ interface PostCardProps {
   post: Post;
   onDelete?: (postId: string) => void;
   onUpdate?: (updated: Post) => void;
+  textOnlyAvatars?: boolean;
 }
 
-export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
+export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = false }: PostCardProps) {
   const { user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likesCount);
@@ -110,23 +110,6 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
 
   useEffect(() => {
     setCommentCount(post.commentCount);
-  }, [post.id, post.commentCount]);
-
-  useEffect(() => {
-    if (post.commentCount > 0) return;
-
-    let cancelled = false;
-    getPostCommentsCount(post.id)
-      .then((count) => {
-        if (!cancelled && count > 0) {
-          setCommentCount(count);
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
   }, [post.id, post.commentCount]);
 
   const displayedCommentCount = showComments ? comments.length : commentCount;
@@ -245,6 +228,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
             src={post.authorPhotoURL}
             alt={post.authorName}
             size="md"
+            preferInitials={textOnlyAvatars}
           />
         </Link>
         <div className="flex-1 min-w-0">
@@ -478,7 +462,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
                 parentId: c.parentId ?? null,
                 authorId: c.authorId,
                 authorName: c.authorName,
-                authorPhotoURL: c.authorPhotoURL,
+                authorPhotoURL: textOnlyAvatars ? null : c.authorPhotoURL,
                 content: c.content,
                 mentionedUsers: c.mentionedUsers,
                 createdAt: c.createdAt as { seconds: number } | null,

@@ -494,9 +494,9 @@ function CommentItem({
                 type="button"
                 onClick={handleCommentLike}
                 disabled={!user || commentLikeLoading}
-                className={`flex items-center gap-1 text-xs font-medium transition-colors cursor-pointer disabled:cursor-not-allowed ${
+                className={`flex items-center gap-1 text-xs font-medium cursor-pointer disabled:cursor-not-allowed ${
                   commentLiked
-                    ? "text-error-500"
+                    ? "text-error-700"
                     : "text-muted hover:text-foreground"
                 }`}
               >

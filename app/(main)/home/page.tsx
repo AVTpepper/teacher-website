@@ -133,7 +133,7 @@ function HomePageInner() {
                     key={f.value}
                     type="button"
                     onClick={() => handleTypeChange(f.value)}
-                    className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-1.5 text-sm font-medium transition-colors cursor-pointer ${
+                    className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-1.5 text-sm font-medium cursor-pointer ${
                       typeFilter === f.value
                         ? "border-primary-300 bg-primary-50 text-primary-900"
                         : "border-primary-100 bg-surface text-primary-800 hover:border-primary-200 hover:bg-surface-hover"
@@ -176,7 +176,7 @@ function HomePageInner() {
                 </svg>
                 Linked post
               </div>
-              <PostCard post={sharedPost} />
+              <PostCard post={sharedPost} textOnlyAvatars />
             </div>
           ) : (
             <div className="rounded-xl border border-border bg-surface shadow-card p-6 text-center text-sm text-muted">
@@ -226,6 +226,7 @@ function HomePageInner() {
             <PostCard
               key={post.id}
               post={post}
+              textOnlyAvatars
               onDelete={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))}
             />
           ))}
