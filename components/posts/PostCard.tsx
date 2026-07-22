@@ -403,9 +403,9 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
           type="button"
           onClick={handleLike}
           disabled={!user}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer ${
             liked
-              ? "text-error-500 bg-error-50 hover:bg-error-100"
+              ? "text-error-700 bg-error-100 hover:bg-error-200"
               : "text-muted hover:bg-surface-hover hover:text-foreground"
           } disabled:opacity-50 disabled:cursor-not-allowed`}
         >

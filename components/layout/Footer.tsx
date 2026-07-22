@@ -53,9 +53,9 @@ export default function Footer() {
           {/* Link columns */}
           {footerLinks.map((group) => (
             <div key={group.title}>
-              <h3 className="type-heading-strong text-xs font-extrabold uppercase tracking-[0.14em] text-primary-900">
+              <h2 className="type-heading-strong text-xs font-extrabold uppercase tracking-[0.14em] text-primary-900">
                 {group.title}
-              </h3>
+              </h2>
               <ul className="mt-3 space-y-2">
                 {group.links.map((link) => (
                   <li key={link.label}>

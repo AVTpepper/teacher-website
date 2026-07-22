@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getUser } from "@/lib/firestore/users";
 
 export default function SiteMessageBanner() {
   const { user, loading } = useAuth();
+  const pathname = usePathname();
   const [isPlus, setIsPlus] = useState(false);
 
   useEffect(() => {
@@ -31,6 +33,7 @@ export default function SiteMessageBanner() {
     };
   }, [user]);
 
+  if (pathname === "/home") return null;
   if (loading) return null;
   if (user && isPlus) return null;
 

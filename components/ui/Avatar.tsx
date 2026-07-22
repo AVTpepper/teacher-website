@@ -48,6 +48,8 @@ export default function Avatar({
           alt={alt}
           width={sizePx[size]}
           height={sizePx[size]}
+          sizes={`${sizePx[size]}px`}
+          quality={60}
           className="object-cover w-full h-full"
         />
       ) : (
