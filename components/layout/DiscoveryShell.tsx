@@ -34,7 +34,7 @@ export default function DiscoveryShell({
           </p>
         </div>
         {action && (
-          <div className="shrink-0 [&_button]:!min-h-10 [&_button]:!min-w-10 [&_button]:!rounded-lg [&_button]:!border-0 [&_button]:!bg-accent-500 [&_button]:!px-5 [&_button]:!py-2.5 [&_button]:!text-sm [&_button]:!font-semibold [&_button]:!text-white [&_button]:!shadow-sm [&_button]:transition-colors [&_button]:hover:!bg-accent-600 [&_button]:active:!bg-accent-600 [&_button]:focus-visible:!outline-2 [&_button]:focus-visible:!outline-offset-2 [&_button]:focus-visible:!outline-white [&_button]:disabled:!bg-accent-500/60 [&_button]:disabled:!text-white/80">
+          <div className="shrink-0 [&_button]:min-h-10! [&_button]:min-w-10! [&_button]:rounded-lg! [&_button]:border-0! [&_button]:bg-accent-500! [&_button]:px-5! [&_button]:py-2.5! [&_button]:text-sm! [&_button]:font-semibold! [&_button]:text-white! [&_button]:shadow-sm! [&_button]:transition-colors [&_button]:hover:bg-accent-600! [&_button]:active:bg-accent-600! [&_button]:focus-visible:outline-2! [&_button]:focus-visible:outline-offset-2! [&_button]:focus-visible:outline-white! [&_button]:disabled:bg-accent-500/60! [&_button]:disabled:text-white/80!">
             {action}
           </div>
         )}

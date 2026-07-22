@@ -401,7 +401,7 @@ export default function AccountManagementPage() {
           <button
             type="button"
             onClick={() => setDeleteOpen(true)}
-            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-error-500 bg-transparent px-4 py-2 text-sm font-medium text-error-700 transition-colors hover:bg-error-50 focus-ring cursor-pointer"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-error-500 bg-transparent px-4 py-2 text-sm font-medium text-error-700 transition-colors hover:bg-error-50 focus-ring cursor-pointer"
           >
             Delete account
           </button>

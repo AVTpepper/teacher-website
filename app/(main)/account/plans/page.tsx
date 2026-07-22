@@ -77,7 +77,7 @@ export default function AccountPlansPage() {
         </div>
 
         <div className="mt-6 overflow-x-auto">
-          <table className="w-full min-w-[640px] border-separate border-spacing-0">
+          <table className="border-separate border-spacing-0 w-full min-w-160">
             <caption className="sr-only">Plan comparison table</caption>
             <thead>
               <tr>
