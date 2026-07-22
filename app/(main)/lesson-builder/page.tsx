@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import {
@@ -19,6 +19,9 @@ import { addBookmark, removeBookmark, getUserBookmarks } from "@/lib/firestore/b
 
 const LESSON_BUILDER_PREVIEW_LIMIT = 6;
 const OBJECTIVE_CHAR_LIMIT = 120;
+
+type LessonSortBy = "newest" | "oldest" | "highest-rated" | "most-saved" | "most-downloaded";
+type LessonModificationFilter = "all" | "modified" | "original";
 
 // ─── Star display ─────────────────────────────────────────────────────────────
 
@@ -395,6 +398,8 @@ export default function LessonBuilderPage() {
 
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
+  const [sortBy, setSortBy] = useState<LessonSortBy>("newest");
+  const [modificationFilter, setModificationFilter] = useState<LessonModificationFilter>("all");
 
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
@@ -477,7 +482,38 @@ export default function LessonBuilderPage() {
   }, [user]);
 
   const hasFilters = gradeLevel || subject;
-  const visibleRecentLessons = lessons.slice(0, LESSON_BUILDER_PREVIEW_LIMIT);
+  const hasAdvancedFilters = modificationFilter !== "all";
+  const displayedLessons = useMemo(() => {
+    const filtered = lessons.filter((lesson) => {
+      if (modificationFilter === "modified") return !!lesson.remixedFromId;
+      if (modificationFilter === "original") return !lesson.remixedFromId;
+      return true;
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
+      const aCreated = a.createdAt?.seconds ?? 0;
+      const bCreated = b.createdAt?.seconds ?? 0;
+
+      if (sortBy === "oldest") return aCreated - bCreated;
+      if (sortBy === "highest-rated") {
+        const ratingDiff = (b.ratingAverage ?? 0) - (a.ratingAverage ?? 0);
+        if (ratingDiff !== 0) return ratingDiff;
+        return (b.ratingCount ?? 0) - (a.ratingCount ?? 0);
+      }
+      if (sortBy === "most-saved") {
+        const diff = (b.bookmarkCount ?? 0) - (a.bookmarkCount ?? 0);
+        return diff !== 0 ? diff : bCreated - aCreated;
+      }
+      if (sortBy === "most-downloaded") {
+        const diff = (b.downloadCount ?? 0) - (a.downloadCount ?? 0);
+        return diff !== 0 ? diff : bCreated - aCreated;
+      }
+      return bCreated - aCreated;
+    });
+
+    return sorted;
+  }, [lessons, modificationFilter, sortBy]);
+  const visibleRecentLessons = displayedLessons.slice(0, LESSON_BUILDER_PREVIEW_LIMIT);
   const visibleDrafts = draftsExpanded ? drafts : drafts.slice(0, 3);
   const visiblePublished = publishedExpanded ? published : published.slice(0, 3);
   const visibleBookmarked = bookmarkedExpanded ? bookmarkedLessons : bookmarkedLessons.slice(0, 3);
@@ -722,7 +758,7 @@ export default function LessonBuilderPage() {
         </Card>
       )}
 
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
         <div className="flex-1">
           <Select
             label="Grade Level"
@@ -741,8 +777,34 @@ export default function LessonBuilderPage() {
             options={SUBJECTS.map((s) => ({ value: s, label: s }))}
           />
         </div>
-        {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={() => { setGradeLevel(""); setSubject(""); }}>
+        <div className="flex-1">
+          <Select
+            label="Sort"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as LessonSortBy)}
+            options={[
+              { value: "newest", label: "Newest" },
+              { value: "oldest", label: "Oldest" },
+              { value: "highest-rated", label: "Highest Rated" },
+              { value: "most-saved", label: "Most Saved" },
+              { value: "most-downloaded", label: "Most Downloaded" },
+            ]}
+          />
+        </div>
+        <div className="flex-1">
+          <Select
+            label="Type"
+            value={modificationFilter}
+            onChange={(e) => setModificationFilter(e.target.value as LessonModificationFilter)}
+            options={[
+              { value: "all", label: "All Lessons" },
+              { value: "modified", label: "Modified" },
+              { value: "original", label: "Original" },
+            ]}
+          />
+        </div>
+        {(hasFilters || hasAdvancedFilters) && (
+          <Button variant="ghost" size="sm" onClick={() => { setGradeLevel(""); setSubject(""); setSortBy("newest"); setModificationFilter("all"); }}>
             Clear Filters
           </Button>
         )}
@@ -752,14 +814,14 @@ export default function LessonBuilderPage() {
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
         </div>
-      ) : lessons.length === 0 ? (
+      ) : displayedLessons.length === 0 ? (
         <div className="py-20 text-center">
           <div className="text-5xl mb-4">📝</div>
           <h3 className="text-sm font-medium text-foreground">No lesson plans found</h3>
           <p className="mt-1 text-xs text-muted">
-            {hasFilters ? "Try adjusting your filters." : "Be the first to publish a lesson plan!"}
+            {hasFilters || hasAdvancedFilters ? "Try adjusting your filters." : "Be the first to publish a lesson plan!"}
           </p>
-          {!hasFilters && (
+          {!hasFilters && !hasAdvancedFilters && (
             <Link href="/lesson-builder/new?path=manual">
               <Button className="mt-4" size="sm">Create a Lesson Plan</Button>
             </Link>
@@ -779,7 +841,7 @@ export default function LessonBuilderPage() {
           </div>
           <div className="mt-8 flex flex-col items-center gap-3">
             <p className="text-xs text-muted">
-              Showing the most recent {Math.min(LESSON_BUILDER_PREVIEW_LIMIT, lessons.length)} lesson plans.
+              Showing {Math.min(LESSON_BUILDER_PREVIEW_LIMIT, displayedLessons.length)} of {displayedLessons.length} lesson plans.
             </p>
             <div className="flex items-center justify-center">
               <Link href="/resources">

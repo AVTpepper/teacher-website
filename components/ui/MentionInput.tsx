@@ -198,7 +198,7 @@ const MentionInput = forwardRef<MentionInputHandle, MentionInputProps>(function 
     onKeyDown: handleKeyDown,
     onFocus,
     placeholder,
-    className,
+    className: `${className ?? ""} text-base sm:text-sm`,
   };
 
   return (

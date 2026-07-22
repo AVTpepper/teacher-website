@@ -28,6 +28,7 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isPlus, setIsPlus] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,10 +36,16 @@ export default function Navbar() {
 
     getUser(user.uid)
       .then((profile) => {
-        if (!cancelled) setIsAdmin(profile?.role === "admin");
+        if (!cancelled) {
+          setIsAdmin(profile?.role === "admin");
+          setIsPlus(profile?.tier === "plus");
+        }
       })
       .catch(() => {
-        if (!cancelled) setIsAdmin(false);
+        if (!cancelled) {
+          setIsAdmin(false);
+          setIsPlus(false);
+        }
       });
 
     return () => {
@@ -95,11 +102,18 @@ export default function Navbar() {
                   <Dropdown
                     align="right"
                     trigger={
-                      <Avatar
-                        src={user.photoURL}
-                        alt={user.displayName || "User"}
-                        size="sm"
-                      />
+                      <div className="relative">
+                        <Avatar
+                          src={user.photoURL}
+                          alt={user.displayName || "User"}
+                          size="sm"
+                        />
+                        {isPlus && (
+                          <span className="absolute -right-1 -top-1 rounded-full bg-accent-400 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-950">
+                            +
+                          </span>
+                        )}
+                      </div>
                     }
                     items={[
                       {

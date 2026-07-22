@@ -45,6 +45,7 @@ export default function ResourceDetailPage({
   const id = parseResourceSlug(rawId);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const resourcePath = `/resources/${rawId}`;
 
   const [resource, setResource] = useState<Resource | null>(null);
   const [author, setAuthor] = useState<UserProfile | null>(null);
@@ -162,7 +163,7 @@ export default function ResourceDetailPage({
           actorName: user.displayName || "Someone",
           actorPhotoURL: user.photoURL,
           resourceTitle: resource.title,
-          linkURL: window.location.href,
+          linkURL: resourcePath,
         }).catch(() => {});
       }
     }
@@ -199,7 +200,7 @@ export default function ResourceDetailPage({
         actorName: user.displayName || "Someone",
         actorPhotoURL: user.photoURL,
         resourceTitle: resource.title,
-        linkURL: window.location.href,
+        linkURL: resourcePath,
       }).catch(() => {});
     }
   }
@@ -224,7 +225,7 @@ export default function ResourceDetailPage({
             actorName: user.displayName || "Someone",
             actorPhotoURL: user.photoURL,
             resourceTitle: resource.title,
-            linkURL: window.location.href,
+            linkURL: resourcePath,
           }).catch(() => {});
         }
       }
@@ -615,7 +616,7 @@ export default function ResourceDetailPage({
               description="Ask a question, share how you'd use it, or suggest an improvement."
               ownerId={resource.authorId}
               contentLabel={`your resource "${resource.title}"`}
-              linkURL={typeof window !== "undefined" ? window.location.href : `/resources/${rawId}`}
+              linkURL={resourcePath}
               maxDepth={1}
               mode="like"
               composerPlaceholder="Add a comment..."

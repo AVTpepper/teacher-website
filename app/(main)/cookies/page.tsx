@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function CookiesPage() {
   const lastUpdated = "May 12, 2026";
   return (
@@ -38,7 +40,7 @@ export default function CookiesPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Contact</h2>
-        <p className="text-muted leading-relaxed">Questions about our use of cookies? <a href="/contact" className="text-primary-900 hover:underline">Contact us</a>.</p>
+        <p className="text-muted leading-relaxed">Questions about our use of cookies? <Link href="/contact" className="text-primary-900 hover:underline">Contact us</Link>.</p>
       </section>
     </div>
   );

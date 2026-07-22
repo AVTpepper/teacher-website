@@ -10,6 +10,7 @@ import {
   markAllAsRead,
   dismissNotification,
   dismissAllVisible,
+  normalizeNotificationLink,
   type Notification,
   type NotificationType,
 } from "@/lib/notifications";
@@ -113,7 +114,7 @@ export default function NotificationDropdown() {
       );
     }
     setOpen(false);
-    router.push(n.linkURL);
+    router.push(normalizeNotificationLink(n.linkURL));
   }
 
   function handleMarkRead(e: React.MouseEvent, n: Notification) {

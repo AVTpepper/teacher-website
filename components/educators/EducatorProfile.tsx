@@ -293,6 +293,9 @@ export default function EducatorProfile({ userId }: { userId: string }) {
                   </span>
                 </Badge>
               )}
+              {profile.tier === "plus" && (
+                <Badge variant="info">Plus Member</Badge>
+              )}
             </div>
 
             {/* Meta row */}
@@ -452,10 +455,19 @@ export default function EducatorProfile({ userId }: { userId: string }) {
       </Card>
 
       {/* Badges Section */}
-      {profile.badges.length > 0 && (
-        <Card className="mt-6">
-          <h2 className="mb-4 text-lg font-semibold text-foreground">Achievements</h2>
-          {(["verification", "contribution", "milestone", "expertise"] as const).map((cat) => {
+      <Card className="mt-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Achievements</h2>
+          <Link href={`/educators/${userId}/achievements`}>
+            <Button variant="outline" size="sm">View Progress</Button>
+          </Link>
+        </div>
+        {profile.badges.length === 0 ? (
+          <p className="text-sm text-muted">
+            No achievements unlocked yet. Track progress and available milestones.
+          </p>
+        ) : (
+          (["verification", "contribution", "milestone", "expertise"] as const).map((cat) => {
             const catBadges = profile.badges.filter(
               (id) => BADGE_LIST.find((b) => b.id === id)?.category === cat
             );
@@ -467,9 +479,9 @@ export default function EducatorProfile({ userId }: { userId: string }) {
                 <BadgeList badgeIds={catBadges} />
               </div>
             );
-          })}
-        </Card>
-      )}
+          })
+        )}
+      </Card>
 
       {/* Content Tabs */}
       <div className="mt-6" ref={tabsSectionRef}>
@@ -591,7 +603,7 @@ function PostsTabContent({
       {visiblePosts.map((post) => (
         <Link
           key={post.id}
-          href={`/?post=${post.id}`}
+          href={`/home?post=${post.id}`}
           className="block rounded-lg border border-border px-4 py-3 hover:bg-surface-hover transition-colors"
         >
           <div className="mb-1 flex items-center gap-2">

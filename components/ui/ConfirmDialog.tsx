@@ -84,7 +84,7 @@ export default function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-4">
       <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
       <div
         ref={dialogRef}
@@ -92,7 +92,7 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-description"
-        className="relative z-10 w-full max-w-md rounded-xl bg-surface border border-border shadow-xl"
+            className="relative z-10 w-full max-w-md rounded-xl bg-surface border border-border shadow-xl max-h-[90vh] overflow-y-auto"
       >
         <div className="px-6 pt-6 pb-4">
           <h2
@@ -108,7 +108,7 @@ export default function ConfirmDialog({
             {description}
           </p>
         </div>
-        <div className="flex justify-end gap-3 px-6 pb-5">
+            <div className="flex flex-col-reverse gap-2 px-6 pb-5 sm:flex-row sm:justify-end sm:gap-3">
           <Button
             ref={cancelBtnRef}
             type="button"
@@ -116,6 +116,7 @@ export default function ConfirmDialog({
             size="sm"
             onClick={onClose}
             disabled={isLoading}
+                className="w-full sm:w-auto"
           >
             {cancelLabel}
           </Button>
@@ -126,6 +127,7 @@ export default function ConfirmDialog({
             onClick={onConfirm}
             isLoading={isLoading}
             disabled={isLoading}
+                className="w-full sm:w-auto"
           >
             {confirmLabel}
           </Button>

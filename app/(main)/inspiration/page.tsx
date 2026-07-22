@@ -43,20 +43,19 @@ interface CardProps {
   currentUserId?: string | null;
   onEdit: (item: InspirationItem) => void;
   onDelete: (item: InspirationItem) => void;
+  onOpen: (item: InspirationItem) => void;
 }
 
-function FeaturedCard({ item, currentUserId, onEdit, onDelete }: CardProps) {
+function FeaturedCard({ item, currentUserId, onEdit, onDelete, onOpen }: CardProps) {
   const thumb = item.thumbnailStorageURL || item.thumbnailURL;
   const isOwner = currentUserId != null && item.submittedBy === currentUserId;
-  const hasSourceUrl = typeof item.sourceURL === "string" && item.sourceURL.length > 0;
-  const sourceHref = item.sourceURL ?? "#";
   return (
     <div className="relative group">
       {isOwner && (
         <div className="absolute top-3 right-3 z-10 flex gap-1">
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); onEdit(item); }}
+            onClick={(e) => { e.stopPropagation(); onEdit(item); }}
             aria-label="Edit inspiration post"
             className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-foreground hover:bg-surface transition-colors"
           >
@@ -66,7 +65,7 @@ function FeaturedCard({ item, currentUserId, onEdit, onDelete }: CardProps) {
           </button>
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); onDelete(item); }}
+            onClick={(e) => { e.stopPropagation(); onDelete(item); }}
             aria-label="Delete inspiration post"
             className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-destructive hover:bg-destructive/10 transition-colors"
           >
@@ -76,13 +75,15 @@ function FeaturedCard({ item, currentUserId, onEdit, onDelete }: CardProps) {
           </button>
         </div>
       )}
-      <a
-        href={sourceHref}
-        target={hasSourceUrl ? "_blank" : undefined}
-        rel={hasSourceUrl ? "noopener noreferrer" : undefined}
-        aria-disabled={!hasSourceUrl}
-        onClick={(event) => {
-          if (!hasSourceUrl) event.preventDefault();
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onOpen(item)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onOpen(item);
+          }
         }}
         className="block group"
       >
@@ -125,25 +126,23 @@ function FeaturedCard({ item, currentUserId, onEdit, onDelete }: CardProps) {
           </div>
         </div>
       </Card>
-    </a>
+    </div>
     </div>
   );
 }
 
 // --- Regular grid card ---
 
-function InspirationCard({ item, currentUserId, onEdit, onDelete }: CardProps) {
+function InspirationCard({ item, currentUserId, onEdit, onDelete, onOpen }: CardProps) {
   const thumb = item.thumbnailStorageURL || item.thumbnailURL;
   const isOwner = currentUserId != null && item.submittedBy === currentUserId;
-  const hasSourceUrl = typeof item.sourceURL === "string" && item.sourceURL.length > 0;
-  const sourceHref = item.sourceURL ?? "#";
   return (
     <div className="relative group h-full">
       {isOwner && (
         <div className="absolute top-2 right-2 z-10 flex gap-1">
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); onEdit(item); }}
+            onClick={(e) => { e.stopPropagation(); onEdit(item); }}
             aria-label="Edit inspiration post"
             className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-foreground hover:bg-surface transition-colors"
           >
@@ -153,7 +152,7 @@ function InspirationCard({ item, currentUserId, onEdit, onDelete }: CardProps) {
           </button>
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); onDelete(item); }}
+            onClick={(e) => { e.stopPropagation(); onDelete(item); }}
             aria-label="Delete inspiration post"
             className="flex items-center justify-center w-7 h-7 rounded-full bg-surface/90 border border-border text-muted hover:text-destructive hover:bg-destructive/10 transition-colors"
           >
@@ -163,13 +162,15 @@ function InspirationCard({ item, currentUserId, onEdit, onDelete }: CardProps) {
           </button>
         </div>
       )}
-      <a
-        href={sourceHref}
-        target={hasSourceUrl ? "_blank" : undefined}
-        rel={hasSourceUrl ? "noopener noreferrer" : undefined}
-        aria-disabled={!hasSourceUrl}
-        onClick={(event) => {
-          if (!hasSourceUrl) event.preventDefault();
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onOpen(item)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onOpen(item);
+          }
         }}
         className="block group h-full"
       >
@@ -210,7 +211,7 @@ function InspirationCard({ item, currentUserId, onEdit, onDelete }: CardProps) {
           </p>
         </div>
       </Card>
-    </a>
+    </div>
     </div>
   );
 }
@@ -318,6 +319,10 @@ export default function InspirationPage() {
     }
   }
 
+  function handleOpen(item: InspirationItem) {
+    router.push(`/inspiration/${item.id}`);
+  }
+
   const featured = items[0] ?? null;
   const rest = items.slice(1);
 
@@ -397,6 +402,7 @@ export default function InspirationPage() {
               currentUserId={user?.uid ?? null}
               onEdit={handleEditOpen}
               onDelete={handleDeleteOpen}
+              onOpen={handleOpen}
             />
           )}
           {rest.length > 0 && (
@@ -408,6 +414,7 @@ export default function InspirationPage() {
                   currentUserId={user?.uid ?? null}
                   onEdit={handleEditOpen}
                   onDelete={handleDeleteOpen}
+                  onOpen={handleOpen}
                 />
               ))}
             </div>

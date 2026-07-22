@@ -1,15 +1,16 @@
 import {
   doc,
   getDoc,
+  deleteDoc,
   setDoc,
   updateDoc,
-  deleteDoc,
   serverTimestamp,
   increment,
   collection,
   query,
   where,
   orderBy,
+  limit,
   getDocs,
   type DocumentSnapshot,
   type Timestamp,
@@ -17,6 +18,11 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { byCreatedAtDesc, byUpdatedAtDesc } from "@/lib/utils";
+import {
+  deleteCommentWithReplies,
+  type DeleteCommentResult,
+  migrateLegacyCommentFields,
+} from "@/lib/firestore/commentThreads";
 
 // --- Lesson types ---
 
@@ -49,6 +55,9 @@ export interface Lesson {
   assessments: string[];
   isPublic: boolean;
   remixedFromId: string | null;
+  remixedFromTitle?: string | null;
+  remixedFromAuthorId?: string | null;
+  remixedFromAuthorName?: string | null;
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
   downloadCount: number;
@@ -73,6 +82,9 @@ export interface LessonInput {
   assessments: string[];
   isPublic: boolean;
   remixedFromId?: string | null;
+  remixedFromTitle?: string | null;
+  remixedFromAuthorId?: string | null;
+  remixedFromAuthorName?: string | null;
 }
 
 // --- Lesson CRUD ---
@@ -89,6 +101,9 @@ export async function createLesson(data: LessonInput): Promise<string> {
     titleLower: data.title.toLowerCase(),
     id: ref.id,
     remixedFromId: data.remixedFromId ?? null,
+    remixedFromTitle: data.remixedFromTitle ?? null,
+    remixedFromAuthorId: data.remixedFromAuthorId ?? null,
+    remixedFromAuthorName: data.remixedFromAuthorName ?? null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     downloadCount: 0,
@@ -201,6 +216,40 @@ export async function getLessonCountByAuthor(
   return lessons.length;
 }
 
+export async function getPublicRemixedLessons(sourceLessonId: string): Promise<Lesson[]> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const q = query(
+    collection(db, "lessons"),
+    where("isPublic", "==", true),
+    where("remixedFromId", "==", sourceLessonId)
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs
+    .map((d) => d.data() as Lesson)
+    .sort(byCreatedAtDesc);
+}
+
+export async function getRecentPublicLessons(maxResults = 3): Promise<Lesson[]> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  try {
+    const q = query(
+      collection(db, "lessons"),
+      where("isPublic", "==", true),
+      orderBy("createdAt", "desc"),
+      limit(Math.max(1, maxResults))
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => d.data() as Lesson);
+  } catch {
+    // Fallback if composite index is still building.
+    const { lessons } = await getPublicLessons();
+    return lessons.slice(0, Math.max(1, maxResults));
+  }
+}
+
 // --- Download tracking ---
 
 export async function trackLessonDownload(
@@ -230,6 +279,9 @@ export interface LessonComment {
   content: string;
   mentionedUsers?: { uid: string; displayName: string }[];
   createdAt: Timestamp | null;
+  editedAt?: Timestamp | null;
+  deleted?: boolean;
+  likesCount: number;
 }
 
 export interface LessonCommentInput {
@@ -255,6 +307,7 @@ export async function addLessonComment(
     lessonId,
     parentId: data.parentId ?? null,
     mentionedUsers: data.mentionedUsers ?? [],
+    likesCount: 0,
     createdAt: serverTimestamp(),
   });
 
@@ -272,7 +325,12 @@ export async function getLessonComments(
   );
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((d) => d.data() as LessonComment);
+  return snapshot.docs.map((d) =>
+    migrateLegacyCommentFields(
+      doc(db!, "lessons", lessonId, "comments", d.id),
+      d.data() as LessonComment
+    )
+  );
 }
 
 export async function updateLessonComment(
@@ -287,10 +345,51 @@ export async function updateLessonComment(
   });
 }
 
+export async function likeLessonComment(
+  lessonId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  await setDoc(doc(db, "lessons", lessonId, "comments", commentId, "likes", userId), {
+    likedAt: serverTimestamp(),
+  });
+  await updateDoc(doc(db, "lessons", lessonId, "comments", commentId), {
+    likesCount: increment(1),
+  });
+}
+
+export async function unlikeLessonComment(
+  lessonId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  await deleteDoc(doc(db, "lessons", lessonId, "comments", commentId, "likes", userId));
+  await updateDoc(doc(db, "lessons", lessonId, "comments", commentId), {
+    likesCount: increment(-1),
+  });
+}
+
+export async function hasLikedLessonComment(
+  lessonId: string,
+  commentId: string,
+  userId: string
+): Promise<boolean> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const snap = await getDoc(doc(db, "lessons", lessonId, "comments", commentId, "likes", userId));
+  return snap.exists();
+}
+
 export async function deleteLessonComment(
   lessonId: string,
   commentId: string
-): Promise<void> {
-  if (!db) throw new Error("Firestore is not initialized");
-  await deleteDoc(doc(db, "lessons", lessonId, "comments", commentId));
+): Promise<DeleteCommentResult> {
+  return deleteCommentWithReplies({
+    collectionPath: ["lessons", lessonId, "comments"],
+    commentId,
+  });
 }

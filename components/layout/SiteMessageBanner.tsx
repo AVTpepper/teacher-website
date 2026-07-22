@@ -1,6 +1,39 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { getUser } from "@/lib/firestore/users";
 
 export default function SiteMessageBanner() {
+  const { user, loading } = useAuth();
+  const [isPlus, setIsPlus] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!user) return;
+
+    getUser(user.uid)
+      .then((profile) => {
+        if (!cancelled) {
+          setIsPlus(profile?.tier === "plus");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsPlus(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  if (loading) return null;
+  if (user && isPlus) return null;
+
   return (
     <div className="mb-6 overflow-hidden rounded-2xl border border-primary-800/20 bg-linear-to-r from-primary-900 via-primary-800 to-primary-700 px-6 py-4 text-white shadow-[0_12px_32px_rgba(15,76,92,0.14)]">
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-accent-300">

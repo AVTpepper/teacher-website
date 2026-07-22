@@ -6,11 +6,18 @@ import Link from "next/link";
 import Card from "@/components/ui/Card";
 import { getPosts, type Post } from "@/lib/firestore/posts";
 import { getResources, type Resource } from "@/lib/firestore/resources";
-import { getPublicLessons, type Lesson } from "@/lib/firestore/lessons";
+import { getRecentPublicLessons, type Lesson } from "@/lib/firestore/lessons";
 import { getInspirationItems, type InspirationItem } from "@/lib/firestore/inspiration";
 
 interface SidebarContentsProps {
   onClose?: () => void;
+}
+
+function cleanDisplayText(value: string | null | undefined): string {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return "";
+  if (/^[\W_]+$/.test(trimmed)) return "";
+  return trimmed;
 }
 
 function SidebarContents({ onClose }: SidebarContentsProps) {
@@ -44,8 +51,8 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
       .catch(() => {})
       .finally(() => setLoadedResources(true));
 
-    getPublicLessons({}, null)
-      .then((result) => setFeaturedLessons(result.lessons.slice(0, 3)))
+    getRecentPublicLessons(3)
+      .then((result) => setFeaturedLessons(result))
       .catch(() => {})
       .finally(() => setLoadedLessons(true));
 
@@ -76,6 +83,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
               <li key={post.id}>
                 <Link
                   href={`/?post=${post.id}`}
+                  onClick={onClose}
                   className="group block rounded-md hover:bg-surface-hover transition-colors -mx-1 px-1 py-0.5"
                 >
                   <p className="text-xs text-foreground line-clamp-2 leading-relaxed group-hover:text-primary-900">
@@ -110,6 +118,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
               <li key={r.id}>
                 <Link
                   href={`/resources/${r.id}`}
+                  onClick={onClose}
                   className="text-xs text-foreground hover:text-primary-900 hover:underline line-clamp-2 leading-relaxed"
                 >
                   {r.title}
@@ -121,6 +130,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
         )}
         <Link
           href="/resources"
+          onClick={onClose}
           className="text-xs text-primary-900 hover:underline mt-2 inline-block"
         >
           Browse all resources →
@@ -146,6 +156,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
               <li key={l.id}>
                 <Link
                   href={`/lesson-builder/${l.id}`}
+                  onClick={onClose}
                   className="text-xs text-foreground hover:text-primary-900 hover:underline line-clamp-2 leading-relaxed"
                 >
                   {l.title}
@@ -157,6 +168,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
         )}
         <Link
           href="/lesson-builder"
+          onClick={onClose}
           className="text-xs text-primary-900 hover:underline mt-2 inline-block"
         >
           Create a lesson →
@@ -180,25 +192,21 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
           <ul className="space-y-2">
             {inspirationItems.map((item) => (
               <li key={item.id}>
-                <a
-                  href={item.sourceURL ?? "#"}
-                  target={item.sourceURL ? "_blank" : undefined}
-                  rel={item.sourceURL ? "noopener noreferrer" : undefined}
-                  aria-disabled={!item.sourceURL}
-                  onClick={(event) => {
-                    if (!item.sourceURL) event.preventDefault();
-                  }}
+                <Link
+                  href={`/inspiration/${item.id}`}
+                  onClick={onClose}
                   className="text-xs text-foreground hover:text-primary-900 hover:underline line-clamp-2 leading-relaxed"
                 >
-                  {item.title}
-                </a>
-                <p className="text-xs text-muted mt-0.5">{item.creator}</p>
+                  {cleanDisplayText(item.title) || "Untitled inspiration"}
+                </Link>
+                <p className="text-xs text-muted mt-0.5">{cleanDisplayText(item.creator) || "Community"}</p>
               </li>
             ))}
           </ul>
         )}
         <Link
           href="/inspiration"
+          onClick={onClose}
           className="text-xs text-primary-900 hover:underline mt-2 inline-block"
         >
           Explore inspiration →
@@ -240,28 +248,29 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
 export function SidebarDrawerButton() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const isLessonBuilderRoute = pathname?.startsWith("/lesson-builder") ?? false;
+  const isDrawerVisible = open && !isLessonBuilderRoute;
 
-  // Close on route changes
   const handleClose = useCallback(() => setOpen(false), []);
 
   // Close on Escape
   useEffect(() => {
-    if (!open) return;
+    if (!isDrawerVisible) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [isDrawerVisible]);
 
   // Lock body scroll when open
   useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
+    document.body.style.overflow = isDrawerVisible ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [open]);
+  }, [isDrawerVisible]);
 
   // Hide on lesson-builder pages - they show their own AI floating button
-  if (pathname?.startsWith("/lesson-builder")) return null;
+  if (isLessonBuilderRoute) return null;
 
   return (
     <>
@@ -278,7 +287,7 @@ export function SidebarDrawerButton() {
       </button>
 
       {/* Backdrop */}
-      {open && (
+      {isDrawerVisible && (
         <div
           className="fixed inset-0 z-40 bg-black/40 xl:hidden"
           onClick={handleClose}
@@ -291,7 +300,7 @@ export function SidebarDrawerButton() {
         role="dialog"
         aria-modal="true"
         aria-label="Sidebar"
-        className={`fixed inset-y-0 right-0 z-50 w-80 max-w-full overflow-y-auto border-l border-primary-100 bg-linear-to-b from-secondary-50 via-background to-background shadow-2xl transition-transform duration-300 xl:hidden ${open ? "translate-x-0" : "translate-x-full"}`}
+        className={`fixed inset-y-0 right-0 z-50 w-80 max-w-full overflow-y-auto border-l border-primary-100 bg-linear-to-b from-secondary-50 via-background to-background shadow-2xl transition-transform duration-300 xl:hidden ${isDrawerVisible ? "translate-x-0" : "translate-x-full"}`}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-primary-100 bg-surface/95 px-4 py-3 backdrop-blur">
           <div>

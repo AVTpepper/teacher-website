@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function PrivacyPage() {
   const lastUpdated = "May 12, 2026";
   return (
@@ -24,22 +26,22 @@ export default function PrivacyPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">4. Cookies</h2>
-        <p className="text-muted leading-relaxed">We use cookies to maintain your authentication session and remember your preferences. See our <a href="/cookies" className="text-primary-900 hover:underline">Cookie Policy</a> for more details.</p>
+        <p className="text-muted leading-relaxed">We use cookies to maintain your authentication session and remember your preferences. See our <Link href="/cookies" className="text-primary-900 hover:underline">Cookie Policy</Link> for more details.</p>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">5. Your Rights</h2>
-        <p className="text-muted leading-relaxed">You have the right to access, correct, or delete your personal data at any time. To request data deletion, please <a href="/contact" className="text-primary-900 hover:underline">contact us</a>.</p>
+        <p className="text-muted leading-relaxed">You have the right to access, correct, or delete your personal data at any time. To request data deletion, please <Link href="/contact" className="text-primary-900 hover:underline">contact us</Link>.</p>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">6. Content Ownership</h2>
-        <p className="text-muted leading-relaxed">Educators retain full intellectual property ownership of the content they publish on VistaTeacher. We do not claim ownership of your lesson plans, resources, or other original content. For full details, see the <a href="/terms#content-ownership" className="text-primary-900 hover:underline">Content Ownership section of our Terms of Service</a>.</p>
+        <p className="text-muted leading-relaxed">Educators retain full intellectual property ownership of the content they publish on VistaTeacher. We do not claim ownership of your lesson plans, resources, or other original content. For full details, see the <Link href="/terms#content-ownership" className="text-primary-900 hover:underline">Content Ownership section of our Terms of Service</Link>.</p>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">7. Contact</h2>
-        <p className="text-muted leading-relaxed">If you have any questions about this Privacy Policy, please <a href="/contact" className="text-primary-900 hover:underline">contact us</a>.</p>
+        <p className="text-muted leading-relaxed">If you have any questions about this Privacy Policy, please <Link href="/contact" className="text-primary-900 hover:underline">contact us</Link>.</p>
       </section>
     </div>
   );

@@ -10,7 +10,12 @@ import MentionInput, { type MentionedUser } from "@/components/ui/MentionInput";
 import { TextButton } from "@/components/ui";
 import Dropdown from "@/components/ui/Dropdown";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { timeAgo, parseMentions, type MentionRef } from "@/lib/utils";
+import {
+  timeAgo,
+  parseMentions,
+  normalizeMultilineText,
+  type MentionRef,
+} from "@/lib/utils";
 
 // ─── Generic comment type ───
 
@@ -70,6 +75,10 @@ export interface CommentThreadProps {
 }
 
 const MAX_COMMENT_LENGTH = 2000;
+const MAX_COMMENT_LINES = 16;
+const MAX_COMMENT_BLANK_RUN = 2;
+const COMMENT_TEXTAREA_CLASS =
+  "w-full resize-none rounded-lg border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background border-secondary-200 bg-white hover:border-border-strong focus-visible:border-primary-300";
 
 // ─── Single comment item (recursive) ───
 
@@ -186,11 +195,18 @@ function CommentItem({
   }
 
   async function handleReply() {
-    if (!user || !replyText.trim()) return;
+    if (!user) return;
+    const normalizedReply = normalizeMultilineText(replyText, {
+      maxLength: MAX_COMMENT_LENGTH,
+      maxLines: MAX_COMMENT_LINES,
+      maxConsecutiveBlankLines: MAX_COMMENT_BLANK_RUN,
+    });
+    if (!normalizedReply) return;
+
     setSubmittingReply(true);
     try {
       const newId = await onAddComment(
-        replyText.trim(),
+        normalizedReply,
         comment.id,
         replyMentions
       );
@@ -202,9 +218,11 @@ function CommentItem({
           authorId: user.uid,
           authorName: user.displayName || "Anonymous",
           authorPhotoURL: user.photoURL,
-          content: replyText.trim(),
+          content: normalizedReply,
           mentionedUsers: [...replyMentions],
           createdAt: { seconds: Date.now() / 1000 },
+          deleted: false,
+          likesCount: 0,
           upvotes: 0,
           downvotes: 0,
         },
@@ -226,11 +244,18 @@ function CommentItem({
   }, [isEditing]);
 
   async function handleSaveEdit() {
-    if (!editText.trim() || editText.trim().length > MAX_COMMENT_LENGTH) return;
+    const normalizedEdit = normalizeMultilineText(editText, {
+      maxLength: MAX_COMMENT_LENGTH,
+      maxLines: MAX_COMMENT_LINES,
+      maxConsecutiveBlankLines: MAX_COMMENT_BLANK_RUN,
+    });
+    if (!normalizedEdit) return;
+
     setEditSaving(true);
     try {
-      await onUpdateComment!(comment.id, editText.trim());
-      onSelfUpdated?.(comment.id, editText.trim());
+      await onUpdateComment!(comment.id, normalizedEdit);
+      onSelfUpdated?.(comment.id, normalizedEdit);
+      setEditText(normalizedEdit);
       setIsEditing(false);
     } catch {
       // ignore
@@ -401,17 +426,17 @@ function CommentItem({
             )}
           </div>
           {isEditing ? (
-            <div className="mt-1">
+            <div className="mt-2 rounded-2xl border border-secondary-200 bg-surface-hover/85 p-3">
               <textarea
                 ref={editTextareaRef}
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
-                rows={3}
+                rows={4}
                 maxLength={MAX_COMMENT_LENGTH + 1}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-ring resize-none"
+                className={COMMENT_TEXTAREA_CLASS}
                 aria-label="Edit comment"
               />
-              <div className="flex items-center justify-between mt-1.5">
+              <div className="mt-2 flex items-center justify-between">
                 <span
                   className={`text-xs ${
                     editText.length > MAX_COMMENT_LENGTH
@@ -531,28 +556,34 @@ function CommentItem({
 
           {/* Reply input - only shown inline when there are no existing replies yet */}
           {showReply && localReplies.length === 0 && (
-            <div className="mt-2 flex gap-2">
-              <MentionInput
-                value={replyText}
-                onChange={setReplyText}
-                onMentionsChange={setReplyMentions}
-                placeholder={replyPlaceholder}
-                className="w-full rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleReply();
-                  }
-                }}
-              />
-              <Button
-                size="sm"
-                onClick={handleReply}
-                disabled={!replyText.trim()}
-                isLoading={submittingReply}
-              >
-                Reply
-              </Button>
+            <div className="mt-2 rounded-2xl border border-secondary-200 bg-surface-hover/85 p-3">
+              <div className="space-y-2">
+                <MentionInput
+                  value={replyText}
+                  onChange={setReplyText}
+                  onMentionsChange={setReplyMentions}
+                  placeholder={replyPlaceholder}
+                  multiline
+                  rows={2}
+                  className={COMMENT_TEXTAREA_CLASS}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      handleReply();
+                    }
+                  }}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={handleReply}
+                    disabled={!replyText.trim()}
+                    isLoading={submittingReply}
+                  >
+                    Reply
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
             </>
@@ -623,28 +654,34 @@ function CommentItem({
                   Reply
                 </TextButton>
               ) : (
-                <div className="flex gap-2">
-                  <MentionInput
-                    value={replyText}
-                    onChange={setReplyText}
-                    onMentionsChange={setReplyMentions}
-                    placeholder={replyPlaceholder}
-                    className="w-full rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleReply();
-                      }
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleReply}
-                    disabled={!replyText.trim()}
-                    isLoading={submittingReply}
-                  >
-                    Reply
-                  </Button>
+                <div className="rounded-2xl border border-secondary-200 bg-surface-hover/85 p-3">
+                  <div className="space-y-2">
+                    <MentionInput
+                      value={replyText}
+                      onChange={setReplyText}
+                      onMentionsChange={setReplyMentions}
+                      placeholder={replyPlaceholder}
+                      multiline
+                      rows={2}
+                      className={COMMENT_TEXTAREA_CLASS}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                          e.preventDefault();
+                          handleReply();
+                        }
+                      }}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        onClick={handleReply}
+                        disabled={!replyText.trim()}
+                        isLoading={submittingReply}
+                      >
+                        Reply
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -695,11 +732,18 @@ export default function CommentThread({
   }
 
   async function handleTopLevelComment() {
-    if (!user || !replyText.trim()) return;
+    if (!user) return;
+    const normalizedComment = normalizeMultilineText(replyText, {
+      maxLength: MAX_COMMENT_LENGTH,
+      maxLines: MAX_COMMENT_LINES,
+      maxConsecutiveBlankLines: MAX_COMMENT_BLANK_RUN,
+    });
+    if (!normalizedComment) return;
+
     setSubmitting(true);
     try {
       const newId = await onAddComment(
-        replyText.trim(),
+        normalizedComment,
         null,
         topLevelMentions
       );
@@ -711,9 +755,11 @@ export default function CommentThread({
           authorId: user.uid,
           authorName: user.displayName || "Anonymous",
           authorPhotoURL: user.photoURL,
-          content: replyText.trim(),
+          content: normalizedComment,
           mentionedUsers: topLevelMentions,
           createdAt: { seconds: Date.now() / 1000 },
+          deleted: false,
+          likesCount: 0,
           upvotes: 0,
           downvotes: 0,
         },
@@ -741,34 +787,40 @@ export default function CommentThread({
 
       {/* Comment input */}
       {user && (
-        <div className="flex gap-2">
-          <Avatar
-            src={user.photoURL}
-            alt={user.displayName || "You"}
-            size="sm"
-          />
-          <div className="flex-1 flex gap-2">
-            <MentionInput
-              value={replyText}
-              onChange={setReplyText}
-              onMentionsChange={setTopLevelMentions}
-              placeholder={composerPlaceholder}
-              className="w-full rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-ring hover:border-border-strong"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleTopLevelComment();
-                }
-              }}
+        <div className="rounded-2xl border border-secondary-200 bg-surface-hover/85 p-4">
+          <div className="flex gap-3">
+            <Avatar
+              src={user.photoURL}
+              alt={user.displayName || "You"}
+              size="md"
             />
-            <Button
-              size="sm"
-              onClick={handleTopLevelComment}
-              disabled={!replyText.trim()}
-              isLoading={submitting}
-            >
-              Post
-            </Button>
+            <div className="flex-1 min-w-0 space-y-2">
+              <MentionInput
+                value={replyText}
+                onChange={setReplyText}
+                onMentionsChange={setTopLevelMentions}
+                placeholder={composerPlaceholder}
+                multiline
+                rows={2}
+                className={COMMENT_TEXTAREA_CLASS}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    handleTopLevelComment();
+                  }
+                }}
+              />
+              <div className="flex items-center justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleTopLevelComment}
+                  disabled={!replyText.trim()}
+                  isLoading={submitting}
+                >
+                  Post
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

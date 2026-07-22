@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -13,11 +13,14 @@ import {
   type ForumThread,
   type GetThreadsResult,
 } from "@/lib/firestore/forums";
+import { GRADE_LEVELS, SUBJECTS } from "@/lib/firestore/users";
 import type { DocumentSnapshot } from "firebase/firestore";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import Tag from "@/components/ui/Tag";
 import { timeAgo } from "@/lib/utils";
 import DiscoveryShell from "@/components/layout/DiscoveryShell";
@@ -37,6 +40,9 @@ export default function ForumsPage() {
   const [loadingThreads, setLoadingThreads] = useState(false);
   const [loadingMoreThreads, setLoadingMoreThreads] = useState(false);
   const [hasMoreThreads, setHasMoreThreads] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [gradeFilter, setGradeFilter] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("");
 
   useEffect(() => {
     getCategories()
@@ -99,6 +105,18 @@ export default function ForumsPage() {
   const selectedCategoryData = FORUM_CATEGORIES.find(
     (c) => c.id === selectedCategory
   );
+  const filteredThreads = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return threads.filter((thread) => {
+      if (gradeFilter && thread.gradeLevel !== gradeFilter) return false;
+      if (subjectFilter && thread.subject !== subjectFilter) return false;
+      if (!query) return true;
+      const inTitle = thread.title.toLowerCase().includes(query);
+      const inContent = thread.content.toLowerCase().includes(query);
+      const inTags = thread.tags.some((tag) => tag.toLowerCase().includes(query));
+      return inTitle || inContent || inTags;
+    });
+  }, [threads, searchQuery, gradeFilter, subjectFilter]);
 
   return (
     <div className="space-y-6">
@@ -224,6 +242,35 @@ export default function ForumsPage() {
             </div>
           )}
 
+          <Card padding="md" className="space-y-3">
+            <Input
+              label="Search discussions"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search title, content, or tags"
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Select
+                label="Grade"
+                value={gradeFilter}
+                onChange={(e) => setGradeFilter(e.target.value)}
+                options={[
+                  { value: "", label: "All grades" },
+                  ...GRADE_LEVELS.map((grade) => ({ value: grade, label: grade })),
+                ]}
+              />
+              <Select
+                label="Subject"
+                value={subjectFilter}
+                onChange={(e) => setSubjectFilter(e.target.value)}
+                options={[
+                  { value: "", label: "All subjects" },
+                  ...SUBJECTS.map((subject) => ({ value: subject, label: subject })),
+                ]}
+              />
+            </div>
+          </Card>
+
           {/* Thread list */}
           {loadingThreads && threads.length === 0 ? (
             <div className="space-y-3">
@@ -263,9 +310,40 @@ export default function ForumsPage() {
                 </Button>
               )}
             </Card>
+          ) : filteredThreads.length === 0 ? (
+            <Card padding="lg" className="text-center">
+              <div className="text-4xl mb-3">💬</div>
+              <h3 className="text-lg font-semibold text-foreground">
+                No matching discussions
+              </h3>
+              <p className="text-sm text-muted mt-1">
+                Try adjusting your search or filters.
+              </p>
+              {(searchQuery || gradeFilter || subjectFilter) && (
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setGradeFilter("");
+                    setSubjectFilter("");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              )}
+              {user && !searchQuery && !gradeFilter && !subjectFilter && (
+                <Button
+                  className="mt-4"
+                  onClick={() => openNewThread()}
+                >
+                  Start a Discussion
+                </Button>
+              )}
+            </Card>
           ) : (
             <div className="space-y-3">
-              {threads.map((thread) => (
+              {filteredThreads.map((thread) => (
                 <Link
                   key={thread.id}
                   href={`/forums/${threadSlug(thread.title, thread.id)}`}

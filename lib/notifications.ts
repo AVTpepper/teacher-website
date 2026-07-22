@@ -2,6 +2,7 @@ import {
   doc,
   setDoc,
   updateDoc,
+  deleteDoc,
   writeBatch,
   collection,
   query,
@@ -54,6 +55,30 @@ export interface Notification {
 }
 
 export type NotificationInput = Omit<Notification, "id" | "createdAt" | "read" | "dismissed">;
+
+export function normalizeNotificationLink(linkURL: string): string {
+  const trimmed = linkURL.trim();
+  if (!trimmed) return "/notifications";
+
+  try {
+    const parsed = trimmed.startsWith("http://") || trimmed.startsWith("https://")
+      ? new URL(trimmed)
+      : new URL(trimmed, "http://localhost");
+
+    if (parsed.pathname === "/" && parsed.searchParams.has("post")) {
+      return `/home${parsed.search}${parsed.hash}`;
+    }
+
+    const normalizedPath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    return normalizedPath || "/notifications";
+  } catch {
+    if (trimmed.startsWith("/?post=")) {
+      return `/home${trimmed.slice(1)}`;
+    }
+
+    return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Firestore path helper
@@ -171,6 +196,30 @@ export async function markAllAsRead(recipientId: string): Promise<void> {
   await batch.commit();
 }
 
+export async function markNotificationsAsRead(
+  recipientId: string,
+  ids: string[]
+): Promise<void> {
+  if (!db || ids.length === 0) return;
+  const batch = writeBatch(db);
+  ids.forEach((id) => {
+    batch.update(doc(notifCollection(recipientId), id), { read: true });
+  });
+  await batch.commit();
+}
+
+export async function markNotificationsAsUnread(
+  recipientId: string,
+  ids: string[]
+): Promise<void> {
+  if (!db || ids.length === 0) return;
+  const batch = writeBatch(db);
+  ids.forEach((id) => {
+    batch.update(doc(notifCollection(recipientId), id), { read: false });
+  });
+  await batch.commit();
+}
+
 // ---------------------------------------------------------------------------
 // dismissNotification - hide a single notification from the dropdown permanently
 // ---------------------------------------------------------------------------
@@ -199,6 +248,26 @@ export async function dismissAllVisible(
   ids.forEach((id) =>
     batch.update(doc(notifCollection(recipientId), id), { dismissed: true })
   );
+  await batch.commit();
+}
+
+export async function deleteNotification(
+  recipientId: string,
+  notificationId: string
+): Promise<void> {
+  if (!db) return;
+  await deleteDoc(doc(notifCollection(recipientId), notificationId));
+}
+
+export async function deleteNotifications(
+  recipientId: string,
+  ids: string[]
+): Promise<void> {
+  if (!db || ids.length === 0) return;
+  const batch = writeBatch(db);
+  ids.forEach((id) => {
+    batch.delete(doc(notifCollection(recipientId), id));
+  });
   await batch.commit();
 }
 

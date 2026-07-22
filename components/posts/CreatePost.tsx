@@ -10,6 +10,11 @@ import { TextButton } from "@/components/ui";
 import Tag from "@/components/ui/Tag";
 import MentionInput, { type MentionedUser, type MentionInputHandle } from "@/components/ui/MentionInput";
 import LinkAttacher, { type AttachedLink } from "@/components/ui/LinkAttacher";
+import { normalizeMultilineText } from "@/lib/utils";
+
+const MAX_POST_LENGTH = 4000;
+const MAX_POST_LINES = 40;
+const MAX_POST_BLANK_RUN = 2;
 
 const POST_TYPES: { value: PostType; label: string }[] = [
   { value: "idea", label: "💡 Idea" },
@@ -68,8 +73,13 @@ export default function CreatePost({ onPostCreated, embedded = false }: CreatePo
   }
 
   async function handleSubmit() {
-    const trimmed = content.trim();
-    if (!trimmed) {
+    const normalized = normalizeMultilineText(content, {
+      maxLength: MAX_POST_LENGTH,
+      maxLines: MAX_POST_LINES,
+      maxConsecutiveBlankLines: MAX_POST_BLANK_RUN,
+    });
+
+    if (!normalized) {
       setError("Post content cannot be empty.");
       return;
     }
@@ -81,7 +91,7 @@ export default function CreatePost({ onPostCreated, embedded = false }: CreatePo
         authorId: user!.uid,
         authorName: user!.displayName || "Anonymous",
         authorPhotoURL: user!.photoURL,
-        content: trimmed,
+        content: normalized,
         type,
         tags: selectedTags,
         gradeLevel,

@@ -6,10 +6,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   getLesson,
+  getPublicRemixedLessons,
   deleteLesson,
   trackLessonDownload,
   getLessonComments,
   addLessonComment,
+  likeLessonComment,
+  unlikeLessonComment,
+  hasLikedLessonComment,
   updateLessonComment,
   deleteLessonComment,
   type Lesson,
@@ -35,9 +39,11 @@ export default function LessonDetailPage({
   const { id } = use(params);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const lessonPath = `/lesson-builder/${id}`;
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [author, setAuthor] = useState<UserProfile | null>(null);
+  const [publicRemixes, setPublicRemixes] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -88,11 +94,14 @@ export default function LessonDetailPage({
         setRatingAverage(res.ratingAverage ?? 0);
         setRatingCount(res.ratingCount ?? 0);
 
-        const [authorData] = await Promise.all([
+        const [authorData, _commentsLoaded, remixes] = await Promise.all([
           getUser(res.authorId),
           loadComments(),
+          getPublicRemixedLessons(res.id),
         ]);
+        void _commentsLoaded;
         setAuthor(authorData);
+        setPublicRemixes(Array.isArray(remixes) ? remixes : []);
 
         // Load user's existing rating
         if (user) {
@@ -141,7 +150,7 @@ export default function LessonDetailPage({
           actorName: user.displayName || "Someone",
           actorPhotoURL: user.photoURL,
           lessonTitle: lesson.title,
-          linkURL: window.location.href,
+          linkURL: lessonPath,
         }).catch(() => {});
       }
     } finally {
@@ -163,7 +172,7 @@ export default function LessonDetailPage({
           actorName: user.displayName || "Someone",
           actorPhotoURL: user.photoURL,
           lessonTitle: lesson.title,
-          linkURL: window.location.href,
+          linkURL: lessonPath,
         }).catch(() => {});
       }
     }
@@ -202,7 +211,7 @@ export default function LessonDetailPage({
         actorName: user.displayName || "Someone",
         actorPhotoURL: user.photoURL,
         lessonTitle: lesson.title,
-        linkURL: window.location.href,
+        linkURL: lessonPath,
       }).catch(() => {});
     }
   }
@@ -217,6 +226,9 @@ export default function LessonDetailPage({
     content: c.content,
     mentionedUsers: c.mentionedUsers,
     createdAt: c.createdAt as { seconds: number } | null,
+    editedAt: c.editedAt as { seconds: number } | null,
+    deleted: c.deleted,
+    likesCount: c.likesCount ?? 0,
   }));
 
   // ─── Loading ───
@@ -402,6 +414,20 @@ export default function LessonDetailPage({
               The content of this lesson plan is the intellectual property of{" "}
               <span className="font-medium text-foreground">{lesson.authorName}</span>. All rights reserved.
             </p>
+            {lesson.remixedFromId && (
+              <p className="text-xs text-muted">
+                This lesson was modified from{" "}
+                <Link
+                  href={`/lesson-builder/${lesson.remixedFromId}`}
+                  className="font-medium text-primary-700 hover:underline"
+                >
+                  {lesson.remixedFromTitle || "an original lesson"}
+                </Link>
+                {lesson.remixedFromAuthorName
+                  ? ` by ${lesson.remixedFromAuthorName}.`
+                  : "."}
+              </p>
+            )}
 
             {lesson.objectives.length > 0 && (
               <div>
@@ -678,6 +704,40 @@ export default function LessonDetailPage({
             </div>
           </Card>
 
+          {Array.isArray(publicRemixes) && publicRemixes.length > 0 && (
+            <Card padding="lg">
+              <h2 className="text-lg font-semibold text-foreground mb-3">
+                Public Modified Lessons
+              </h2>
+              <p className="text-sm text-muted mb-4">
+                Community versions adapted from this lesson.
+              </p>
+              <div className="space-y-2">
+                {publicRemixes.map((remix) => (
+                  <Link
+                    key={remix.id}
+                    href={`/lesson-builder/${remix.id}`}
+                    className="block rounded-lg border border-border px-4 py-3 hover:bg-surface-hover transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {remix.title || "Untitled"}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted truncate">
+                          by {remix.authorName} · {timeAgo(remix.createdAt as { seconds: number } | null)}
+                        </p>
+                      </div>
+                      <span className="shrink-0">
+                        <Badge variant="success">Modified</Badge>
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </Card>
+          )}
+
           {/* Comments */}
           <Card padding="lg">
             <h2 className="text-xl font-semibold text-foreground mb-4">
@@ -706,7 +766,7 @@ export default function LessonDetailPage({
                     actorName: user.displayName || "Someone",
                     actorPhotoURL: user.photoURL,
                     contentLabel: `your lesson "${lesson.title}"`,
-                    linkURL: window.location.href,
+                    linkURL: lessonPath,
                   }).catch(() => {});
                 }
                 // Notify parent comment author on reply (fire-and-forget)
@@ -718,7 +778,7 @@ export default function LessonDetailPage({
                       actorId: user.uid,
                       actorName: user.displayName || "Someone",
                       actorPhotoURL: user.photoURL,
-                      linkURL: window.location.href,
+                      linkURL: lessonPath,
                     }).catch(() => {});
                   }
                 }
@@ -731,7 +791,7 @@ export default function LessonDetailPage({
                         actorId: user.uid,
                         actorName: user.displayName || "Anonymous",
                         actorPhotoURL: user.photoURL,
-                        linkURL: window.location.href,
+                        linkURL: lessonPath,
                       }).catch(() => {});
                     }
                   });
@@ -744,6 +804,19 @@ export default function LessonDetailPage({
               }}
               onDeleteComment={async (commentId) => {
                 await deleteLessonComment(lesson.id, commentId);
+              }}
+              onLikeComment={async (commentId) => {
+                if (!user) return;
+                const alreadyLiked = await hasLikedLessonComment(lesson.id, commentId, user.uid);
+                if (alreadyLiked) {
+                  await unlikeLessonComment(lesson.id, commentId, user.uid);
+                } else {
+                  await likeLessonComment(lesson.id, commentId, user.uid);
+                }
+              }}
+              hasLikedComment={async (commentId) => {
+                if (!user) return false;
+                return hasLikedLessonComment(lesson.id, commentId, user.uid);
               }}
             />
           </Card>

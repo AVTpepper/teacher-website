@@ -378,7 +378,7 @@ export default function InspirationDetailPage({
           description="Share how this idea could be used, ask a question, or add context for other educators."
           ownerId={item.submittedBy ?? null}
           contentLabel={`this inspiration post "${displayTitle}"`}
-          linkURL={typeof window !== "undefined" ? window.location.href : `/inspiration/${item.id}`}
+          linkURL={`/inspiration/${item.id}`}
           mode="like"
           maxDepth={1}
           composerPlaceholder="Add a comment..."

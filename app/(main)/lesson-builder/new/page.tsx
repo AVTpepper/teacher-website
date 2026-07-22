@@ -110,6 +110,7 @@ function LessonBuilderNewEntry() {
 
   // Edit / Remix path: load lesson into wizard state
   const [editLoadedState, setEditLoadedState] = useState<WizardLessonState | null>(null);
+  const [remixSourceLesson, setRemixSourceLesson] = useState<Pick<Lesson, "id" | "title" | "authorId" | "authorName"> | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editLoadError, setEditLoadError] = useState<string | null>(null);
 
@@ -140,6 +141,16 @@ function LessonBuilderNewEntry() {
       .then((lesson) => {
         if (!lesson) { setEditLoadError("Lesson not found."); return; }
         setEditLoadedState(lessonToWizardState(lesson));
+        if (remixLessonId) {
+          setRemixSourceLesson({
+            id: lesson.id,
+            title: lesson.title,
+            authorId: lesson.authorId,
+            authorName: lesson.authorName,
+          });
+        } else {
+          setRemixSourceLesson(null);
+        }
       })
       .catch(() => setEditLoadError("Failed to load lesson. Please try again."))
       .finally(() => setEditLoading(false));
@@ -245,6 +256,7 @@ function LessonBuilderNewEntry() {
         // For edit: reuse the existing doc; for remix: create a new draft on first save
         initialDraftId={editingLessonId ?? null}
         initialState={editLoadedState ?? undefined}
+        remixSourceLesson={remixSourceLesson ?? undefined}
         initialCompletedSteps={new Set([1, 2, 3, 4, 5, 6, 7])}
         isAvailable={isAvailable}
         onExit={() => {

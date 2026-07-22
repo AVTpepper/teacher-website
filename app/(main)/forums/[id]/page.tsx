@@ -122,7 +122,7 @@ export default function ForumThreadPage({
             actorName: user.displayName || "Someone",
             actorPhotoURL: user.photoURL,
             threadTitle: thread.title,
-            linkURL: window.location.href,
+            linkURL: `/forums/${rawId}`,
           }).catch(() => {});
         }
       }
@@ -392,7 +392,7 @@ export default function ForumThreadPage({
             title=""
             ownerId={thread.authorId}
             contentLabel={`your discussion "${thread.title}"`}
-            linkURL={typeof window !== "undefined" ? window.location.href : `/forums/${rawId}`}
+            linkURL={`/forums/${rawId}`}
             maxDepth={1}
             mode="like"
             composerPlaceholder="Add a comment..."

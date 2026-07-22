@@ -102,3 +102,84 @@ export function byUpdatedAtDesc(
 ): number {
   return (b.updatedAt?.seconds ?? 0) - (a.updatedAt?.seconds ?? 0);
 }
+
+// ---------------------------------------------------------------------------
+// Multiline content helpers
+// ---------------------------------------------------------------------------
+
+export interface NormalizeMultilineOptions {
+  maxLength?: number;
+  maxLines?: number;
+  maxConsecutiveBlankLines?: number;
+}
+
+/**
+ * Normalizes user-authored multiline text to avoid excessive whitespace spam.
+ */
+export function normalizeMultilineText(
+  input: string,
+  options: NormalizeMultilineOptions = {}
+): string {
+  const {
+    maxLength,
+    maxLines,
+    maxConsecutiveBlankLines = 2,
+  } = options;
+
+  const normalizedNewlines = input.replace(/\r\n?/g, "\n");
+  const lines = normalizedNewlines.split("\n").map((line) => line.replace(/[ \t]+$/g, ""));
+
+  const constrainedLines: string[] = [];
+  let blankRun = 0;
+
+  for (const line of lines) {
+    const isBlank = line.trim().length === 0;
+    if (isBlank) {
+      blankRun += 1;
+      if (blankRun > maxConsecutiveBlankLines) {
+        continue;
+      }
+      constrainedLines.push("");
+      continue;
+    }
+
+    blankRun = 0;
+    constrainedLines.push(line);
+  }
+
+  let output = constrainedLines.join("\n").trim();
+
+  if (typeof maxLines === "number" && maxLines > 0) {
+    output = output.split("\n").slice(0, maxLines).join("\n");
+  }
+
+  if (typeof maxLength === "number" && maxLength > 0) {
+    output = output.slice(0, maxLength);
+  }
+
+  return output.trim();
+}
+
+export function getCollapsedPreview(
+  input: string,
+  maxChars = 360,
+  maxLines = 8
+): { preview: string; truncated: boolean } {
+  const normalized = normalizeMultilineText(input, {
+    maxConsecutiveBlankLines: 2,
+  });
+
+  const lines = normalized.split("\n");
+  const lineLimited = lines.slice(0, maxLines).join("\n");
+  const lineTruncated = lines.length > maxLines;
+  const charTruncated = lineLimited.length > maxChars;
+
+  if (!lineTruncated && !charTruncated) {
+    return { preview: normalized, truncated: false };
+  }
+
+  return {
+    preview: lineLimited.slice(0, maxChars).trimEnd(),
+    truncated: true,
+  };
+}

@@ -27,9 +27,13 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Dropdown from "@/components/ui/Dropdown";
 import ContentCommentSection from "@/components/comments/ContentCommentSection";
 import { type CommentData } from "@/components/comments/CommentThread";
-import { timeAgo } from "@/lib/utils";
+import { timeAgo, normalizeMultilineText, getCollapsedPreview } from "@/lib/utils";
 import Tag from "@/components/ui/Tag";
 import type { MentionedUserRef } from "@/lib/firestore/posts";
+
+const MAX_POST_LENGTH = 4000;
+const MAX_POST_LINES = 40;
+const MAX_POST_BLANK_RUN = 2;
 
 function escapeRegex(str: string) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -94,6 +98,8 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [localContent, setLocalContent] = useState(post.content);
+  const [localUpdatedAt, setLocalUpdatedAt] = useState(post.updatedAt);
+  const [showFullContent, setShowFullContent] = useState(false);
   const isAuthor = user?.uid === post.authorId;
 
   useEffect(() => {
@@ -175,20 +181,26 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
   }
 
   async function handleSaveEdit() {
-    const trimmed = editContent.trim();
-    if (!trimmed || editSaving) return;
+    const normalized = normalizeMultilineText(editContent, {
+      maxLength: MAX_POST_LENGTH,
+      maxLines: MAX_POST_LINES,
+      maxConsecutiveBlankLines: MAX_POST_BLANK_RUN,
+    });
+    if (!normalized || editSaving) return;
+
     setEditSaving(true);
     try {
       await updatePost(post.id, {
-        content: trimmed,
+        content: normalized,
         type: post.type,
         tags: post.tags,
         gradeLevel: post.gradeLevel,
         links: post.links,
       });
-      setLocalContent(trimmed);
+      setLocalContent(normalized);
+      setLocalUpdatedAt({ seconds: Date.now() / 1000 } as typeof post.updatedAt);
       setEditing(false);
-      onUpdate?.({ ...post, content: trimmed });
+      onUpdate?.({ ...post, content: normalized });
     } catch {
       // ignore
     } finally {
@@ -211,6 +223,16 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
   }
 
   const typeInfo = TYPE_LABELS[post.type] || TYPE_LABELS.idea;
+  const createdSeconds = post.createdAt?.seconds ?? 0;
+  const updatedSeconds = localUpdatedAt?.seconds ?? 0;
+  const wasEdited = updatedSeconds > createdSeconds;
+  const normalizedContent = normalizeMultilineText(localContent, {
+    maxConsecutiveBlankLines: MAX_POST_BLANK_RUN,
+  });
+  const collapsed = getCollapsedPreview(normalizedContent, 360, 8);
+  const renderedContent = showFullContent || !collapsed.truncated
+    ? normalizedContent
+    : collapsed.preview;
 
   if (deleted) return null;
 
@@ -240,6 +262,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
           </div>
           <p className="type-body-light text-xs text-muted mt-0.5">
             {timeAgo(post.createdAt as { seconds: number } | null)}
+            {wasEdited && <span className="ml-1 italic">(edited)</span>}
           </p>
         </div>
         {isAuthor && (
@@ -310,13 +333,20 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
 
       {/* Content - click to expand comments */}
       {!editing && (
-        <p
-          className="type-body-medium mt-3 text-sm text-foreground whitespace-pre-wrap cursor-pointer"
-          onClick={toggleComments}
-          title="Click to view comments"
-        >
-          {renderContent(localContent, post.mentionedUsers)}
-        </p>
+        <div className="mt-3">
+          <p className="type-body-medium text-sm text-foreground whitespace-pre-wrap">
+            {renderContent(renderedContent, post.mentionedUsers)}
+          </p>
+          {collapsed.truncated && (
+            <button
+              type="button"
+              onClick={() => setShowFullContent((prev) => !prev)}
+              className="mt-1 text-xs font-medium text-primary-900 hover:underline cursor-pointer"
+            >
+              {showFullContent ? "Show less" : "Show more"}
+            </button>
+          )}
+        </div>
       )}
 
       {/* Tags */}

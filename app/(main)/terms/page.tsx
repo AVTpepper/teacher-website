@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function TermsPage() {
   const lastUpdated = "May 12, 2026";
   return (
@@ -39,7 +41,7 @@ export default function TermsPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">7. Contact</h2>
-        <p className="text-muted leading-relaxed">Questions about these terms? <a href="/contact" className="text-primary-900 hover:underline">Contact us</a>.</p>
+        <p className="text-muted leading-relaxed">Questions about these terms? <Link href="/contact" className="text-primary-900 hover:underline">Contact us</Link>.</p>
       </section>
     </div>
   );

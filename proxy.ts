@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Routes that require authentication
-const protectedPrefixes = ["/profile", "/lesson-builder", "/admin", "/account"];
+const protectedPrefixes = ["/profile", "/admin", "/account"];
+
+function isProtectedLessonBuilderRoute(pathname: string): boolean {
+  if (pathname.startsWith("/lesson-builder/new")) return true;
+  if (pathname.startsWith("/lesson-builder/drafts")) return true;
+
+  const previewMatch = pathname.match(/^\/lesson-builder\/[^/]+\/preview(?:\/.*)?$/);
+  return previewMatch !== null;
+}
 
 // Routes that authenticated users should be redirected away from
 const authRoutes = ["/auth/login", "/auth/signup"];
@@ -12,7 +20,7 @@ export function proxy(request: NextRequest) {
 
   const isProtected = protectedPrefixes.some((prefix) =>
     pathname.startsWith(prefix)
-  );
+  ) || isProtectedLessonBuilderRoute(pathname);
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
 
   // Unauthenticated user hitting a protected route → landing page

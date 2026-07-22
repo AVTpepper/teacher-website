@@ -81,7 +81,7 @@ export default function Modal({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-4"
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
@@ -92,7 +92,7 @@ export default function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? "modal-title" : undefined}
-        className={`relative z-10 w-full max-w-lg rounded-xl bg-surface border border-border shadow-xl ${className}`}
+        className={`relative z-10 w-full max-w-lg rounded-xl bg-surface border border-border shadow-xl max-h-[90vh] overflow-y-auto ${className}`}
       >
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">

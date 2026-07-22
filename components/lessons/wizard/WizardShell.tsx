@@ -26,6 +26,12 @@ import AssessmentsStep from "./steps/AssessmentsStep";
 interface WizardShellProps {
   user: User | null;
   initialDraftId?: string | null;
+  remixSourceLesson?: {
+    id: string;
+    title: string;
+    authorId: string;
+    authorName: string;
+  };
   onExit: () => void;
   /** Pre-populated lesson state (AI creation path) */
   initialState?: WizardLessonState;
@@ -54,6 +60,7 @@ function getStepState(
 export default function WizardShell({
   user,
   initialDraftId,
+  remixSourceLesson,
   onExit,
   initialState,
   initialCompletedSteps,
@@ -211,6 +218,10 @@ export default function WizardShell({
       assessments: currentLesson.assessments.filter((a) => a.trim() !== ""),
       attachments: [],
       isPublic: false,
+      remixedFromId: remixSourceLesson?.id ?? null,
+      remixedFromTitle: remixSourceLesson?.title ?? null,
+      remixedFromAuthorId: remixSourceLesson?.authorId ?? null,
+      remixedFromAuthorName: remixSourceLesson?.authorName ?? null,
     };
 
     try {
@@ -253,6 +264,10 @@ export default function WizardShell({
       assessments: lesson.assessments.filter((a) => a.trim() !== ""),
       attachments: [],
       isPublic: true,
+      remixedFromId: remixSourceLesson?.id ?? null,
+      remixedFromTitle: remixSourceLesson?.title ?? null,
+      remixedFromAuthorId: remixSourceLesson?.authorId ?? null,
+      remixedFromAuthorName: remixSourceLesson?.authorName ?? null,
     };
 
     try {
