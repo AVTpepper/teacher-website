@@ -111,7 +111,7 @@ export default function ResourceDetailPage({
         const [authorData] = await Promise.all([
           getUser(res.authorId).catch(() => null),
           getRelatedResources(res).then(setRelated).catch(() => {}),
-          loadComments(res.id),
+          user ? loadComments(res.id) : Promise.resolve(null),
         ]);
         setAuthor(authorData);
       } catch (err) {
@@ -503,10 +503,10 @@ export default function ResourceDetailPage({
                     Create a free account to access and save educational resources shared by real teachers.
                   </p>
                   <div className="flex gap-2">
-                    <Link href="/auth/login">
+                    <Link href={`/auth/login?redirect=${encodeURIComponent(resourcePath)}`}>
                       <Button variant="outline" size="sm">Sign In</Button>
                     </Link>
-                    <Link href="/auth/signup">
+                    <Link href={`/auth/signup?redirect=${encodeURIComponent(resourcePath)}`}>
                       <Button variant="secondary" size="sm">Create Account</Button>
                     </Link>
                   </div>
@@ -608,52 +608,71 @@ export default function ResourceDetailPage({
             {/* IP Notice */}
             <IPNotice />          </Card>
 
-          <Card padding="lg">
-            <ContentCommentSection
-              comments={commentData}
-              loading={commentsLoading}
-              title="Comments"
-              description="Ask a question, share how you'd use it, or suggest an improvement."
-              ownerId={resource.authorId}
-              contentLabel={`your resource "${resource.title}"`}
-              linkURL={resourcePath}
-              maxDepth={1}
-              mode="like"
-              composerPlaceholder="Add a comment..."
-              addComment={async ({ parentId, authorId, authorName, authorPhotoURL, content, mentionedUsers }) => {
-                return addResourceComment(resource.id, {
-                  parentId,
-                  authorId,
-                  authorName,
-                  authorPhotoURL,
-                  content,
-                  mentionedUsers,
-                });
-              }}
-              updateComment={async (commentId, text) => {
-                await updateResourceComment(resource.id, commentId, text);
-              }}
-              deleteComment={async (commentId) => {
-                return deleteResourceComment(resource.id, commentId);
-              }}
-              refreshComments={async () => {
-                await loadComments(resource.id);
-              }}
-              onLikeComment={async (commentId) => {
-                if (!user) return;
-                const alreadyLiked = await hasLikedResourceComment(resource.id, commentId, user.uid);
-                if (alreadyLiked) {
-                  await unlikeResourceComment(resource.id, commentId, user.uid);
-                } else {
-                  await likeResourceComment(resource.id, commentId, user.uid);
-                }
-              }}
-              hasLikedComment={async (commentId) => {
-                if (!user) return false;
-                return hasLikedResourceComment(resource.id, commentId, user.uid);
-              }}
-            />
-          </Card>
+          {!user && (
+            <Card padding="lg" className="border-primary-200 bg-primary-50">
+              <h2 className="text-lg font-semibold text-foreground">Preview Mode</h2>
+              <p className="mt-1 text-sm text-muted">
+                You are viewing a public preview of this resource. Sign in to unlock member comments, save actions, and downloads.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Link href={`/auth/signup?redirect=${encodeURIComponent(resourcePath)}`}>
+                  <Button variant="primary" size="sm">Create Account</Button>
+                </Link>
+                <Link href={`/auth/login?redirect=${encodeURIComponent(resourcePath)}`}>
+                  <Button variant="outline" size="sm">Sign In</Button>
+                </Link>
+              </div>
+            </Card>
+          )}
+
+          {user && (
+            <Card padding="lg">
+              <ContentCommentSection
+                comments={commentData}
+                loading={commentsLoading}
+                title="Comments"
+                description="Ask a question, share how you'd use it, or suggest an improvement."
+                ownerId={resource.authorId}
+                contentLabel={`your resource "${resource.title}"`}
+                linkURL={resourcePath}
+                maxDepth={1}
+                mode="like"
+                composerPlaceholder="Add a comment..."
+                addComment={async ({ parentId, authorId, authorName, authorPhotoURL, content, mentionedUsers }) => {
+                  return addResourceComment(resource.id, {
+                    parentId,
+                    authorId,
+                    authorName,
+                    authorPhotoURL,
+                    content,
+                    mentionedUsers,
+                  });
+                }}
+                updateComment={async (commentId, text) => {
+                  await updateResourceComment(resource.id, commentId, text);
+                }}
+                deleteComment={async (commentId) => {
+                  return deleteResourceComment(resource.id, commentId);
+                }}
+                refreshComments={async () => {
+                  await loadComments(resource.id);
+                }}
+                onLikeComment={async (commentId) => {
+                  if (!user) return;
+                  const alreadyLiked = await hasLikedResourceComment(resource.id, commentId, user.uid);
+                  if (alreadyLiked) {
+                    await unlikeResourceComment(resource.id, commentId, user.uid);
+                  } else {
+                    await likeResourceComment(resource.id, commentId, user.uid);
+                  }
+                }}
+                hasLikedComment={async (commentId) => {
+                  if (!user) return false;
+                  return hasLikedResourceComment(resource.id, commentId, user.uid);
+                }}
+              />
+            </Card>
+          )}
 
         </div>
 

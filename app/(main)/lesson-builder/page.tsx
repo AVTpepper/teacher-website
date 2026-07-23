@@ -519,6 +519,12 @@ export default function LessonBuilderPage() {
   const visibleBookmarked = bookmarkedExpanded ? bookmarkedLessons : bookmarkedLessons.slice(0, 3);
   // Latest draft for resume banner (most recently updated)
   const latestDraft = drafts[0] ?? null;
+  const manualCreateHref = user
+    ? "/lesson-builder/new?path=manual"
+    : `/auth/signup?redirect=${encodeURIComponent("/lesson-builder/new?path=manual")}`;
+  const aiCreateHref = user
+    ? "/lesson-builder/new?path=ai"
+    : `/auth/signup?redirect=${encodeURIComponent("/lesson-builder/new?path=ai")}`;
 
   return (
     <div className="space-y-6 pb-8">
@@ -551,7 +557,7 @@ export default function LessonBuilderPage() {
       <div className="grid w-full max-w-2xl mx-auto gap-4 sm:grid-cols-2 mb-10">
         {/* Create My Own */}
         <Link
-          href="/lesson-builder/new?path=manual"
+          href={manualCreateHref}
           className="group flex flex-col items-center gap-3 rounded-xl border-2 border-border bg-surface p-8 text-center transition-colors hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
         >
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-primary-700 group-hover:bg-primary-200 transition-colors" aria-hidden="true">
@@ -566,7 +572,7 @@ export default function LessonBuilderPage() {
         {/* Create with AI Assistant */}
         {isAvailable ? (
           <Link
-            href="/lesson-builder/new?path=ai"
+            href={aiCreateHref}
             className="group flex flex-col items-center gap-3 rounded-xl border-2 border-border bg-surface p-8 text-center transition-colors hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-primary-700 group-hover:bg-primary-200 transition-colors" aria-hidden="true">

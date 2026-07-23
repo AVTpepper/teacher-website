@@ -12,13 +12,26 @@ import {
   limit,
   getDocs,
 } from "firebase/firestore";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Input,
+  ListSkeleton,
+  PageContainer,
+  SearchResultCard,
+  Section,
+  SectionHeader,
+} from "@/components/ui";
 import { db } from "@/lib/firebase";
 import { resourceSlug, type Resource } from "@/lib/firestore/resources";
 import { jobSlug, type Job } from "@/lib/firestore/jobs";
 import { threadSlug, type ForumThread } from "@/lib/firestore/forums";
 import { type Lesson } from "@/lib/firestore/lessons";
 import { type UserProfile } from "@/lib/firestore/users";
-import { Avatar, Badge, Button, Card, Input, SearchResultCard } from "@/components/ui";
 import HorizontalScrollHint from "@/components/ui/HorizontalScrollHint";
 
 // ---------------------------------------------------------------------------
@@ -121,6 +134,13 @@ async function runSearch(rawQuery: string): Promise<SearchResults> {
 // ---------------------------------------------------------------------------
 
 function EducatorResult({ user }: { user: UserProfile }) {
+  const subtitle =
+    user.professionalHeadline?.trim() || user.professionalRole?.trim() || user.gradeLevel || "Educator";
+
+  const meta = [user.professionalRole?.trim(), user.country?.trim()]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <Link href={`/educators/${user.uid}`} className="block group">
       <Card className="hover:shadow-md transition-shadow">
@@ -128,7 +148,8 @@ function EducatorResult({ user }: { user: UserProfile }) {
           <Avatar src={user.photoURL ?? null} alt={user.displayName} size="md" />
           <div className="min-w-0">
             <p className="font-semibold text-foreground group-hover:underline truncate">{user.displayName}</p>
-            <p className="text-xs text-muted">{user.gradeLevel} · {user.school || user.country}</p>
+            <p className="text-xs text-muted truncate">{subtitle}</p>
+            {meta && <p className="text-xs text-muted truncate">{meta}</p>}
             <div className="flex flex-wrap gap-1 mt-1">
               {user.subjects?.slice(0, 3).map((s) => (
                 <Badge key={s} variant="default">{s}</Badge>
@@ -195,19 +216,6 @@ function JobResult({ job }: { job: Job }) {
 }
 
 // ---------------------------------------------------------------------------
-// Section heading with count
-// ---------------------------------------------------------------------------
-
-function SectionHeading({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">{label}</h2>
-      <span className="text-xs bg-secondary-100 text-muted px-2 py-0.5 rounded-full">{count}</span>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Inner search page (needs useSearchParams - must be inside Suspense)
 // ---------------------------------------------------------------------------
 
@@ -220,20 +228,24 @@ function SearchInner() {
   const [activeTab, setActiveTab] = useState<TabId>("all");
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const doSearch = useCallback(async (q: string) => {
     const trimmed = q.trim();
     if (!trimmed) {
       setResults(null);
+      setSearchError(null);
       return;
     }
     setLoading(true);
+    setSearchError(null);
     try {
       const res = await runSearch(trimmed);
       setResults(res);
     } catch (err) {
       console.error(err);
       setResults({ educators: [], resources: [], discussions: [], lessons: [], jobs: [] });
+      setSearchError("We could not load search results right now. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -279,9 +291,9 @@ function SearchInner() {
   const showJobs = activeTab === "all" || activeTab === "jobs";
 
   return (
-    <div className="space-y-6 pb-8">
+    <PageContainer width="wide" className="space-y-6 pb-8">
       {/* Search box */}
-      <div className="-mx-4 -mt-4 border-b border-primary-700 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 shadow-md sm:-mx-6 sm:-mt-6 rounded-t-2xl">
+      <div className="surface-panel -mx-4 -mt-4 overflow-hidden rounded-t-2xl border border-primary-700/30 bg-linear-to-r from-primary-900 via-primary-800 to-primary-900 p-6 text-primary-50 sm:-mx-6 sm:-mt-6">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent-300">Explore</p>
         <h1 className="text-2xl font-bold mb-3">Search</h1>
         <form onSubmit={handleSubmit} className="flex gap-2">
@@ -289,7 +301,7 @@ function SearchInner() {
             <Input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Search educators, resources, discussions, lessons, jobs…"
+              placeholder="Search educators, resources, communities, lessons, jobs…"
             />
           </div>
           <Button type="submit" variant="primary" disabled={loading}>
@@ -300,27 +312,21 @@ function SearchInner() {
 
       {/* No query yet */}
       {!initialQuery && !loading && results === null && (
-        <div className="py-16 text-center">
-          <p className="text-5xl mb-3">🔍</p>
-          <p className="text-foreground font-medium">What are you looking for?</p>
-          <p className="text-sm text-muted mt-1">
-            Search across educators, resources, forum discussions, lesson plans, and jobs.
-          </p>
-          <div className="mt-4 flex justify-center gap-2">
-            <Link href="/auth/signup">
-              <Button variant="secondary" size="sm">Create Account</Button>
-            </Link>
-            <Link href="/auth/login">
-              <Button variant="outline" size="sm">Sign In</Button>
-            </Link>
-          </div>
-        </div>
+        <EmptyState
+          icon="🔍"
+          title="What are you looking for?"
+          description="Search across educators, resources, communities discussions, lesson plans, and jobs."
+          actionLabel="Create Account"
+          onAction={() => router.push("/auth/signup?redirect=/search")}
+        />
       )}
 
       {/* Loading */}
       {loading && (
-        <div className="py-16 text-center text-sm text-muted">Searching…</div>
+        <ListSkeleton rows={4} />
       )}
+
+      {searchError && !loading && <ErrorState message={searchError} onRetry={() => doSearch(initialQuery)} />}
 
       {/* Results */}
       {!loading && results !== null && (
@@ -356,97 +362,90 @@ function SearchInner() {
 
           {/* Zero results */}
           {totalCount === 0 && (
-            <div className="py-16 text-center">
-              <p className="text-4xl mb-3">😔</p>
-              <p className="text-foreground font-medium">No results found</p>
-              <p className="text-sm text-muted mt-1">
-                No matches for <span className="font-semibold">&ldquo;{initialQuery}&rdquo;</span>. Try a different search term.
-              </p>
-              <div className="mt-4 flex justify-center gap-2">
-                <Link href="/auth/signup">
-                  <Button variant="secondary" size="sm">Create Account</Button>
-                </Link>
-                <Link href="/auth/login">
-                  <Button variant="outline" size="sm">Sign In</Button>
-                </Link>
-              </div>
-            </div>
+            <EmptyState
+              icon="😔"
+              title="No results found"
+              description={`No matches for “${initialQuery}”. Try a different search term.`}
+              actionLabel="Try a broader search"
+              onAction={() => setInputValue("")}
+            />
           )}
 
           {/* Filtered empty (tab has 0, but others have results) */}
           {totalCount > 0 && tabCount[activeTab] === 0 && activeTab !== "all" && (
-            <div className="py-12 text-center">
-              <p className="text-foreground font-medium">No {activeTab} results</p>
-              <button onClick={() => setActiveTab("all")} className="mt-2 text-sm text-primary underline">
-                Show all results
-              </button>
-            </div>
+            <EmptyState
+              icon="🧭"
+              title={`No ${activeTab} results`}
+              description="Try another tab to explore all matching content types."
+              actionLabel="Show all results"
+              onAction={() => setActiveTab("all")}
+            />
           )}
 
           <div className="space-y-8">
             {/* Educators */}
             {showEducators && results.educators.length > 0 && (
-              <section>
-                <SectionHeading label="Educators" count={results.educators.length} />
+              <Section>
+                <SectionHeader title="Educators" description={`${results.educators.length} results`} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {results.educators.map((u) => (
                     <EducatorResult key={u.uid} user={u} />
                   ))}
                 </div>
-              </section>
+              </Section>
             )}
 
             {/* Resources */}
             {showResources && results.resources.length > 0 && (
-              <section>
-                <SectionHeading label="Resources" count={results.resources.length} />
+              <Section>
+                <SectionHeader title="Resources" description={`${results.resources.length} results`} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {results.resources.map((r) => (
                     <ResourceResult key={r.id} resource={r} />
                   ))}
                 </div>
-              </section>
+              </Section>
             )}
 
             {/* Discussions */}
             {showDiscussions && results.discussions.length > 0 && (
-              <section>
-                <SectionHeading label="Discussions" count={results.discussions.length} />
+              <Section>
+                <SectionHeader title="Discussions" description={`${results.discussions.length} results`} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {results.discussions.map((t) => (
                     <DiscussionResult key={t.id} thread={t} />
                   ))}
                 </div>
-              </section>
+              </Section>
             )}
 
             {/* Lessons */}
             {showLessons && results.lessons.length > 0 && (
-              <section>
-                <SectionHeading label="Lessons" count={results.lessons.length} />
+              <Section>
+                <SectionHeader title="Lessons" description={`${results.lessons.length} results`} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {results.lessons.map((l) => (
                     <LessonResult key={l.id} lesson={l} />
                   ))}
                 </div>
-              </section>
+              </Section>
             )}
 
             {/* Jobs */}
             {showJobs && results.jobs.length > 0 && (
-              <section>
-                <SectionHeading label="Jobs" count={results.jobs.length} />
+              <Section>
+                <SectionHeader title="Jobs" description={`${results.jobs.length} results`} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {results.jobs.map((j) => (
                     <JobResult key={j.id} job={j} />
                   ))}
                 </div>
-              </section>
+              </Section>
             )}
           </div>
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

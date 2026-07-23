@@ -84,7 +84,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
                 <Link
                   href={`/?post=${post.id}`}
                   onClick={onClose}
-                  className="group block rounded-md hover:bg-surface-hover transition-colors -mx-1 px-1 py-0.5"
+                  className="group block rounded-lg border border-secondary-200/80 bg-white/65 px-2 py-2 transition-colors hover:border-primary-200 hover:bg-white"
                 >
                   <p className="text-xs text-foreground line-clamp-2 leading-relaxed group-hover:text-primary-900">
                     {post.content}
@@ -115,7 +115,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
         ) : (
           <ul className="space-y-2">
             {latestResources.map((r) => (
-              <li key={r.id}>
+              <li key={r.id} className="rounded-lg border border-secondary-200/80 bg-white/65 px-2 py-2">
                 <Link
                   href={`/resources/${r.id}`}
                   onClick={onClose}
@@ -153,7 +153,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
         ) : (
           <ul className="space-y-2">
             {featuredLessons.map((l) => (
-              <li key={l.id}>
+              <li key={l.id} className="rounded-lg border border-secondary-200/80 bg-white/65 px-2 py-2">
                 <Link
                   href={`/lesson-builder/${l.id}`}
                   onClick={onClose}
@@ -191,7 +191,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
         ) : (
           <ul className="space-y-2">
             {inspirationItems.map((item) => (
-              <li key={item.id}>
+              <li key={item.id} className="rounded-lg border border-secondary-200/80 bg-white/65 px-2 py-2">
                 <Link
                   href={`/inspiration/${item.id}`}
                   onClick={onClose}
@@ -199,7 +199,9 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
                 >
                   {cleanDisplayText(item.title) || "Untitled inspiration"}
                 </Link>
-                <p className="text-xs text-muted mt-0.5">{cleanDisplayText(item.creator) || "Community"}</p>
+                <p className="mt-0.5 text-[11px] font-medium text-muted">
+                  Source: {cleanDisplayText(item.creator) || "Community"}
+                </p>
               </li>
             ))}
           </ul>

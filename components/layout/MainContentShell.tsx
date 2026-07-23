@@ -28,7 +28,7 @@ export default function MainContentShell({ children }: { children: React.ReactNo
   }
 
   return (
-    <div className="flex-1 min-w-0 rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+    <div className="surface-panel flex-1 min-w-0 rounded-2xl bg-surface-elevated/90 p-4 backdrop-blur-sm sm:p-6">
       {children}
     </div>
   );

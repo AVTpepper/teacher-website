@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { getUser } from "@/lib/firestore/users";
+import { ensureUserProfile, getUser } from "@/lib/firestore/users";
+import { getOnboardingEligibility } from "@/lib/onboarding";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
@@ -20,7 +21,17 @@ const firebaseErrorMessages: Record<string, string> = {
 };
 
 export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
+  );
+}
+
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/home";
   const { signUp, signInWithGoogle } = useAuth();
 
   const [name, setName] = useState("");
@@ -57,7 +68,21 @@ export default function SignupPage() {
       // Update display name via Firebase Auth profile
       const { updateProfile } = await import("firebase/auth");
       await updateProfile(user, { displayName: name.trim() });
-      router.push("/profile/edit");
+
+      await ensureUserProfile({
+        uid: user.uid,
+        displayName: name.trim(),
+        email: user.email || email.trim(),
+        photoURL: user.photoURL,
+      });
+
+      const profile = await getUser(user.uid);
+      const eligibility = getOnboardingEligibility(profile);
+      if (eligibility === "needs-onboarding") {
+        router.push(`/onboarding?redirect=${encodeURIComponent(redirectTo)}`);
+      } else {
+        router.push(redirectTo);
+      }
     } catch (err: unknown) {
       const code =
         err instanceof Error && "code" in err
@@ -76,8 +101,19 @@ export default function SignupPage() {
     setLoading(true);
     try {
       const googleUser = await signInWithGoogle();
+      await ensureUserProfile({
+        uid: googleUser.uid,
+        displayName: googleUser.displayName || "",
+        email: googleUser.email || "",
+        photoURL: googleUser.photoURL,
+      });
       const profile = await getUser(googleUser.uid);
-      router.push(profile ? "/home" : "/profile/edit");
+      const eligibility = getOnboardingEligibility(profile);
+      if (eligibility === "needs-onboarding") {
+        router.push(`/onboarding?redirect=${encodeURIComponent(redirectTo)}`);
+      } else {
+        router.push(redirectTo);
+      }
     } catch (err: unknown) {
       const code =
         err instanceof Error && "code" in err
@@ -94,11 +130,11 @@ export default function SignupPage() {
   }
 
   return (
-    <Card padding="lg">
-      <h1 className="text-3xl font-bold text-foreground text-center sm:text-4xl">
+    <Card padding="lg" variant="standard" className="surface-panel">
+      <h1 className="type-page-title text-center text-3xl text-foreground sm:text-4xl">
         Create Account
       </h1>
-      <p className="mt-1 text-sm text-muted text-center">
+      <p className="mt-1 text-center text-sm text-text-secondary">
         Join VistaTeacher and connect with educators worldwide.
       </p>
 
@@ -111,6 +147,7 @@ export default function SignupPage() {
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <Input
           label="Full Name"
+          description="This is shown on your educator profile."
           type="text"
           placeholder="Jane Smith"
           value={name}
@@ -120,6 +157,7 @@ export default function SignupPage() {
         />
         <Input
           label="Email"
+          description="Use your school or professional email if possible."
           type="email"
           placeholder="you@school.edu"
           value={email}
@@ -140,7 +178,7 @@ export default function SignupPage() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-9.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="focus-ring absolute right-2 top-8.5 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:text-foreground"
             tabIndex={-1}
           >
             {showPassword ? (
@@ -168,7 +206,7 @@ export default function SignupPage() {
           <button
             type="button"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute right-3 top-9.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="focus-ring absolute right-2 top-8.5 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:text-foreground"
             tabIndex={-1}
           >
             {showConfirmPassword ? (
@@ -226,8 +264,8 @@ export default function SignupPage() {
       <p className="mt-6 text-center text-sm text-muted">
         Already have an account?{" "}
         <Link
-          href="/auth/login"
-          className="font-medium text-primary-900 hover:text-primary-700"
+          href={`/auth/login${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ""}`}
+          className="focus-ring rounded-sm font-semibold text-primary-900 hover:text-primary-700"
         >
           Sign in
         </Link>

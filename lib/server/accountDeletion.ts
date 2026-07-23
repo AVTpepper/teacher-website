@@ -1,5 +1,7 @@
 import { FieldValue, type Query } from "firebase-admin/firestore";
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from "@/lib/server/firebaseAdmin";
+import { cleanupConnectionsForDeletedUser } from "@/lib/server/connections";
+import { cleanupMessagingForDeletedUser } from "@/lib/server/messages";
 
 const DELETE_BATCH_SIZE = 100;
 
@@ -89,6 +91,10 @@ export async function processAccountDeletion(uid: string): Promise<void> {
   await cleanupTopLevelReferences(uid);
   await cleanupNestedReferences(uid);
   await cleanupRelationships(uid);
+  await cleanupConnectionsForDeletedUser(uid);
+  await cleanupMessagingForDeletedUser(uid);
+
+  await db.doc(`notifications/${uid}`).delete().catch(() => {});
 
   await db.recursiveDelete(db.doc(`users/${uid}`));
 

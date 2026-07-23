@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -13,48 +13,120 @@ import {
 } from "@/lib/firestore/users";
 import {
   getLessonsByAuthor,
+  getLessonCountByAuthor,
   type Lesson,
 } from "@/lib/firestore/lessons";
 import {
   getPostsByAuthor,
+  getPostCountByAuthor,
   type Post,
 } from "@/lib/firestore/posts";
 import {
   getResourcesByAuthor,
+  getResourceCountByAuthor,
   resourceSlug,
   RESOURCE_TYPES,
   type Resource,
 } from "@/lib/firestore/resources";
 import {
   getThreadsByAuthor,
+  getThreadCountByAuthor,
   threadSlug,
   type ForumThread,
 } from "@/lib/firestore/forums";
 import { Avatar, Badge, Button, Card, Tabs } from "@/components/ui";
 import { BadgeList } from "@/components/badges/BadgeIcon";
+import ConnectionButton from "@/components/network/ConnectionButton";
 import { BADGE_LIST } from "@/lib/badges";
 import { notifyNewFollower } from "@/lib/notifications";
+import { timeAgo } from "@/lib/utils";
+import { getSharedContextReasons } from "@/lib/profile/sharedContext";
+import {
+  ConnectionClientError,
+  fetchConnectionQuota,
+  fetchConnectionStatuses,
+  sendConnectionRequest,
+} from "@/lib/network/client";
+import type { ConnectionQuotaSummary, ConnectionRelationshipState, ConnectionRequestReason } from "@/lib/network/types";
+import { getOrCreateConversation } from "@/lib/messages/client";
 
-const PROFILE_TABS = [
-  { label: "Posts", value: "posts" },
-  { label: "Resources Shared", value: "resources" },
-  { label: "Lessons Created", value: "lessons" },
-  { label: "Discussions", value: "discussions" },
-];
+interface TabCounts {
+  posts: number;
+  resources: number;
+  lessons: number;
+  discussions: number;
+}
+
+interface OverviewFeed {
+  posts: Post[];
+  resources: Resource[];
+  lessons: Lesson[];
+  discussions: ForumThread[];
+}
+
+function toList(values?: string[]): string[] {
+  return (values ?? []).map((item) => item.trim()).filter(Boolean);
+}
+
+function formatYearsOfExperience(years: number): string {
+  if (years <= 0) return "New to the profession";
+  if (years === 1) return "1 year of experience";
+  return `${years} years of experience`;
+}
+
+function formatRelativeTime(value: { seconds: number } | null | undefined): string {
+  return timeAgo(value ?? null);
+}
+
+function roleHeading(profile: UserProfile): string {
+  if (profile.professionalHeadline?.trim()) {
+    return profile.professionalHeadline.trim();
+  }
+  if (profile.professionalRole?.trim()) {
+    return profile.professionalRole.trim();
+  }
+  return "Educator";
+}
 
 export default function EducatorProfile({ userId }: { userId: string }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [viewerProfile, setViewerProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [followError, setFollowError] = useState<string | null>(null);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [lessonsLoading, setLessonsLoading] = useState(false);
-  const [lessonsLoaded, setLessonsLoaded] = useState(false);
+  const [connectionState, setConnectionState] = useState<ConnectionRelationshipState>("none");
+  const [connectionQuota, setConnectionQuota] = useState<ConnectionQuotaSummary | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionLoading, setConnectionLoading] = useState(false);
+  const [messageLoading, setMessageLoading] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
+
+  const [tabCounts, setTabCounts] = useState<TabCounts>({
+    posts: 0,
+    resources: 0,
+    lessons: 0,
+    discussions: 0,
+  });
+
+  const [activeTab, setActiveTab] = useState("overview");
+  const tabsSectionRef = useRef<HTMLDivElement>(null);
+
+  const [overviewFeed, setOverviewFeed] = useState<OverviewFeed>({
+    posts: [],
+    resources: [],
+    lessons: [],
+    discussions: [],
+  });
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [overviewLoaded, setOverviewLoaded] = useState(false);
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
@@ -64,125 +136,312 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   const [resourcesLoading, setResourcesLoading] = useState(false);
   const [resourcesLoaded, setResourcesLoaded] = useState(false);
 
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [lessonsLoading, setLessonsLoading] = useState(false);
+  const [lessonsLoaded, setLessonsLoaded] = useState(false);
+
   const [threads, setThreads] = useState<ForumThread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
   const [threadsLoaded, setThreadsLoaded] = useState(false);
 
-  const [activeTab, setActiveTab] = useState("posts");
-  const tabsSectionRef = useRef<HTMLDivElement>(null);
+  const isOwnProfile = user?.uid === userId;
+  const canViewSensitiveProfileInfo = Boolean(user);
+
+  const profileTabs = useMemo(
+    () => [
+      { label: "Overview", value: "overview" },
+      { label: `Posts (${tabCounts.posts})`, value: "posts" },
+      { label: `Resources (${tabCounts.resources})`, value: "resources" },
+      { label: `Lessons (${tabCounts.lessons})`, value: "lessons" },
+      { label: `Discussions (${tabCounts.discussions})`, value: "discussions" },
+    ],
+    [tabCounts],
+  );
+
+  const completion = profile?.profileCompletion ?? 0;
+  const showCompletionPrompt = isOwnProfile && completion < 85;
+
+  const sharedContextReasons = useMemo(() => {
+    if (!profile || !viewerProfile) return [];
+    return getSharedContextReasons(viewerProfile, profile);
+  }, [profile, viewerProfile]);
+
   function handleTabChange(tab: string) {
     setActiveTab(tab);
-    // After content settles, scroll so the tab bar is visible without losing the header
     requestAnimationFrame(() => {
-      tabsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      const node = tabsSectionRef.current;
+      if (node && typeof node.scrollIntoView === "function") {
+        node.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
     });
   }
 
-  const isOwnProfile = user?.uid === userId;
-
   useEffect(() => {
-    async function load() {
+    let cancelled = false;
+
+    async function loadProfile() {
+      setLoading(true);
       try {
         const data = await getUser(userId);
         if (!data) {
-          setNotFound(true);
-        } else {
+          if (!cancelled) setNotFound(true);
+          return;
+        }
+        if (!cancelled) {
           setProfile(data);
+          setNotFound(false);
         }
       } catch {
-        setNotFound(true);
+        if (!cancelled) setNotFound(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    load();
+
+    void loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
-  // Check follow status
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.uid) {
+      setViewerProfile(null);
+      return;
+    }
+
+    getUser(user.uid)
+      .then((data) => {
+        if (!cancelled) setViewerProfile(data);
+      })
+      .catch(() => {
+        if (!cancelled) setViewerProfile(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+
   useEffect(() => {
     if (!user || !userId || isOwnProfile) return;
     checkIsFollowing(user.uid, userId).then(setFollowing).catch(() => {});
   }, [user, userId, isOwnProfile]);
 
-  // Lazy-load lessons when the tab becomes active
   useEffect(() => {
-    if (activeTab !== "lessons" || lessonsLoaded) return;
+    let cancelled = false;
+    if (!user || isOwnProfile) {
+      setConnectionState("none");
+      setConnectionQuota(null);
+      return;
+    }
+    const currentUser = user;
 
-    async function loadLessons() {
-      setLessonsLoading(true);
+    async function loadConnectionData() {
       try {
-        if (isOwnProfile) {
-          // Own profile: show all lessons (published + drafts)
-          const result = await getLessonsByAuthor(userId, true, null, 100);
-          setLessons(result.lessons);
-        } else {
-          // Other profiles: only published
-          const result = await getLessonsByAuthor(userId, false, null, 100);
-          setLessons(result.lessons);
-        }
+        const token = await currentUser.getIdToken();
+        const [statuses, quota] = await Promise.all([
+          fetchConnectionStatuses(() => Promise.resolve(token), [userId]),
+          fetchConnectionQuota(() => Promise.resolve(token)),
+        ]);
+
+        if (cancelled) return;
+        setConnectionState(statuses[userId]?.status ?? "none");
+        setConnectionQuota(quota);
       } catch {
-        setLessons([]);
-      } finally {
-        setLessonsLoading(false);
-        setLessonsLoaded(true);
+        if (!cancelled) {
+          setConnectionState("none");
+          setConnectionQuota(null);
+        }
       }
     }
 
-    loadLessons();
-  }, [activeTab, lessonsLoaded, isOwnProfile, userId]);
+    void loadConnectionData();
 
-  // Lazy-load posts when the tab becomes active
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwnProfile, user, userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTabCounts() {
+      try {
+        const [postsCount, resourcesCount, lessonsCount, discussionsCount] = await Promise.all([
+          getPostCountByAuthor(userId),
+          getResourceCountByAuthor(userId),
+          getLessonCountByAuthor(userId, isOwnProfile),
+          getThreadCountByAuthor(userId),
+        ]);
+
+        if (!cancelled) {
+          setTabCounts({
+            posts: postsCount,
+            resources: resourcesCount,
+            lessons: lessonsCount,
+            discussions: discussionsCount,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setTabCounts({ posts: 0, resources: 0, lessons: 0, discussions: 0 });
+        }
+      }
+    }
+
+    void loadTabCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, isOwnProfile]);
+
+  useEffect(() => {
+    if (activeTab !== "overview" || overviewLoaded) return;
+    let cancelled = false;
+
+    async function loadOverviewFeed() {
+      setOverviewLoading(true);
+      try {
+        const [postsResult, resourcesResult, lessonsResult, threadsResult] = await Promise.all([
+          getPostsByAuthor(userId, 3),
+          getResourcesByAuthor(userId, false, 3),
+          getLessonsByAuthor(userId, false, null, 3),
+          getThreadsByAuthor(userId, 3),
+        ]);
+
+        if (cancelled) return;
+
+        setOverviewFeed({
+          posts: postsResult.posts.slice(0, 3),
+          resources: resourcesResult.resources.slice(0, 3),
+          lessons: lessonsResult.lessons.filter((lesson) => lesson.isPublic).slice(0, 3),
+          discussions: threadsResult.threads.slice(0, 3),
+        });
+      } catch {
+        if (!cancelled) {
+          setOverviewFeed({ posts: [], resources: [], lessons: [], discussions: [] });
+        }
+      } finally {
+        if (!cancelled) {
+          setOverviewLoading(false);
+          setOverviewLoaded(true);
+        }
+      }
+    }
+
+    void loadOverviewFeed();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, overviewLoaded, userId]);
+
   useEffect(() => {
     if (activeTab !== "posts" || postsLoaded) return;
+    let cancelled = false;
+
     async function loadPosts() {
       setPostsLoading(true);
       try {
         const result = await getPostsByAuthor(userId);
-        setPosts(result.posts);
+        if (!cancelled) setPosts(result.posts);
       } catch {
-        setPosts([]);
+        if (!cancelled) setPosts([]);
       } finally {
-        setPostsLoading(false);
-        setPostsLoaded(true);
+        if (!cancelled) {
+          setPostsLoading(false);
+          setPostsLoaded(true);
+        }
       }
     }
-    loadPosts();
+
+    void loadPosts();
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab, postsLoaded, userId]);
 
-  // Lazy-load resources when the tab becomes active
   useEffect(() => {
     if (activeTab !== "resources" || resourcesLoaded) return;
+    let cancelled = false;
+
     async function loadResources() {
       setResourcesLoading(true);
       try {
         const result = await getResourcesByAuthor(userId);
-        setResources(result.resources);
+        if (!cancelled) setResources(result.resources);
       } catch {
-        setResources([]);
+        if (!cancelled) setResources([]);
       } finally {
-        setResourcesLoading(false);
-        setResourcesLoaded(true);
+        if (!cancelled) {
+          setResourcesLoading(false);
+          setResourcesLoaded(true);
+        }
       }
     }
-    loadResources();
+
+    void loadResources();
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab, resourcesLoaded, userId]);
 
-  // Lazy-load forum threads when the tab becomes active
+  useEffect(() => {
+    if (activeTab !== "lessons" || lessonsLoaded) return;
+    let cancelled = false;
+
+    async function loadLessons() {
+      setLessonsLoading(true);
+      try {
+        const result = await getLessonsByAuthor(userId, isOwnProfile, null, 100);
+        if (!cancelled) setLessons(result.lessons);
+      } catch {
+        if (!cancelled) setLessons([]);
+      } finally {
+        if (!cancelled) {
+          setLessonsLoading(false);
+          setLessonsLoaded(true);
+        }
+      }
+    }
+
+    void loadLessons();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, lessonsLoaded, userId, isOwnProfile]);
+
   useEffect(() => {
     if (activeTab !== "discussions" || threadsLoaded) return;
+    let cancelled = false;
+
     async function loadThreads() {
       setThreadsLoading(true);
       try {
         const result = await getThreadsByAuthor(userId);
-        setThreads(result.threads);
+        if (!cancelled) setThreads(result.threads);
       } catch {
-        setThreads([]);
+        if (!cancelled) setThreads([]);
       } finally {
-        setThreadsLoading(false);
-        setThreadsLoaded(true);
+        if (!cancelled) {
+          setThreadsLoading(false);
+          setThreadsLoaded(true);
+        }
       }
     }
-    loadThreads();
+
+    void loadThreads();
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab, threadsLoaded, userId]);
 
   async function handleFollowToggle() {
@@ -190,12 +449,17 @@ export default function EducatorProfile({ userId }: { userId: string }) {
     setFollowLoading(true);
     setFollowError(null);
 
-    // Optimistic update — apply immediately before Firestore confirms
     const wasFollowing = following;
     const countDelta = wasFollowing ? -1 : 1;
+
     setFollowing(!wasFollowing);
-    setProfile((p) =>
-      p ? { ...p, followerCount: Math.max(0, p.followerCount + countDelta) } : p
+    setProfile((current) =>
+      current
+        ? {
+            ...current,
+            followerCount: Math.max(0, current.followerCount + countDelta),
+          }
+        : current,
     );
 
     try {
@@ -203,7 +467,6 @@ export default function EducatorProfile({ userId }: { userId: string }) {
         await unfollowUser(user.uid, profile.uid);
       } else {
         await followUser(user.uid, profile.uid);
-        // Notify the followed user (fire-and-forget)
         notifyNewFollower({
           recipientId: profile.uid,
           actorId: user.uid,
@@ -212,18 +475,103 @@ export default function EducatorProfile({ userId }: { userId: string }) {
         }).catch(() => {});
       }
     } catch {
-      // Revert optimistic changes on failure
       setFollowing(wasFollowing);
-      setProfile((p) =>
-        p ? { ...p, followerCount: Math.max(0, p.followerCount - countDelta) } : p
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              followerCount: Math.max(0, current.followerCount - countDelta),
+            }
+          : current,
       );
       setFollowError(
         wasFollowing
           ? "Could not unfollow. Please try again."
-          : "Could not follow. Please try again."
+          : "Could not follow. Please try again.",
       );
     } finally {
       setFollowLoading(false);
+    }
+  }
+
+  async function handleSendConnectionRequest(payload: {
+    reason?: ConnectionRequestReason;
+    introMessage?: string;
+  }) {
+    if (!user || isOwnProfile) return;
+
+    setConnectionLoading(true);
+    setConnectionError(null);
+
+    try {
+      const token = await user.getIdToken();
+      const result = await sendConnectionRequest(() => Promise.resolve(token), {
+        recipientId: userId,
+        reason: payload.reason,
+        introMessage: payload.introMessage,
+      });
+
+      setConnectionState(result.status);
+      const quota = await fetchConnectionQuota(() => Promise.resolve(token));
+      setConnectionQuota(quota);
+    } catch (error) {
+      if (error instanceof ConnectionClientError && error.code === "MONTHLY_LIMIT_REACHED") {
+        setConnectionQuota((current) =>
+          current
+            ? { ...current, canSend: false, remaining: 0 }
+            : current,
+        );
+      }
+
+      setConnectionError(error instanceof Error ? error.message : "Could not send request.");
+      throw error;
+    } finally {
+      setConnectionLoading(false);
+    }
+  }
+
+  async function handleShareProfile() {
+    if (typeof window === "undefined") return;
+
+    const shareUrl = window.location.href;
+    const sharePayload = {
+      title: profile?.displayName ? `${profile.displayName} | VistaTeacher` : "VistaTeacher profile",
+      text: profile?.professionalHeadline || profile?.bio || "Connect with this educator on VistaTeacher.",
+      url: shareUrl,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(sharePayload);
+        setShareMessage("Profile shared.");
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareMessage("Profile link copied.");
+        return;
+      }
+
+      setShareMessage("Copy link from your browser address bar.");
+    } catch {
+      setShareMessage("Could not share right now. Please try again.");
+    }
+  }
+
+  async function handleMessageEducator() {
+    if (!user || !profile || isOwnProfile || connectionState !== "connected") return;
+    setMessageLoading(true);
+    setMessageError(null);
+
+    try {
+      const token = await user.getIdToken();
+      const conversation = await getOrCreateConversation(() => Promise.resolve(token), profile.uid);
+      router.push(`/messages/${conversation.conversationId}`);
+    } catch (error) {
+      setMessageError(error instanceof Error ? error.message : "Could not open conversation.");
+    } finally {
+      setMessageLoading(false);
     }
   }
 
@@ -238,9 +586,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   if (notFound || !profile) {
     return (
       <div className="py-20 text-center">
-        <h1 className="text-2xl font-bold text-foreground">
-          Educator Not Found
-        </h1>
+        <h1 className="text-2xl font-bold text-foreground">Educator Not Found</h1>
         <p className="mt-2 text-sm text-muted">
           This profile doesn&apos;t exist or has been removed.
         </p>
@@ -255,262 +601,166 @@ export default function EducatorProfile({ userId }: { userId: string }) {
     );
   }
 
+  const subjects = toList(profile.subjects);
+  const gradeLevels = toList([...(profile.gradeLevels ?? []), profile.gradeLevel]);
+
   return (
-    <div className="mx-auto max-w-3xl py-8">
-      {/* Profile Header */}
-      <Card className="p-6">
-        <div>
-        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-          {/* Avatar */}
-          <Avatar
-            src={profile.photoURL}
-            alt={profile.displayName}
-            size="xl"
-            className="h-24! w-24! text-2xl!"
-          />
+    <div className="mx-auto max-w-5xl space-y-6 py-8">
+      <Card className="overflow-hidden p-0">
+        <div className="bg-linear-to-r from-primary-900 via-primary-800 to-secondary-900 p-6 text-white sm:p-8">
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div className="flex items-start gap-4">
+              <Avatar
+                src={profile.photoURL}
+                alt={profile.displayName}
+                size="xl"
+                className="h-24! w-24! text-2xl!"
+                userId={profile.uid}
+                showPlusBadge
+                isPlus={profile.tier === "plus"}
+              />
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                    {profile.displayName}
+                  </h1>
+                  {profile.isVerified && <Badge variant="success">Verified</Badge>}
+                  {profile.tier === "plus" && <Badge variant="info">Plus Member</Badge>}
+                </div>
+                <p className="mt-1 text-sm text-primary-100 sm:text-base">{roleHeading(profile)}</p>
+                {profile.professionalRole && profile.professionalHeadline && (
+                  <p className="mt-1 text-xs text-primary-200">{profile.professionalRole}</p>
+                )}
 
-          {/* Info */}
-          <div className="flex-1 text-center sm:text-left">
-            <div className="flex flex-col items-center gap-2 sm:flex-row">
-              <h1 className="text-2xl font-bold text-foreground">
-                {profile.displayName}
-              </h1>
-              {profile.isVerified && (
-                <Badge variant="success">
-                  <span className="flex items-center gap-1">
-                    <svg
-                      className="h-3 w-3"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    Verified
-                  </span>
-                </Badge>
-              )}
-              {profile.tier === "plus" && (
-                <Badge variant="info">Plus Member</Badge>
-              )}
-            </div>
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-primary-100">
+                  {gradeLevels.slice(0, 2).map((grade) => (
+                    <span key={grade} className="rounded-full border border-primary-500/60 px-2 py-0.5">
+                      {grade}
+                    </span>
+                  ))}
+                  {subjects.slice(0, 3).map((subject) => (
+                    <span key={subject} className="rounded-full border border-primary-500/60 px-2 py-0.5">
+                      {subject}
+                    </span>
+                  ))}
+                </div>
 
-            {/* Meta row */}
-            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted sm:justify-start">
-              {profile.gradeLevel && (
-                <span className="flex items-center gap-1">
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342"
-                    />
-                  </svg>
-                  {profile.gradeLevel}
-                </span>
-              )}
-              {profile.school && (
-                <span className="flex items-center gap-1">
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 7.5h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Z"
-                    />
-                  </svg>
-                  {profile.school}
-                </span>
-              )}
-              {profile.country && (
-                <span className="flex items-center gap-1">
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0 1 15 0Z"
-                    />
-                  </svg>
-                  {profile.country}
-                </span>
-              )}
-              {profile.yearsOfExperience > 0 && (
-                <span className="flex items-center gap-1">
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-                    />
-                  </svg>
-                  {profile.yearsOfExperience} yr{profile.yearsOfExperience !== 1 && "s"} experience
-                </span>
-              )}
-            </div>
-
-            {/* Subjects */}
-            {profile.subjects.length > 0 && (
-              <div className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
-                {profile.subjects.map((s) => (
-                  <Badge key={s} variant="primary">
-                    {s}
-                  </Badge>
-                ))}
+                <div className="mt-4 flex items-center gap-5 text-sm">
+                  <Link href={`/educators/${userId}/followers`} className="underline-offset-4 hover:underline">
+                    <strong>{profile.followerCount}</strong> {profile.followerCount === 1 ? "Follower" : "Followers"}
+                  </Link>
+                  <Link href={`/educators/${userId}/following`} className="underline-offset-4 hover:underline">
+                    <strong>{profile.followingCount}</strong> Following
+                  </Link>
+                </div>
               </div>
-            )}
-
-            {/* Stats */}
-            <div className="mt-4 flex items-center justify-center gap-6 text-sm sm:justify-start">
-              <Link
-                href={`/educators/${userId}/followers`}
-                className="hover:underline focus-ring rounded"
-              >
-                <strong className="text-foreground">
-                  {profile.followerCount}
-                </strong>{" "}
-                <span className="text-muted">
-                  {profile.followerCount === 1 ? "Follower" : "Followers"}
-                </span>
-              </Link>
-              <Link
-                href={`/educators/${userId}/following`}
-                className="hover:underline focus-ring rounded"
-              >
-                <strong className="text-foreground">
-                  {profile.followingCount}
-                </strong>{" "}
-                <span className="text-muted">Following</span>
-              </Link>
             </div>
 
-            {/* Bio */}
-            {profile.bio && (
-              <p className="mt-4 whitespace-pre-line text-sm text-secondary-600">{profile.bio}</p>
-            )}
+            <div className="flex flex-wrap items-center gap-2 md:justify-end">
+              {!authLoading && !isOwnProfile && user && (
+                <ConnectionButton
+                  targetDisplayName={profile.displayName}
+                  relationshipState={connectionState}
+                  quota={connectionQuota}
+                  loading={connectionLoading}
+                  onSendRequest={handleSendConnectionRequest}
+                  onRespond={() => router.push("/network?tab=requests")}
+                />
+              )}
+              {!authLoading && !isOwnProfile && user && (
+                <Button
+                  variant={following ? "outline" : "primary"}
+                  isLoading={followLoading}
+                  onClick={handleFollowToggle}
+                  className={following ? "border-primary-100 bg-white text-primary-900" : "bg-accent-300 text-primary-950 hover:bg-accent-200"}
+                >
+                  {following ? "Following" : "Follow"}
+                </Button>
+              )}
+              {!authLoading && !isOwnProfile && user && connectionState === "connected" && (
+                <Button variant="secondary" onClick={handleMessageEducator} isLoading={messageLoading}>
+                  Message
+                </Button>
+              )}
+              {isOwnProfile && (
+                <Button variant="outline" onClick={() => router.push("/profile/edit", { scroll: true })}>
+                  Edit Profile
+                </Button>
+              )}
+              <Button variant="outline" onClick={handleShareProfile}>
+                Share Profile
+              </Button>
+            </div>
           </div>
-        </div>
 
-        {/* Action buttons */}
-        {!authLoading && !isOwnProfile && (
-          <div className="mt-6 flex items-center gap-3 border-t border-border pt-4">
-            <Button
-              variant={following ? "outline" : "primary"}
-              isLoading={followLoading}
-              onClick={handleFollowToggle}
-              className={following ? "border-primary-200 bg-primary-50 text-primary-900 hover:bg-primary-100" : "bg-primary-700 text-white hover:bg-primary-800 active:bg-primary-900"}
-            >
-              {following ? "Following" : "Follow"}
-            </Button>
-            <Button variant="secondary" disabled>
-              Message
-            </Button>
-          </div>
-        )}
-        {followError && (
-          <p role="alert" className="mt-2 text-xs text-error-600">{followError}</p>
-        )}
-
-        {isOwnProfile && (
-          <div className="mt-6 flex items-center gap-3 border-t border-border pt-4">
-            <Button
-              variant="outline"
-              onClick={() => router.push("/profile/edit", { scroll: true })}
-            >
-              Edit Profile
-            </Button>
-          </div>
-        )}
+          {followError && <p role="alert" className="mt-3 text-xs text-warning-200">{followError}</p>}
+          {connectionError && <p role="alert" className="mt-2 text-xs text-warning-200">{connectionError}</p>}
+          {messageError && <p role="alert" className="mt-2 text-xs text-warning-200">{messageError}</p>}
+          {shareMessage && <p role="status" className="mt-2 text-xs text-primary-100">{shareMessage}</p>}
         </div>
       </Card>
 
-      {/* Badges Section */}
-      <Card className="mt-6">
+      {showCompletionPrompt && (
+        <Card className="border-accent-200 bg-accent-50">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-primary-900">Complete your professional profile</h2>
+              <p className="mt-1 text-sm text-primary-800">
+                You are at {completion}%. Add more context to help educators understand your expertise.
+              </p>
+            </div>
+            <Button onClick={() => router.push("/profile/edit")}>Continue Editing</Button>
+          </div>
+        </Card>
+      )}
+
+      <Card>
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-foreground">Achievements</h2>
           <Link href={`/educators/${userId}/achievements`}>
             <Button variant="outline" size="sm">View Progress</Button>
           </Link>
         </div>
+
         {profile.badges.length === 0 ? (
           <p className="text-sm text-muted">
-            No achievements unlocked yet. Track progress and available milestones.
+            No achievements unlocked yet. Milestones appear here as this educator contributes.
           </p>
         ) : (
-          (["verification", "contribution", "milestone", "expertise"] as const).map((cat) => {
-            const catBadges = profile.badges.filter(
-              (id) => BADGE_LIST.find((b) => b.id === id)?.category === cat
+          (["verification", "contribution", "milestone", "expertise"] as const).map((category) => {
+            const categoryBadges = profile.badges.filter(
+              (id) => BADGE_LIST.find((badge) => badge.id === id)?.category === category,
             );
-            if (catBadges.length === 0) return null;
-            const catLabel = { verification: "Verification", contribution: "Contribution", milestone: "Milestones", expertise: "Expertise" }[cat];
+            if (categoryBadges.length === 0) return null;
+            const labelMap = {
+              verification: "Verification",
+              contribution: "Contribution",
+              milestone: "Milestones",
+              expertise: "Expertise",
+            };
             return (
-              <div key={cat} className="mb-4 last:mb-0">
-                <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">{catLabel}</p>
-                <BadgeList badgeIds={catBadges} />
+              <div key={category} className="mb-4 last:mb-0">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{labelMap[category]}</p>
+                <BadgeList badgeIds={categoryBadges} />
               </div>
             );
           })
         )}
       </Card>
 
-      {/* Content Tabs */}
-      <div className="mt-6" ref={tabsSectionRef}>
-        <Tabs
-          tabs={PROFILE_TABS}
-          defaultValue="posts"
-          onChange={handleTabChange}
-        />
+      <div ref={tabsSectionRef}>
+        <Tabs tabs={profileTabs} defaultValue="overview" onChange={handleTabChange} />
         <Card className="mt-4 min-h-80" padding="lg">
-          {!user ? (
-            <div className="py-12 text-center">
-              <div className="text-4xl mb-3">🔒</div>
-              <h3 className="text-base font-semibold text-foreground">
-                Sign in to view {isOwnProfile ? "your" : `${profile.displayName}'s`} content
-              </h3>
-              <p className="text-sm text-muted mt-1">
-                Create a free account to see posts, resources, and lessons from educators on VistaTeacher.
-              </p>
-              <div className="mt-4 flex justify-center gap-3">
-                <Button variant="primary" onClick={() => window.location.href = "/auth/signup"}>
-                  Create Account
-                </Button>
-                <Button variant="outline" onClick={() => window.location.href = `/auth/login?redirect=/educators/${userId}`}>
-                  Sign In
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
+          {activeTab === "overview" && (
+            <OverviewTabContent
+              profile={profile}
+              canViewSensitiveProfileInfo={canViewSensitiveProfileInfo}
+              sharedContextReasons={sharedContextReasons}
+              overviewFeed={overviewFeed}
+              loading={overviewLoading}
+            />
+          )}
+
           {activeTab === "posts" && (
             <PostsTabContent
               posts={posts}
@@ -519,6 +769,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
               displayName={profile.displayName}
             />
           )}
+
           {activeTab === "resources" && (
             <ResourcesTabContent
               resources={resources}
@@ -527,6 +778,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
               displayName={profile.displayName}
             />
           )}
+
           {activeTab === "lessons" && (
             <LessonsTabContent
               lessons={lessons}
@@ -535,6 +787,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
               displayName={profile.displayName}
             />
           )}
+
           {activeTab === "discussions" && (
             <DiscussionsTabContent
               threads={threads}
@@ -543,15 +796,214 @@ export default function EducatorProfile({ userId }: { userId: string }) {
               displayName={profile.displayName}
             />
           )}
-            </>
-          )}
         </Card>
       </div>
     </div>
   );
 }
 
-// --- Posts tab ---
+function OverviewTabContent({
+  profile,
+  canViewSensitiveProfileInfo,
+  sharedContextReasons,
+  overviewFeed,
+  loading,
+}: {
+  profile: UserProfile;
+  canViewSensitiveProfileInfo: boolean;
+  sharedContextReasons: { id: string; label: string; detail: string }[];
+  overviewFeed: OverviewFeed;
+  loading: boolean;
+}) {
+  const gradeLevels = toList([...(profile.gradeLevels ?? []), profile.gradeLevel]);
+  const subjects = toList(profile.subjects);
+  const curricula = toList(profile.curricula);
+  const languages = toList(profile.languages);
+  const interests = toList(profile.professionalInterests);
+
+  return (
+    <div className="space-y-6">
+      <section>
+        <h3 className="text-base font-semibold text-foreground">About</h3>
+        <p className="mt-2 whitespace-pre-line text-sm text-secondary-700">
+          {profile.bio?.trim() || "This educator has not added an introduction yet."}
+        </p>
+      </section>
+
+      {profile.lookingFor?.trim() && (
+        <section>
+          <h3 className="text-base font-semibold text-foreground">Looking For</h3>
+          <p className="mt-2 whitespace-pre-line text-sm text-secondary-700">{profile.lookingFor}</p>
+        </section>
+      )}
+
+      <section>
+        <h3 className="text-base font-semibold text-foreground">Professional Context</h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <ContextItem label="Primary Role" value={profile.professionalRole || "Not set"} />
+          <ContextItem label="Experience" value={formatYearsOfExperience(profile.yearsOfExperience)} />
+          <ContextItem label="Grade Levels" value={gradeLevels.length > 0 ? gradeLevels.join(", ") : "Not set"} />
+          <ContextItem label="Subjects" value={subjects.length > 0 ? subjects.join(", ") : "Not set"} />
+          <ContextItem label="Curriculum" value={curricula.length > 0 ? curricula.join(", ") : "Not set"} />
+          <ContextItem
+            label="Languages"
+            value={languages.length > 0 ? languages.join(", ") : "Not set"}
+          />
+          {canViewSensitiveProfileInfo && (
+            <>
+              <ContextItem label="Country" value={profile.country || "Not set"} />
+              <ContextItem label="City" value={profile.city || "Not set"} />
+              <ContextItem label="School" value={profile.school || "Not set"} />
+              <ContextItem label="School Type" value={profile.schoolType || "Not set"} />
+            </>
+          )}
+        </div>
+
+        {!canViewSensitiveProfileInfo && (
+          <p className="mt-3 text-xs text-muted">
+            Sign in to view location and school context.
+          </p>
+        )}
+      </section>
+
+      {interests.length > 0 && (
+        <section>
+          <h3 className="text-base font-semibold text-foreground">Professional Interests</h3>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {interests.map((interest) => (
+              <Badge key={interest} variant="primary">{interest}</Badge>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {sharedContextReasons.length > 0 && (
+        <section>
+          <h3 className="text-base font-semibold text-foreground">Shared Context</h3>
+          <ul className="mt-2 space-y-2">
+            {sharedContextReasons.map((reason) => (
+              <li key={reason.id} className="rounded-lg border border-primary-100 bg-primary-50/50 p-3">
+                <p className="text-sm font-medium text-primary-900">{reason.label}</p>
+                <p className="mt-0.5 text-xs text-primary-800">{reason.detail}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="text-base font-semibold text-foreground">Recent Contributions</h3>
+          <Link href="/home" className="text-xs font-medium text-primary-800 hover:underline">
+            View all activity
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <RecentContributionCard
+              title="Posts"
+              count={overviewFeed.posts.length}
+              link="/home"
+              items={overviewFeed.posts.map((item) => ({
+                id: item.id,
+                title: item.content,
+                subtitle: formatRelativeTime(item.createdAt as { seconds: number } | null),
+                href: `/home?post=${item.id}`,
+              }))}
+            />
+            <RecentContributionCard
+              title="Resources"
+              count={overviewFeed.resources.length}
+              link="/resources"
+              items={overviewFeed.resources.map((item) => ({
+                id: item.id,
+                title: item.title,
+                subtitle: `${item.type} • ${formatRelativeTime(item.createdAt as { seconds: number } | null)}`,
+                href: `/resources/${resourceSlug(item.title, item.id)}`,
+              }))}
+            />
+            <RecentContributionCard
+              title="Lessons"
+              count={overviewFeed.lessons.length}
+              link="/lesson-builder"
+              items={overviewFeed.lessons.map((item) => ({
+                id: item.id,
+                title: item.title || "Untitled lesson",
+                subtitle: `${item.subject || "General"} • ${formatRelativeTime(item.updatedAt as { seconds: number } | null)}`,
+                href: `/lesson-builder/${item.id}`,
+              }))}
+            />
+            <RecentContributionCard
+              title="Discussions"
+              count={overviewFeed.discussions.length}
+              link="/forums"
+              items={overviewFeed.discussions.map((item) => ({
+                id: item.id,
+                title: item.title,
+                subtitle: `${item.commentCount} comments • ${formatRelativeTime(item.createdAt as { seconds: number } | null)}`,
+                href: `/forums/${threadSlug(item.title, item.id)}`,
+              }))}
+            />
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ContextItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface-subtle px-3 py-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+      <p className="mt-1 text-sm text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function RecentContributionCard({
+  title,
+  count,
+  link,
+  items,
+}: {
+  title: string;
+  count: number;
+  link: string;
+  items: Array<{ id: string; title: string; subtitle: string; href: string }>;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-surface p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <span className="text-xs text-muted">{count}</span>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="text-xs text-muted">No recent activity yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((item) => (
+            <li key={item.id}>
+              <Link href={item.href} className="group block rounded p-1 transition-colors hover:bg-surface-hover">
+                <p className="line-clamp-1 text-sm text-foreground group-hover:underline">{item.title}</p>
+                <p className="text-xs text-muted">{item.subtitle}</p>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Link href={link} className="mt-3 inline-block text-xs font-medium text-primary-800 hover:underline">
+        Open {title.toLowerCase()}
+      </Link>
+    </div>
+  );
+}
 
 function PostsTabContent({
   posts,
@@ -574,27 +1026,23 @@ function PostsTabContent({
       </div>
     );
   }
+
   if (posts.length === 0) {
     return (
       <EmptyTabContent
         title="No Posts Yet"
-        description={
-          isOwnProfile
-            ? "Share your first post with the community."
-            : `${displayName} hasn't posted yet.`
-        }
+        description={isOwnProfile ? "Share your first post with the community." : `${displayName} hasn&apos;t posted yet.`}
         cta={
           isOwnProfile ? (
             <Link href="/home">
-              <Button size="sm" className="mt-4">
-                Create a Post
-              </Button>
+              <Button size="sm" className="mt-4">Create a Post</Button>
             </Link>
           ) : undefined
         }
       />
     );
   }
+
   const visiblePosts = posts.slice(0, visibleCount);
   const hasMore = visibleCount < posts.length;
 
@@ -604,40 +1052,29 @@ function PostsTabContent({
         <Link
           key={post.id}
           href={`/home?post=${post.id}`}
-          className="block rounded-lg border border-border px-4 py-3 hover:bg-surface-hover transition-colors"
+          className="block rounded-lg border border-border px-4 py-3 transition-colors hover:bg-surface-hover"
         >
           <div className="mb-1 flex items-center gap-2">
             <Badge variant="primary">{post.type}</Badge>
-            {post.gradeLevel && (
-              <span className="text-xs text-muted">{post.gradeLevel}</span>
-            )}
+            {post.gradeLevel && <span className="text-xs text-muted">{post.gradeLevel}</span>}
+            <span className="text-xs text-muted">• {formatRelativeTime(post.createdAt as { seconds: number } | null)}</span>
           </div>
-          <p className="text-sm text-foreground line-clamp-3">{post.content}</p>
+          <p className="line-clamp-3 text-sm text-foreground">{post.content}</p>
           <div className="mt-2 flex items-center gap-4 text-xs text-muted">
-            <span className="flex items-center gap-1">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
-              </svg>
-              {post.likesCount}
-            </span>
-            <span className="flex items-center gap-1">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
-              </svg>
-              {post.commentCount}
-            </span>
-            {post.tags.slice(0, 3).map((t) => (
-              <span key={t} className="rounded-full bg-secondary-100 px-2 py-0.5 text-xs">
-                {t}
-              </span>
+            <span>{post.likesCount} likes</span>
+            <span>{post.commentCount} comments</span>
+            {post.tags.slice(0, 3).map((tag) => (
+              <span key={tag} className="rounded-full bg-secondary-100 px-2 py-0.5 text-xs">{tag}</span>
             ))}
           </div>
         </Link>
       ))}
+
       {hasMore && (
         <button
-          className="w-full rounded-lg py-2 text-sm font-medium text-primary-900 hover:bg-surface-hover transition-colors"
-          onClick={() => setVisibleCount((c) => c + POSTS_PER_PAGE)}
+          type="button"
+          className="w-full rounded-lg py-2 text-sm font-medium text-primary-900 transition-colors hover:bg-surface-hover"
+          onClick={() => setVisibleCount((current) => current + POSTS_PER_PAGE)}
         >
           Show more ({posts.length - visibleCount} remaining)
         </button>
@@ -645,8 +1082,6 @@ function PostsTabContent({
     </div>
   );
 }
-
-// --- Resources tab ---
 
 function ResourcesTabContent({
   resources,
@@ -666,60 +1101,39 @@ function ResourcesTabContent({
       </div>
     );
   }
+
   if (resources.length === 0) {
     return (
       <EmptyTabContent
         title="No Resources Shared"
-        description={
-          isOwnProfile
-            ? "Share a resource to help fellow educators."
-            : `${displayName} hasn't shared resources yet.`
-        }
+        description={isOwnProfile ? "Share a resource to help fellow educators." : `${displayName} hasn&apos;t shared resources yet.`}
         cta={
           isOwnProfile ? (
             <Link href="/resources/upload">
-              <Button size="sm" className="mt-4">
-                Upload a Resource
-              </Button>
+              <Button size="sm" className="mt-4">Upload a Resource</Button>
             </Link>
           ) : undefined
         }
       />
     );
   }
+
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {resources.map((resource) => {
-        const typeLabel =
-          RESOURCE_TYPES.find((t) => t.value === resource.type)?.label ??
-          resource.type;
+        const typeLabel = RESOURCE_TYPES.find((item) => item.value === resource.type)?.label ?? resource.type;
         return (
-          <Link
-            key={resource.id}
-            href={`/resources/${resourceSlug(resource.title, resource.id)}`}
-          >
+          <Link key={resource.id} href={`/resources/${resourceSlug(resource.title, resource.id)}`}>
             <div className="flex h-full flex-col rounded-lg border border-border px-4 py-3 transition-colors hover:border-primary-300 hover:bg-primary-50/40">
               <div className="mb-1 flex items-center gap-2">
                 <Badge variant="primary">{typeLabel}</Badge>
-                {resource.gradeLevel && (
-                  <span className="text-xs text-muted">{resource.gradeLevel}</span>
-                )}
+                {resource.gradeLevel && <span className="text-xs text-muted">{resource.gradeLevel}</span>}
               </div>
-              <p className="text-sm font-medium text-foreground line-clamp-2">
-                {resource.title}
-              </p>
-              {resource.description && (
-                <p className="mt-0.5 text-xs text-muted line-clamp-2">
-                  {resource.description}
-                </p>
-              )}
+              <p className="line-clamp-2 text-sm font-medium text-foreground">{resource.title}</p>
+              {resource.description && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{resource.description}</p>}
               <div className="mt-2 flex items-center gap-3 text-xs text-muted">
-                <span className="flex items-center gap-1">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                  </svg>
-                  {resource.downloadCount}
-                </span>
+                <span>{resource.downloadCount} downloads</span>
+                <span>{formatRelativeTime(resource.createdAt as { seconds: number } | null)}</span>
               </div>
             </div>
           </Link>
@@ -728,8 +1142,6 @@ function ResourcesTabContent({
     </div>
   );
 }
-
-// --- Discussions tab ---
 
 function DiscussionsTabContent({
   threads,
@@ -749,56 +1161,34 @@ function DiscussionsTabContent({
       </div>
     );
   }
+
   if (threads.length === 0) {
     return (
       <EmptyTabContent
         title="No Discussions"
-        description={
-          isOwnProfile
-            ? "Start a discussion in the forums."
-            : `${displayName} hasn't started any discussions yet.`
-        }
+        description={isOwnProfile ? "Start a discussion in the forums." : `${displayName} hasn&apos;t started any discussions yet.`}
         cta={
           isOwnProfile ? (
             <Link href="/forums">
-              <Button size="sm" className="mt-4">
-                Browse Forums
-              </Button>
+              <Button size="sm" className="mt-4">Browse Forums</Button>
             </Link>
           ) : undefined
         }
       />
     );
   }
+
   return (
     <div className="space-y-3">
       {threads.map((thread) => (
-        <Link
-          key={thread.id}
-          href={`/forums/${threadSlug(thread.title, thread.id)}`}
-        >
+        <Link key={thread.id} href={`/forums/${threadSlug(thread.title, thread.id)}`}>
           <div className="rounded-lg border border-border px-4 py-3 transition-colors hover:border-primary-300 hover:bg-primary-50/40">
-            <p className="text-sm font-medium text-foreground line-clamp-2">
-              {thread.title}
-            </p>
-            {thread.content && (
-              <p className="mt-0.5 text-xs text-muted line-clamp-2">
-                {thread.content}
-              </p>
-            )}
+            <p className="line-clamp-2 text-sm font-medium text-foreground">{thread.title}</p>
+            {thread.content && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{thread.content}</p>}
             <div className="mt-2 flex items-center gap-4 text-xs text-muted">
-              <span className="flex items-center gap-1">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
-                </svg>
-                {thread.commentCount}
-              </span>
-              <span className="flex items-center gap-1">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
-                </svg>
-                {thread.upvotes}
-              </span>
+              <span>{thread.commentCount} comments</span>
+              <span>{thread.upvotes} upvotes</span>
+              <span>{formatRelativeTime(thread.createdAt as { seconds: number } | null)}</span>
             </div>
           </div>
         </Link>
@@ -806,8 +1196,6 @@ function DiscussionsTabContent({
     </div>
   );
 }
-
-// --- Lessons tab ---
 
 function LessonsTabContent({
   lessons,
@@ -832,17 +1220,11 @@ function LessonsTabContent({
     return (
       <EmptyTabContent
         title="No Lessons Created"
-        description={
-          isOwnProfile
-            ? "Create your first lesson plan."
-            : `${displayName} hasn't created lessons yet.`
-        }
+        description={isOwnProfile ? "Create your first lesson plan." : `${displayName} hasn&apos;t created lessons yet.`}
         cta={
           isOwnProfile ? (
             <Link href="/lesson-builder/new">
-              <Button size="sm" className="mt-4">
-                Create a Lesson Plan
-              </Button>
+              <Button size="sm" className="mt-4">Create a Lesson Plan</Button>
             </Link>
           ) : undefined
         }
@@ -850,18 +1232,15 @@ function LessonsTabContent({
     );
   }
 
-  const published = lessons.filter((l) => l.isPublic);
-  const drafts = lessons.filter((l) => !l.isPublic);
+  const published = lessons.filter((lesson) => lesson.isPublic);
+  const drafts = lessons.filter((lesson) => !lesson.isPublic);
 
   return (
     <div className="space-y-6">
-      {/* Published */}
       {published.length > 0 && (
         <div>
           {isOwnProfile && (
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
-              Published ({published.length})
-            </h3>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">Published ({published.length})</h3>
           )}
           <div className="grid gap-3 sm:grid-cols-2">
             {published.map((lesson) => (
@@ -871,12 +1250,9 @@ function LessonsTabContent({
         </div>
       )}
 
-      {/* Drafts – own profile only */}
       {isOwnProfile && drafts.length > 0 && (
         <div>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
-            Drafts ({drafts.length})
-          </h3>
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">Drafts ({drafts.length})</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             {drafts.map((lesson) => (
               <LessonMiniCard key={lesson.id} lesson={lesson} isOwnProfile={isOwnProfile} />
@@ -888,9 +1264,7 @@ function LessonsTabContent({
       {isOwnProfile && (
         <div className="flex justify-end">
           <Link href="/lesson-builder/new">
-            <Button variant="outline" size="sm">
-              + New Lesson Plan
-            </Button>
+            <Button variant="outline" size="sm">+ New Lesson Plan</Button>
           </Link>
         </div>
       )}
@@ -907,40 +1281,22 @@ function LessonMiniCard({
 }) {
   return (
     <div className="flex items-start justify-between gap-3 rounded-lg border border-border px-4 py-3">
-      <div className="flex-1 min-w-0">
-        <div className="flex flex-wrap items-center gap-1.5 mb-1">
-          {lesson.isPublic ? (
-            <Badge variant="success">Published</Badge>
-          ) : (
-            <Badge variant="default">Draft</Badge>
-          )}
-          {lesson.gradeLevel && (
-            <span className="text-xs text-muted">{lesson.gradeLevel}</span>
-          )}
-          {lesson.subject && (
-            <span className="text-xs text-muted">· {lesson.subject}</span>
-          )}
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 flex flex-wrap items-center gap-1.5">
+          {lesson.isPublic ? <Badge variant="success">Published</Badge> : <Badge variant="default">Draft</Badge>}
+          {lesson.gradeLevel && <span className="text-xs text-muted">{lesson.gradeLevel}</span>}
+          {lesson.subject && <span className="text-xs text-muted">· {lesson.subject}</span>}
         </div>
-        <p className="text-sm font-medium text-foreground line-clamp-2">
-          {lesson.title || "Untitled lesson"}
-        </p>
-        {lesson.objectives.length > 0 && (
-          <p className="mt-0.5 text-xs text-muted line-clamp-1">
-            {lesson.objectives[0]}
-          </p>
-        )}
+        <p className="line-clamp-2 text-sm font-medium text-foreground">{lesson.title || "Untitled lesson"}</p>
+        {lesson.objectives.length > 0 && <p className="mt-0.5 line-clamp-1 text-xs text-muted">{lesson.objectives[0]}</p>}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1.5">
         <Link href={`/lesson-builder/${lesson.id}`}>
-          <Button type="button" variant="outline" size="sm">
-            View
-          </Button>
+          <Button type="button" variant="outline" size="sm">View</Button>
         </Link>
         {isOwnProfile && (
           <Link href={`/lesson-builder/new?edit=${lesson.id}`}>
-            <Button type="button" variant="ghost" size="sm">
-              Edit
-            </Button>
+            <Button type="button" variant="ghost" size="sm">Edit</Button>
           </Link>
         )}
       </div>

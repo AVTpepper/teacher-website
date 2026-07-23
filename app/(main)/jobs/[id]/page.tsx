@@ -189,7 +189,7 @@ export default function JobDetailPage({
                 )
               ) : (
                 <div className="flex items-center gap-3">
-                  <Link href="/auth/login">
+                  <Link href={`/auth/login?redirect=${encodeURIComponent(`/jobs/${rawId}`)}`}>
                     <Button variant="primary" size="lg">
                       Sign In to Apply
                     </Button>

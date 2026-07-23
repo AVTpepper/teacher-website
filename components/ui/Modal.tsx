@@ -92,14 +92,14 @@ export default function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? "modal-title" : undefined}
-        className={`relative z-10 w-full max-w-lg rounded-xl bg-surface border border-border shadow-xl max-h-[90vh] overflow-y-auto ${className}`}
+        className={`surface-panel relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl ${className}`}
       >
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <h2 id="modal-title" className="text-lg font-semibold text-foreground">{title}</h2>
             <button
               onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="focus-ring touch-target cursor-pointer rounded-md text-muted-foreground transition-colors hover:text-foreground"
               aria-label="Close"
             >
               <svg

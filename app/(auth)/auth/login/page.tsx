@@ -6,7 +6,8 @@ import Link from "next/link";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { getUser } from "@/lib/firestore/users";
+import { ensureUserProfile, getUser } from "@/lib/firestore/users";
+import { getOnboardingEligibility } from "@/lib/onboarding";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
@@ -93,8 +94,21 @@ function LoginForm() {
 
     setLoading(true);
     try {
-      await signIn(email, password);
-      router.push(redirectTo);
+      const signedInUser = await signIn(email, password);
+      await ensureUserProfile({
+        uid: signedInUser.uid,
+        displayName: signedInUser.displayName || "",
+        email: signedInUser.email || email.trim(),
+        photoURL: signedInUser.photoURL,
+      });
+
+      const profile = await getUser(signedInUser.uid);
+      const eligibility = getOnboardingEligibility(profile);
+      if (eligibility === "needs-onboarding") {
+        router.push(`/onboarding?redirect=${encodeURIComponent(redirectTo)}`);
+      } else {
+        router.push(redirectTo);
+      }
     } catch (err: unknown) {
       const code =
         err instanceof Error && "code" in err
@@ -111,8 +125,19 @@ function LoginForm() {
     setLoading(true);
     try {
       const googleUser = await signInWithGoogle();
+      await ensureUserProfile({
+        uid: googleUser.uid,
+        displayName: googleUser.displayName || "",
+        email: googleUser.email || "",
+        photoURL: googleUser.photoURL,
+      });
       const profile = await getUser(googleUser.uid);
-      router.push(profile ? redirectTo : "/profile/edit");
+      const eligibility = getOnboardingEligibility(profile);
+      if (eligibility === "needs-onboarding") {
+        router.push(`/onboarding?redirect=${encodeURIComponent(redirectTo)}`);
+      } else {
+        router.push(redirectTo);
+      }
     } catch (err: unknown) {
       const code =
         err instanceof Error && "code" in err
@@ -127,14 +152,14 @@ function LoginForm() {
   }
 
   return (
-    <Card padding="lg">
+    <Card padding="lg" variant="standard" className="surface-panel">
       {showForgot ? (
         /* ===== Forgot Password View ===== */
         <>
-          <h1 className="text-3xl font-bold text-foreground text-center sm:text-4xl">
+          <h1 className="type-page-title text-center text-3xl text-foreground sm:text-4xl">
             Reset Password
           </h1>
-          <p className="mt-1 text-sm text-muted text-center">
+          <p className="mt-1 text-center text-sm text-text-secondary">
             Enter your email and we&apos;ll send you a reset link.
           </p>
 
@@ -152,6 +177,7 @@ function LoginForm() {
               <form onSubmit={handleForgotPassword} className="mt-6 space-y-4">
                 <Input
                   label="Email"
+                  description="Use the email address linked to your account."
                   type="email"
                   placeholder="you@school.edu"
                   value={forgotEmail}
@@ -169,7 +195,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => { setShowForgot(false); setForgotSent(false); setForgotError(""); }}
-            className="mt-5 w-full text-center text-sm text-primary-900 hover:text-primary-700 font-medium"
+            className="focus-ring mt-5 w-full rounded-md text-center text-sm font-semibold text-primary-900 hover:text-primary-700"
           >
             ← Back to Sign In
           </button>
@@ -177,10 +203,10 @@ function LoginForm() {
       ) : (
         /* ===== Login View ===== */
         <>
-      <h1 className="text-3xl font-bold text-foreground text-center sm:text-4xl">
+      <h1 className="type-page-title text-center text-3xl text-foreground sm:text-4xl">
         Sign In
       </h1>
-      <p className="mt-1 text-sm text-muted text-center">
+      <p className="mt-1 text-center text-sm text-text-secondary">
         Welcome back. Sign in to your VistaTeacher account.
       </p>
 
@@ -213,7 +239,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-9.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="focus-ring absolute right-2 top-8.5 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:text-foreground"
             tabIndex={-1}
           >
             {showPassword ? (
@@ -233,7 +259,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => { setShowForgot(true); setForgotEmail(email); }}
-            className="text-xs text-primary-900 hover:text-primary-700 font-medium"
+            className="focus-ring rounded-md text-xs font-semibold text-primary-900 hover:text-primary-700"
           >
             Forgot password?
           </button>
@@ -285,8 +311,8 @@ function LoginForm() {
       <p className="mt-6 text-center text-sm text-muted">
         Don&apos;t have an account?{" "}
         <Link
-          href="/auth/signup"
-          className="font-medium text-primary-900 hover:text-primary-700"
+          href={`/auth/signup${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ""}`}
+          className="focus-ring rounded-sm font-semibold text-primary-900 hover:text-primary-700"
         >
           Create one
         </Link>

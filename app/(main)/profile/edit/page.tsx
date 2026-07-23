@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useState, useRef, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { updateProfile } from "firebase/auth";
 import Image from "next/image";
-
+import { updateProfile } from "firebase/auth";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
+import { Button, Card, Input, Select, Tag, Textarea } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
 import { storage } from "@/lib/firebase";
-import DiscoveryShell from "@/components/layout/DiscoveryShell";
 import {
   getUser,
   createUser,
@@ -18,181 +17,246 @@ import {
   SUBJECTS,
   type UserProfileInput,
 } from "@/lib/firestore/users";
-import { Button, Input, Select, Textarea, Tag, Card } from "@/components/ui";
+import {
+  computeProfileCompletion,
+  CURRICULA,
+  LANGUAGES,
+  NETWORKING_GOALS,
+  ONBOARDING_VERSION,
+  PROFESSIONAL_INTERESTS,
+  PROFESSIONAL_ROLES,
+  SCHOOL_TYPES,
+} from "@/lib/onboarding";
+import { uploadProfilePhoto, validateProfilePhoto } from "@/lib/profile-photo";
+
+type EditState = {
+  displayName: string;
+  photoURL: string | null;
+  gradeLevels: string[];
+  subjects: string[];
+  professionalRole: string;
+  additionalRoles: string[];
+  professionalHeadline: string;
+  curricula: string[];
+  country: string;
+  city: string;
+  languages: string[];
+  school: string;
+  schoolType: string;
+  yearsOfExperience: string;
+  bio: string;
+  professionalInterests: string[];
+  networkingGoals: string[];
+  lookingFor: string;
+};
+
+function initialState(): EditState {
+  return {
+    displayName: "",
+    photoURL: null,
+    gradeLevels: [],
+    subjects: [],
+    professionalRole: "",
+    additionalRoles: [],
+    professionalHeadline: "",
+    curricula: [],
+    country: "",
+    city: "",
+    languages: [],
+    school: "",
+    schoolType: "",
+    yearsOfExperience: "",
+    bio: "",
+    professionalInterests: [],
+    networkingGoals: [],
+    lookingFor: "",
+  };
+}
+
+function toggleSelection(values: string[], value: string, max: number): string[] {
+  if (values.includes(value)) return values.filter((item) => item !== value);
+  if (values.length >= max) return values;
+  return [...values, value];
+}
 
 export default function EditProfilePage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-
-  const [displayName, setDisplayName] = useState("");
-  const [gradeLevel, setGradeLevel] = useState("");
-  const [subjects, setSubjects] = useState<string[]>([]);
-  const [country, setCountry] = useState("");
-  const [school, setSchool] = useState("");
-  const [yearsOfExperience, setYearsOfExperience] = useState("");
-  const [bio, setBio] = useState("");
-  const [photoURL, setPhotoURL] = useState<string | null>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoError, setPhotoError] = useState("");
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-
+  const [state, setState] = useState<EditState>(initialState());
   const [isExisting, setIsExisting] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-
+  const [photoError, setPhotoError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push("/");
+      router.replace("/");
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, router, user]);
 
-  // Ensure route transitions to this page start at the top.
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "auto" });
-  }, []);
-
-  // Load existing profile
   useEffect(() => {
     if (!user) return;
+
+    const currentUser = user;
+
+    let cancelled = false;
 
     async function loadProfile() {
       try {
-        const profile = await getUser(user!.uid);
+        const profile = await getUser(currentUser.uid);
+        if (cancelled) return;
+
         if (profile) {
           setIsExisting(true);
-          setDisplayName(profile.displayName);
-          setGradeLevel(profile.gradeLevel);
-          setSubjects(profile.subjects);
-          setCountry(profile.country ?? "");
-          setSchool(profile.school);
-          setYearsOfExperience(
-            profile.yearsOfExperience > 0
-              ? String(profile.yearsOfExperience)
-              : ""
-          );
-          setBio(profile.bio);
-          setPhotoURL(profile.photoURL);
+          setState({
+            displayName: profile.displayName || currentUser.displayName || "",
+            photoURL: profile.photoURL ?? currentUser.photoURL,
+            gradeLevels: profile.gradeLevels ?? (profile.gradeLevel ? [profile.gradeLevel] : []),
+            subjects: profile.subjects ?? [],
+            professionalRole: profile.professionalRole || "",
+            additionalRoles: profile.additionalRoles ?? [],
+            professionalHeadline: profile.professionalHeadline || "",
+            curricula: profile.curricula ?? [],
+            country: profile.country || "",
+            city: profile.city || "",
+            languages: profile.languages ?? [],
+            school: profile.school || "",
+            schoolType: profile.schoolType || "",
+            yearsOfExperience:
+              typeof profile.yearsOfExperience === "number" && profile.yearsOfExperience > 0
+                ? String(profile.yearsOfExperience)
+                : "",
+            bio: profile.bio || "",
+            professionalInterests: profile.professionalInterests ?? [],
+            networkingGoals: profile.networkingGoals ?? [],
+            lookingFor: profile.lookingFor || "",
+          });
         } else {
-          // Pre-fill from auth data
-          setDisplayName(user!.displayName || "");
-          setPhotoURL(user!.photoURL || null);
+          setState((prev) => ({
+            ...prev,
+            displayName: currentUser.displayName || "",
+            photoURL: currentUser.photoURL,
+          }));
         }
       } catch {
-        // Firestore may not be configured yet - just pre-fill from auth
-        setDisplayName(user!.displayName || "");
-        setPhotoURL(user!.photoURL || null);
+        setState((prev) => ({
+          ...prev,
+          displayName: currentUser.displayName || "",
+          photoURL: currentUser.photoURL,
+        }));
       } finally {
-        setLoadingProfile(false);
+        if (!cancelled) setLoadingProfile(false);
       }
     }
 
-    loadProfile();
+    void loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== "image/jpeg" && file.type !== "image/png") {
-      setPhotoError("Only JPEG and PNG files are allowed");
-      e.target.value = "";
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      setPhotoError("Image must be less than 2 MB");
-      e.target.value = "";
+  async function handlePhotoFile(file: File) {
+    const validation = validateProfilePhoto(file);
+    if (validation) {
+      setPhotoError(validation);
       return;
     }
 
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+    if (!storage || !user) {
+      setPhotoError("File upload is not available right now.");
+      return;
+    }
+
+    setUploading(true);
     setPhotoError("");
-  }
-
-  function toggleSubject(subject: string) {
-    setSubjects((prev) =>
-      prev.includes(subject)
-        ? prev.filter((s) => s !== subject)
-        : [...prev, subject]
-    );
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!user) return;
-
-    setError("");
-    setSaving(true);
+    setUploadProgress(0);
 
     try {
-      let finalPhotoURL = photoURL;
+      const url = await uploadProfilePhoto({
+        storage,
+        uid: user.uid,
+        file,
+        onProgress: setUploadProgress,
+      });
+      setState((prev) => ({ ...prev, photoURL: url }));
+    } catch {
+      setPhotoError("Image upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+      setUploadProgress(null);
+    }
+  }
 
-      // Upload photo if a new one was selected
-      if (photoFile) {
-        if (!storage) {
-          // Storage not initialised — skip photo upload silently
-        } else {
-          const storageRef = ref(
-            storage,
-            `avatars/${user.uid}/${Date.now()}_${photoFile.name}`
-          );
-          await new Promise<void>((resolve, reject) => {
-            const task = uploadBytesResumable(storageRef, photoFile);
-            task.on(
-              "state_changed",
-              (snapshot) => {
-                setUploadProgress(
-                  Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
-                );
-              },
-              (err) => {
-                setUploadProgress(null);
-                reject(err);
-              },
-              () => resolve()
-            );
-          });
-          setUploadProgress(null);
-          finalPhotoURL = await getDownloadURL(storageRef);
-        }
-      }
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!user) return;
+
+    setSaving(true);
+    setError("");
+
+    try {
+      const years = Number(state.yearsOfExperience);
+      const yearsOfExperience = !state.yearsOfExperience || Number.isNaN(years)
+        ? 0
+        : Math.max(0, Math.min(60, years));
 
       const profileData: UserProfileInput = {
         uid: user.uid,
-        displayName: displayName.trim(),
+        displayName: state.displayName.trim(),
         email: user.email || "",
-        photoURL: finalPhotoURL,
-        gradeLevel,
-        subjects,
-        country: country.trim() || undefined,
-        school: school.trim(),
-        yearsOfExperience: yearsOfExperience
-          ? parseInt(yearsOfExperience, 10)
-          : 0,
-        bio: bio.trim(),
+        photoURL: state.photoURL,
+        gradeLevel: state.gradeLevels[0] || "",
+        gradeLevels: state.gradeLevels,
+        subjects: state.subjects,
+        professionalRole: state.professionalRole,
+        additionalRoles: state.additionalRoles,
+        professionalHeadline: state.professionalHeadline.trim(),
+        curricula: state.curricula,
+        country: state.country.trim(),
+        city: state.city.trim(),
+        languages: state.languages,
+        school: state.school.trim(),
+        schoolType: state.schoolType,
+        yearsOfExperience,
+        bio: state.bio.trim(),
+        professionalInterests: state.professionalInterests,
+        networkingGoals: state.networkingGoals,
+        lookingFor: state.lookingFor.trim(),
+        onboardingVersion: ONBOARDING_VERSION,
+        onboardingCurrentStep: 7,
       };
+
+      const completion = computeProfileCompletion(profileData);
+      profileData.profileCompletion = completion.percentage;
+      if (completion.minimumComplete) {
+        profileData.onboardingCompleted = true;
+      }
 
       if (isExisting) {
         const { uid, ...updateData } = profileData;
         await updateUser(uid, updateData);
       } else {
-        await createUser(profileData);
+        await createUser({
+          ...profileData,
+          onboardingCompleted: Boolean(profileData.onboardingCompleted),
+          profileCompletion: profileData.profileCompletion ?? 0,
+          onboardingCurrentStep: 7,
+        });
       }
 
-      // Update Firebase Auth display name + photo
       await updateProfile(user, {
         displayName: profileData.displayName,
-        photoURL: finalPhotoURL,
+        photoURL: profileData.photoURL,
       });
 
       setSuccessMsg("Profile updated");
-      setTimeout(() => router.push("/profile"), 1000);
+      setTimeout(() => router.push("/profile"), 900);
     } catch {
       setError("Failed to save profile. Please try again.");
     } finally {
@@ -210,219 +274,249 @@ export default function EditProfilePage() {
 
   if (!user) return null;
 
-  const currentPhoto = photoPreview || photoURL;
-
   return (
-    <div className="pt-2 space-y-6 pb-8 sm:pt-3">
+    <div className="space-y-6 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-muted">
-          <Link
-            href="/profile"
-            className="hover:text-foreground transition-colors"
-          >
-            Profile
-          </Link>
+          <Link href="/profile" className="transition-colors hover:text-foreground">Profile</Link>
           <span>/</span>
           <span className="text-foreground">Edit Profile</span>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            if (typeof window !== "undefined" && window.history.length > 1) {
-              router.back();
-              return;
-            }
-            router.push("/profile");
-          }}
-        >
+        <Button variant="outline" size="sm" onClick={() => router.back()}>
           Back
         </Button>
       </div>
 
       <DiscoveryShell
         title={isExisting ? "Edit Profile" : "Complete Your Profile"}
-        subtitle={
-          isExisting
-            ? "Update your profile information."
-            : "Tell the community about yourself to get started."
-        }
+        subtitle="Update your professional profile so VistaTeacher can personalize who and what you discover."
         eyebrow="Profile"
         className="mb-0"
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Profile Photo */}
-        <Card className="flex items-center gap-6">
-          <button
-            type="button"
-            aria-label="Change profile photo"
-            onClick={() => fileInputRef.current?.click()}
-            className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-secondary-100 transition-opacity hover:opacity-80"
-          >
-            {currentPhoto ? (
-              <Image
-                src={currentPhoto}
-                alt="Profile photo"
-                fill
-                sizes="80px"
-                className="object-cover"
-              />
+        <Card className="flex items-center gap-4">
+          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-secondary-100">
+            {state.photoURL ? (
+              <Image src={state.photoURL} alt="Profile photo" fill sizes="80px" className="object-cover" />
             ) : (
               <span className="flex h-full w-full items-center justify-center text-2xl font-semibold text-secondary-500">
-                {displayName.charAt(0).toUpperCase() || "?"}
+                {state.displayName.charAt(0).toUpperCase() || "?"}
               </span>
             )}
-          </button>
-          <div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadProgress !== null}
-            >
-              {currentPhoto ? "Change Photo" : "Upload Photo"}
-            </Button>
-            <p className="mt-1 text-xs text-muted">JPEG or PNG. Maximum 2 MB.</p>
-            {photoError && (
-              <p role="alert" className="mt-1 text-xs text-error-500">{photoError}</p>
-            )}
-            {uploadProgress !== null && (
-              <div className="mt-2 w-40">
-                <div className="h-1.5 w-full rounded-full bg-secondary-100 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary-500 transition-all"
-                    style={{ width: `${uploadProgress}%` }}
-                    role="progressbar"
-                    aria-valuenow={uploadProgress}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label="Upload progress"
-                  />
-                </div>
-                <p className="mt-0.5 text-xs text-muted">{uploadProgress}%</p>
-              </div>
-            )}
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png"
-            onChange={handlePhotoChange}
-            className="hidden"
+          <div className="space-y-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading || saving}>
+              {state.photoURL ? "Replace photo" : "Upload photo"}
+            </Button>
+            {state.photoURL && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setState((prev) => ({ ...prev, photoURL: null }))} disabled={uploading || saving}>
+                Remove photo
+              </Button>
+            )}
+            <p className="text-xs text-muted">JPEG or PNG. Maximum 2 MB.</p>
+            {photoError && <p className="text-xs text-error-600">{photoError}</p>}
+            {uploadProgress !== null && <p className="text-xs text-muted">Uploading... {uploadProgress}%</p>}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                void handlePhotoFile(file);
+              }}
+            />
+          </div>
+        </Card>
+
+        <Card className="space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Professional identity</h2>
+          <Input
+            label="Display name"
+            value={state.displayName}
+            onChange={(event) => setState((prev) => ({ ...prev, displayName: event.target.value }))}
+            required
+          />
+          <Select
+            label="Primary professional role"
+            value={state.professionalRole}
+            onChange={(event) => setState((prev) => ({ ...prev, professionalRole: event.target.value }))}
+            options={PROFESSIONAL_ROLES.map((role) => ({ value: role, label: role }))}
+            placeholder="Select one"
+          />
+          <Input
+            label="Professional headline"
+            value={state.professionalHeadline}
+            onChange={(event) => setState((prev) => ({ ...prev, professionalHeadline: event.target.value.slice(0, 120) }))}
+            maxLength={120}
+            placeholder="Primary Teacher | IB PYP | EdTech Enthusiast"
+          />
+          <div>
+            <p className="mb-2 text-sm font-semibold text-foreground">Additional roles</p>
+            <div className="flex flex-wrap gap-2">
+              {PROFESSIONAL_ROLES.filter((role) => role !== state.professionalRole).map((role) => (
+                <Tag
+                  key={role}
+                  label={role}
+                  selected={state.additionalRoles.includes(role)}
+                  onToggle={() => setState((prev) => ({ ...prev, additionalRoles: toggleSelection(prev.additionalRoles, role, 3) }))}
+                />
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        <Card className="space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Teaching context</h2>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-foreground">Grade levels</p>
+            <div className="flex flex-wrap gap-2">
+              {GRADE_LEVELS.map((level) => (
+                <Tag
+                  key={level}
+                  label={level}
+                  selected={state.gradeLevels.includes(level)}
+                  onToggle={() => setState((prev) => ({ ...prev, gradeLevels: toggleSelection(prev.gradeLevels, level, 6) }))}
+                />
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-foreground">Subjects</p>
+            <div className="flex flex-wrap gap-2">
+              {SUBJECTS.map((subject) => (
+                <Tag
+                  key={subject}
+                  label={subject}
+                  selected={state.subjects.includes(subject)}
+                  onToggle={() => setState((prev) => ({ ...prev, subjects: toggleSelection(prev.subjects, subject, 8) }))}
+                />
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-foreground">Curriculum</p>
+            <div className="flex flex-wrap gap-2">
+              {CURRICULA.map((curriculum) => (
+                <Tag
+                  key={curriculum}
+                  label={curriculum}
+                  selected={state.curricula.includes(curriculum)}
+                  onToggle={() => setState((prev) => ({ ...prev, curricula: toggleSelection(prev.curricula, curriculum, 6) }))}
+                />
+              ))}
+            </div>
+          </div>
+          <Input
+            label="Years of experience"
+            type="number"
+            min={0}
+            max={60}
+            value={state.yearsOfExperience}
+            onChange={(event) => setState((prev) => ({ ...prev, yearsOfExperience: event.target.value }))}
+          />
+          <Select
+            label="School type"
+            value={state.schoolType}
+            onChange={(event) => setState((prev) => ({ ...prev, schoolType: event.target.value }))}
+            options={SCHOOL_TYPES.map((value) => ({ value, label: value }))}
+            placeholder="Select school type"
+          />
+          <Input
+            label="School or organization"
+            value={state.school}
+            onChange={(event) => setState((prev) => ({ ...prev, school: event.target.value }))}
           />
         </Card>
 
-        {/* Basic Info */}
-        <Card>
-          <h2 className="mb-4 text-lg font-semibold text-foreground">
-            Basic Information
-          </h2>
-          <div className="space-y-4">
-            <Input
-              label="Display Name"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Your full name"
-              required
-            />
-
-            <Select
-              label="Grade Level"
-              value={gradeLevel}
-              onChange={(e) => setGradeLevel(e.target.value)}
-              placeholder="Select your grade level"
-              options={GRADE_LEVELS.map((g) => ({ value: g, label: g }))}
-            />
-
-            <Input
-              label="School"
-              value={school}
-              onChange={(e) => setSchool(e.target.value)}
-              placeholder="Your school or institution"
-            />
-
-            <Input
-              label="Country"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              placeholder="e.g. Australia"
-            />
-
-            <Input
-              label="Years of Experience"
-              type="number"
-              value={yearsOfExperience}
-              onChange={(e) => setYearsOfExperience(e.target.value)}
-              placeholder="e.g. 5"
-              min={0}
-              max={60}
-            />
+        <Card className="space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Location and languages</h2>
+          <Input
+            label="Country"
+            value={state.country}
+            onChange={(event) => setState((prev) => ({ ...prev, country: event.target.value }))}
+          />
+          <Input
+            label="City"
+            value={state.city}
+            onChange={(event) => setState((prev) => ({ ...prev, city: event.target.value }))}
+          />
+          <div>
+            <p className="mb-2 text-sm font-semibold text-foreground">Languages</p>
+            <div className="flex flex-wrap gap-2">
+              {LANGUAGES.map((language) => (
+                <Tag
+                  key={language}
+                  label={language}
+                  selected={state.languages.includes(language)}
+                  onToggle={() => setState((prev) => ({ ...prev, languages: toggleSelection(prev.languages, language, 8) }))}
+                />
+              ))}
+            </div>
           </div>
         </Card>
 
-        {/* Subjects */}
-        <Card>
-          <h2 className="mb-4 text-lg font-semibold text-foreground">
-            Subjects You Teach
-          </h2>
-          <p className="mb-3 text-sm text-muted">
-            Select all that apply.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {SUBJECTS.map((subject) => (
-              <Tag
-                key={subject}
-                label={subject}
-                selected={subjects.includes(subject)}
-                onToggle={() => toggleSubject(subject)}
-              />
-            ))}
+        <Card className="space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Interests and goals</h2>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-foreground">Professional interests</p>
+            <div className="flex flex-wrap gap-2">
+              {PROFESSIONAL_INTERESTS.map((interest) => (
+                <Tag
+                  key={interest}
+                  label={interest}
+                  selected={state.professionalInterests.includes(interest)}
+                  onToggle={() => setState((prev) => ({ ...prev, professionalInterests: toggleSelection(prev.professionalInterests, interest, 8) }))}
+                />
+              ))}
+            </div>
           </div>
-        </Card>
-
-        {/* Bio */}
-        <Card>
-          <h2 className="mb-4 text-lg font-semibold text-foreground">
-            About You
-          </h2>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-foreground">Networking goals</p>
+            <div className="flex flex-wrap gap-2">
+              {NETWORKING_GOALS.map((goal) => (
+                <Tag
+                  key={goal}
+                  label={goal}
+                  selected={state.networkingGoals.includes(goal)}
+                  onToggle={() => setState((prev) => ({ ...prev, networkingGoals: toggleSelection(prev.networkingGoals, goal, 6) }))}
+                />
+              ))}
+            </div>
+          </div>
           <Textarea
             label="Bio"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            placeholder="Share a bit about your teaching philosophy, interests, or experience..."
-            rows={5}
+            value={state.bio}
+            onChange={(event) => setState((prev) => ({ ...prev, bio: event.target.value.slice(0, 500) }))}
             maxLength={500}
+            showCharacterCount
+            rows={5}
           />
-          <p className="mt-1 text-right text-xs text-muted">
-            {bio.length}/500
-          </p>
+          <Textarea
+            label="What I am looking for"
+            value={state.lookingFor}
+            onChange={(event) => setState((prev) => ({ ...prev, lookingFor: event.target.value.slice(0, 240) }))}
+            maxLength={240}
+            showCharacterCount
+            rows={3}
+          />
         </Card>
 
-        {/* Success message */}
         {successMsg && (
           <div role="status" className="rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">
             {successMsg}
           </div>
         )}
 
-        {/* Error */}
-        {error && (
-          <p className="text-sm text-error-500">{error}</p>
-        )}
+        {error && <p className="text-sm text-error-600">{error}</p>}
 
-        {/* Actions */}
         <div className="flex items-center justify-end gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.back()}
-            disabled={saving || uploadProgress !== null}
-          >
+          <Button type="button" variant="outline" onClick={() => router.back()} disabled={saving || uploading}>
             Cancel
           </Button>
-          <Button type="submit" isLoading={saving} disabled={uploadProgress !== null}>
+          <Button type="submit" isLoading={saving} disabled={uploading || !state.displayName.trim()}>
             {isExisting ? "Save Changes" : "Create Profile"}
           </Button>
         </div>

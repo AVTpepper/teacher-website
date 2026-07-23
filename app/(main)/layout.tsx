@@ -2,6 +2,8 @@ import Navbar from "@/components/layout/Navbar";
 import Sidebar, { SidebarDrawerButton } from "@/components/layout/Sidebar";
 import Footer from "@/components/layout/Footer";
 import SiteMessageBanner from "@/components/layout/SiteMessageBanner";
+import OnboardingGuard from "@/components/layout/OnboardingGuard";
+import { TwoColumnLayout } from "@/components/ui/PageLayout";
 
 export default function MainLayout({
   children,
@@ -11,13 +13,13 @@ export default function MainLayout({
   return (
     <>
       <Navbar />
-      <div className="flex-1 bg-linear-to-b from-background via-secondary-50 to-background">
-        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 py-6">
+      <div className="flex-1 bg-linear-to-b from-page-background via-page-background-soft to-page-background">
+        <div className="app-container py-6 lg:py-8">
+          <OnboardingGuard />
           <SiteMessageBanner />
-          <div className="flex gap-6">
-            <div className="flex-1 min-w-0">{children}</div>
-            <Sidebar />
-          </div>
+          <TwoColumnLayout sidebar={<Sidebar />} className="mt-4">
+            {children}
+          </TwoColumnLayout>
         </div>
       </div>
       <Footer />

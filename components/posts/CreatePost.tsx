@@ -133,6 +133,8 @@ export default function CreatePost({ onPostCreated, embedded = false }: CreatePo
           src={user.photoURL}
           alt={user.displayName || "You"}
           size="md"
+          userId={user.uid}
+          showPlusBadge
         />
         <div className="flex-1 min-w-0">
           <MentionInput

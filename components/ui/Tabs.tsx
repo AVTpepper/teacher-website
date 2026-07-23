@@ -11,6 +11,7 @@ interface Tab {
 interface TabsProps {
   tabs: Tab[];
   defaultValue?: string;
+  value?: string;
   onChange?: (value: string) => void;
   className?: string;
   variant?: "underline" | "pill";
@@ -19,14 +20,17 @@ interface TabsProps {
 export default function Tabs({
   tabs,
   defaultValue,
+  value,
   onChange,
   className = "",
   variant = "underline",
 }: TabsProps) {
-  const [active, setActive] = useState(defaultValue || tabs[0]?.value);
+  const [internalActive, setInternalActive] = useState(defaultValue || tabs[0]?.value);
+
+  const active = value ?? internalActive;
 
   function handleSelect(value: string) {
-    setActive(value);
+    setInternalActive(value);
     onChange?.(value);
   }
 

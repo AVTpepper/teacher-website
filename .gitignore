@@ -17,6 +17,11 @@
 /.next/
 /out/
 
+# Lighthouse reports
+lighthouse-*.report.html
+lighthouse-*.report.json
+lh-all/
+
 # production
 /build
 

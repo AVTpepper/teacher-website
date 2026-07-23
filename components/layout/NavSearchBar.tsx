@@ -129,7 +129,7 @@ async function fetchSuggestions(term: string): Promise<SuggestionItem[]> {
       key: `edu-${u.uid}`,
       icon: "👩‍🏫",
       title: u.displayName,
-      pathLabel: `/educators / ${u.displayName}`,
+      pathLabel: `/discover / ${u.displayName}`,
       href: `/educators/${u.uid}`,
     });
   });
@@ -149,7 +149,7 @@ async function fetchSuggestions(term: string): Promise<SuggestionItem[]> {
       key: `thr-${t.id}`,
       icon: "💬",
       title: t.title,
-      pathLabel: `/forums / ${t.title}`,
+      pathLabel: `/communities / ${t.title}`,
       href: `/forums/${threadSlug(t.title, t.id)}`,
     });
   });
@@ -189,7 +189,7 @@ interface NavSearchBarProps {
 
 export default function NavSearchBar({
   onNavigate,
-  placeholder = "Search educators, resources, discussions...",
+  placeholder = "Search educators, resources, communities...",
 }: NavSearchBarProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -289,7 +289,10 @@ export default function NavSearchBar({
 
   // Scroll active item into view
   useEffect(() => {
-    activeItemRef.current?.scrollIntoView({ block: "nearest" });
+    const node = activeItemRef.current;
+    if (node && typeof node.scrollIntoView === "function") {
+      node.scrollIntoView({ block: "nearest" });
+    }
   }, [activeIndex]);
 
   const showSeeAll = value.trim().length > 0;

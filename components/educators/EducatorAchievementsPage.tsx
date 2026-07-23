@@ -192,8 +192,13 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
     [earnedBadgeSet, contentSummary]
   );
 
+  const availableAchievementItems = useMemo(
+    () => allAchievementItems.filter((item) => item.earned || Boolean(item.progress)),
+    [allAchievementItems]
+  );
+
   const filteredAchievementItems = useMemo(() => {
-    return allAchievementItems.filter((item) => {
+    return availableAchievementItems.filter((item) => {
       if (achievementCategoryFilter !== "all" && item.category !== achievementCategoryFilter) {
         return false;
       }
@@ -201,7 +206,7 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
       if (achievementStatusFilter === "locked" && item.earned) return false;
       return true;
     });
-  }, [allAchievementItems, achievementCategoryFilter, achievementStatusFilter]);
+  }, [availableAchievementItems, achievementCategoryFilter, achievementStatusFilter]);
 
   const reputationScore = useMemo(
     () => getReputationScore(contentSummary, earnedBadgeIds.length),
@@ -249,7 +254,7 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
         <div>
           <h1 className="text-2xl font-bold text-foreground">{profile.displayName}&apos;s Achievements</h1>
           <p className="mt-1 text-sm text-muted">
-            {earnedBadgeIds.length} earned of {BADGE_LIST.length} total
+            {earnedBadgeIds.length} earned of {availableAchievementItems.length} available
           </p>
         </div>
       </div>
@@ -267,7 +272,7 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
         <div className="flex flex-col gap-3">
 
           <HorizontalScrollHint nudgeKey="achievements-status-filter">
-            <div className="inline-flex min-w-max rounded-lg border border-border bg-background p-1">
+            <div className="inline-flex min-w-max rounded-lg border border-primary-100 bg-surface p-1 shadow-sm">
             {(["all", "earned", "locked"] as const).map((status) => (
               <button
                 key={status}
@@ -279,14 +284,14 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
                     : "text-muted hover:text-foreground"
                 }`}
               >
-                {status}
+                {status === "earned" ? "Completed" : status === "locked" ? "In Progress" : "All"}
               </button>
             ))}
             </div>
           </HorizontalScrollHint>
 
           <HorizontalScrollHint nudgeKey="achievements-category-filter">
-            <div className="inline-flex min-w-max rounded-lg border border-border bg-background p-1">
+            <div className="inline-flex min-w-max rounded-lg border border-primary-100 bg-surface p-1 shadow-sm">
             {(["all", "contribution", "milestone", "expertise", "verification"] as const).map((cat) => (
               <button
                 key={cat}
@@ -314,10 +319,10 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
             {filteredAchievementItems.map((item) => (
               <div
                 key={item.id}
-                className={`rounded-lg border px-4 py-3 ${
+                className={`rounded-lg border px-4 py-3 transition-colors ${
                   item.earned
-                    ? "border-success-200 bg-success-50/40"
-                    : "border-border bg-background"
+                    ? "border-primary-200 bg-white"
+                    : "border-secondary-200 bg-white"
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -332,20 +337,22 @@ export default function EducatorAchievementsPage({ userId }: { userId: string })
 
                 <div className="mt-3 flex items-center justify-between text-xs">
                   <span className="text-muted">{CATEGORY_LABEL_MAP[item.category]}</span>
-                  <span className={item.earned ? "font-semibold text-success-700" : "text-muted"}>
-                    {item.earned ? "Earned" : "Locked"}
+                  <span className={item.earned ? "font-semibold text-primary-800" : "text-muted"}>
+                    {item.earned ? "Completed" : "In progress"}
                   </span>
                 </div>
 
-                {!item.earned && item.progress && (
+                {item.progress && (
                   <div className="mt-2">
                     <p className="text-[11px] text-muted">
-                      {Math.min(item.progress.current, item.progress.target)} / {item.progress.target} {item.progress.label}
+                      {item.earned
+                        ? `${item.progress.target} / ${item.progress.target} ${item.progress.label}`
+                        : `${Math.min(item.progress.current, item.progress.target)} / ${item.progress.target} ${item.progress.label}`}
                     </p>
                     <div className="mt-1 h-1.5 w-full rounded-full bg-secondary-100">
                       <div
                         className="h-1.5 rounded-full bg-primary-900"
-                        style={{ width: `${item.progressPercent}%` }}
+                        style={{ width: `${item.earned ? 100 : item.progressPercent}%` }}
                       />
                     </div>
                   </div>
@@ -369,7 +376,7 @@ function SummaryPill({
   subLabel?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-background px-3 py-2">
+    <div className="rounded-lg border border-secondary-200 bg-white px-3 py-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
       <p className="mt-1 text-lg font-bold text-foreground">{value}</p>
       {subLabel ? <p className="text-xs text-muted">{subLabel}</p> : null}

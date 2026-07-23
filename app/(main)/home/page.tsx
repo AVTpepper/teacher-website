@@ -40,8 +40,7 @@ function HomePageInner() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Capture the linked post ID once at mount - stays stable even after we strip the URL param
-  const [pinnedPostId] = useState<string | null>(() => searchParams.get("post"));
+  const [pinnedPostId, setPinnedPostId] = useState<string | null>(() => searchParams.get("post"));
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [sharedPost, setSharedPost] = useState<Post | null>(null);
@@ -82,7 +81,14 @@ function HomePageInner() {
     }
   }, [authLoading, typeFilter, loadPosts]);
 
-  // Fetch the linked post on mount (once only)
+  useEffect(() => {
+    const linkedPostId = searchParams.get("post");
+    if (linkedPostId) {
+      setPinnedPostId(linkedPostId);
+    }
+  }, [searchParams]);
+
+  // Fetch linked post whenever the target ID changes
   useEffect(() => {
     if (!pinnedPostId) return;
     setSharedPostLoading(true);
@@ -90,8 +96,7 @@ function HomePageInner() {
       .then(setSharedPost)
       .catch(() => setSharedPost(null))
       .finally(() => setSharedPostLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pinnedPostId]);
 
   // Once the post loads: scroll to it, then strip ?post= so refresh shows normal feed
   useEffect(() => {
@@ -242,10 +247,10 @@ function HomePageInner() {
                 Create a free account to view the full educator feed and join the conversation.
               </p>
               <div className="mt-4 flex justify-center gap-3">
-                <Button variant="primary" onClick={() => router.push("/auth/signup")}>
+                <Button variant="primary" onClick={() => router.push("/auth/signup?redirect=/home")}>
                   Create Account
                 </Button>
-                <Button variant="outline" onClick={() => router.push("/auth/login")}>
+                <Button variant="outline" onClick={() => router.push("/auth/login?redirect=/home")}>
                   Sign In
                 </Button>
               </div>

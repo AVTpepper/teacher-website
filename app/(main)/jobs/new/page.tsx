@@ -48,7 +48,7 @@ export default function PostJobPage() {
     return (
       <div className="py-16 text-center">
         <p className="text-foreground font-medium">You must be signed in to post a job.</p>
-        <Button variant="primary" className="mt-4" onClick={() => router.push("/auth/login")}>
+        <Button variant="primary" className="mt-4" onClick={() => router.push("/auth/login?redirect=/jobs/new")}>
           Sign In
         </Button>
       </div>

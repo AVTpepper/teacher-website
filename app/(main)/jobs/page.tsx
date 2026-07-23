@@ -150,7 +150,7 @@ export default function JobsPage() {
             </p>
           ) : (
             <p className="text-sm text-white/80">
-              <Link href="/auth/login" className="text-primary-100 underline">Sign in</Link> to post a job.
+              <Link href="/auth/login?redirect=/jobs/new" className="text-primary-100 underline">Sign in</Link> to post a job.
             </p>
           )
         }

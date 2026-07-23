@@ -136,6 +136,7 @@ export default function InspirationDetailPage({
   const { id } = use(params);
   const { user } = useAuth();
   const router = useRouter();
+  const previewPath = `/inspiration/${id}`;
 
   const [item, setItem] = useState<InspirationItem | null>(null);
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -171,6 +172,7 @@ export default function InspirationDetailPage({
 
   useEffect(() => {
     if (!item) return;
+    if (!user) return;
 
     getInspirationComments(item.id)
       .then((latest) => {
@@ -181,7 +183,7 @@ export default function InspirationDetailPage({
       .finally(() => {
         setCommentsLoadedFor(item.id);
       });
-  }, [item]);
+  }, [item, user]);
 
   if (loading) {
     return (
@@ -370,55 +372,74 @@ export default function InspirationDetailPage({
         </div>
       </div>
 
-      <Card padding="lg">
-        <ContentCommentSection
-          comments={commentData}
-          loading={commentsLoading}
-          title="Discussion"
-          description="Share how this idea could be used, ask a question, or add context for other educators."
-          ownerId={item.submittedBy ?? null}
-          contentLabel={`this inspiration post "${displayTitle}"`}
-          linkURL={`/inspiration/${item.id}`}
-          mode="like"
-          maxDepth={1}
-          composerPlaceholder="Add a comment..."
-          emptyStateMessage="No comments yet. Start the discussion."
-          emptyStateGuestMessage="Sign in to join the discussion."
-          addComment={async ({ parentId, authorId, authorName, authorPhotoURL, content, mentionedUsers }) => {
-            return addInspirationComment(item.id, {
-              parentId,
-              authorId,
-              authorName,
-              authorPhotoURL,
-              content,
-              mentionedUsers,
-            });
-          }}
-          updateComment={async (commentId, text) => {
-            await updateInspirationComment(item.id, commentId, text);
-          }}
-          deleteComment={async (commentId) => {
-            return deleteInspirationComment(item.id, commentId);
-          }}
-          refreshComments={async () => {
-            const latest = await getInspirationComments(item.id);
-            setComments(latest);
-          }}
-          onLikeComment={async (commentId) => {
-            if (!user) return;
-            const alreadyLiked = await hasLikedInspirationComment(item.id, commentId, user.uid);
-            if (alreadyLiked) {
-              await unlikeInspirationComment(item.id, commentId, user.uid);
-            } else {
-              await likeInspirationComment(item.id, commentId, user.uid);
-            }
-          }}
-          hasLikedComment={async (commentId) => {
-            if (!user) return false;
-            return hasLikedInspirationComment(item.id, commentId, user.uid);
-          }}
-        />
-      </Card>
+      {!user && (
+        <Card padding="lg" className="border-primary-200 bg-primary-50">
+          <h2 className="text-lg font-semibold text-foreground">Preview Mode</h2>
+          <p className="mt-1 text-sm text-muted">
+            You are viewing a public preview. Sign in to join member discussion and interact with this inspiration post.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Link href={`/auth/signup?redirect=${encodeURIComponent(previewPath)}`}>
+              <Button variant="primary" size="sm">Create Account</Button>
+            </Link>
+            <Link href={`/auth/login?redirect=${encodeURIComponent(previewPath)}`}>
+              <Button variant="outline" size="sm">Sign In</Button>
+            </Link>
+          </div>
+        </Card>
+      )}
+
+      {user && (
+        <Card padding="lg">
+          <ContentCommentSection
+            comments={commentData}
+            loading={commentsLoading}
+            title="Discussion"
+            description="Share how this idea could be used, ask a question, or add context for other educators."
+            ownerId={item.submittedBy ?? null}
+            contentLabel={`this inspiration post "${displayTitle}"`}
+            linkURL={`/inspiration/${item.id}`}
+            mode="like"
+            maxDepth={1}
+            composerPlaceholder="Add a comment..."
+            emptyStateMessage="No comments yet. Start the discussion."
+            emptyStateGuestMessage="Sign in to join the discussion."
+            addComment={async ({ parentId, authorId, authorName, authorPhotoURL, content, mentionedUsers }) => {
+              return addInspirationComment(item.id, {
+                parentId,
+                authorId,
+                authorName,
+                authorPhotoURL,
+                content,
+                mentionedUsers,
+              });
+            }}
+            updateComment={async (commentId, text) => {
+              await updateInspirationComment(item.id, commentId, text);
+            }}
+            deleteComment={async (commentId) => {
+              return deleteInspirationComment(item.id, commentId);
+            }}
+            refreshComments={async () => {
+              const latest = await getInspirationComments(item.id);
+              setComments(latest);
+            }}
+            onLikeComment={async (commentId) => {
+              if (!user) return;
+              const alreadyLiked = await hasLikedInspirationComment(item.id, commentId, user.uid);
+              if (alreadyLiked) {
+                await unlikeInspirationComment(item.id, commentId, user.uid);
+              } else {
+                await likeInspirationComment(item.id, commentId, user.uid);
+              }
+            }}
+            hasLikedComment={async (commentId) => {
+              if (!user) return false;
+              return hasLikedInspirationComment(item.id, commentId, user.uid);
+            }}
+          />
+        </Card>
+      )}
 
       <IPNotice />
     </div>

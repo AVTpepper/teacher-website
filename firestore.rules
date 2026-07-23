@@ -36,7 +36,7 @@ service cloud.firestore {
       // Any authenticated user can increment/decrement followerCount (follow/unfollow)
       allow update: if (isOwner(userId)
                         && !request.resource.data.diff(resource.data)
-              .affectedKeys().hasAny(['tier', 'createdAt', 'role', 'stripeCustomerId', 'stripeSubscriptionId', 'billingStatus', 'billingUpdatedAt']))
+          .affectedKeys().hasAny(['tier', 'createdAt', 'role', 'isVerified', 'stripeCustomerId', 'stripeSubscriptionId', 'billingStatus', 'billingUpdatedAt']))
                     || (isAuth() && request.resource.data.diff(resource.data)
                            .affectedKeys().hasOnly(['followerCount']));
       // Only the owner can delete their own profile (account deletion)
@@ -66,6 +66,20 @@ service cloud.firestore {
       match /aiRefineUsage/{monthKey} {
         allow read: if isOwner(userId);
         allow write: if isOwner(userId);
+      }
+
+      // connectionRequestUsage sub-collection — users/{userId}/connectionRequestUsage/{periodKey}
+      // Server-managed connection request quota data.
+      match /connectionRequestUsage/{periodKey} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+
+      // messageUsage sub-collection — users/{userId}/messageUsage/{periodKey}
+      // Server-managed message quota data.
+      match /messageUsage/{periodKey} {
+        allow read: if isOwner(userId);
+        allow write: if false;
       }
     }
 
@@ -318,6 +332,38 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isAuth()
                     && request.auth.uid == resource.data.followerId;
+    }
+
+    // -----------------------------------------------------------------------
+    // connections/{participantKey}
+    // Private professional relationship records.
+    // -----------------------------------------------------------------------
+    match /connections/{participantKey} {
+      allow read: if isAuth()
+                  && request.auth.uid in resource.data.participantIds;
+      allow create, update, delete: if false;
+    }
+
+    // -----------------------------------------------------------------------
+    // conversations/{conversationId}
+    // Private one-to-one messaging conversations and message threads.
+    // -----------------------------------------------------------------------
+    match /conversations/{conversationId} {
+      allow read: if isAuth()
+                  && request.auth.uid in resource.data.participantIds;
+      allow create, update, delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isAuth()
+                    && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+        allow create, update, delete: if false;
+      }
+
+      match /idempotency/{idempotencyId} {
+        allow read: if isAuth()
+                    && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+        allow create, update, delete: if false;
+      }
     }
 
     // -----------------------------------------------------------------------

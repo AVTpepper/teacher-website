@@ -64,7 +64,7 @@ export default function AccountUpgradePage() {
             You need an account session before starting a Plus subscription.
           </p>
           <div className="flex justify-center gap-3">
-            <Button onClick={() => router.push("/auth/login")}>Sign In</Button>
+            <Button onClick={() => router.push("/auth/login?redirect=/account/upgrade")}>Sign In</Button>
             <Button variant="outline" onClick={() => router.push("/account")}>Back</Button>
           </div>
         </Card>

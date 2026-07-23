@@ -23,6 +23,9 @@ import { timeAgo } from "@/lib/utils";
 
 const TYPE_ICON: Record<NotificationType, string> = {
   "new-follower": "👤",
+  "connection-request": "🤝",
+  "connection-accepted": "✅",
+  "message-received": "✉️",
   comment: "💬",
   upvote: "⬆️",
   "badge-earned": "🏅",
@@ -361,7 +364,13 @@ export default function NotificationsPage() {
                   >
                     <div className="shrink-0 mt-0.5">
                       {n.actorPhotoURL || n.actorName !== "VistaTeacher" ? (
-                        <Avatar src={n.actorPhotoURL} alt={n.actorName} size="sm" />
+                        <Avatar
+                          src={n.actorPhotoURL}
+                          alt={n.actorName}
+                          size="sm"
+                          userId={n.actorId}
+                          showPlusBadge
+                        />
                       ) : (
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary-100 text-base">
                           {TYPE_ICON[n.type]}

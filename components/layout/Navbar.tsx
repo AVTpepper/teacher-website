@@ -13,8 +13,10 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const navLinks = [
   { href: "/home", label: "Home" },
-  { href: "/educators", label: "Educators" },
-  { href: "/forums", label: "Forums" },
+  { href: "/discover", label: "Discover" },
+  { href: "/network", label: "Network" },
+  { href: "/messages", label: "Messages" },
+  { href: "/forums", label: "Communities" },
   { href: "/resources", label: "Resources" },
   { href: "/lesson-builder", label: "Lesson Builder" },
   { href: "/inspiration", label: "Inspiration" },
@@ -55,6 +57,9 @@ export default function Navbar() {
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
+    if (href === "/discover") {
+      return pathname.startsWith("/discover") || pathname.startsWith("/educators");
+    }
     return pathname.startsWith(href);
   }
 
@@ -73,10 +78,10 @@ export default function Navbar() {
       confirmLabel="Sign out"
       isDestructive={false}
     />
-    <header className="sticky top-0 z-50 border-b border-primary-900/80 bg-primary-950 text-white backdrop-blur supports-backdrop-filter:bg-primary-950/95">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+    <header className="sticky top-0 z-50 border-b border-primary-900/70 bg-primary-950 text-white backdrop-blur supports-backdrop-filter:bg-primary-950/95">
+      <div className="app-container">
         {/* Top row: Logo + Search + Actions */}
-        <div className="flex h-14 items-center justify-between gap-4">
+        <div className="flex h-(--header-height) items-center justify-between gap-4">
           {/* Logo */}
           <Link
             href={user ? "/home" : "/"}
@@ -86,14 +91,16 @@ export default function Navbar() {
           </Link>
 
           {/* Search - hidden on mobile, shown md+ */}
-          <div className="hidden md:block flex-1 max-w-md mx-4">
-            <NavSearchBar placeholder="Search educators, resources, discussions..." />
+          <div className="mx-4 hidden max-w-xl flex-1 md:block">
+            <NavSearchBar placeholder="Search educators, resources, communities..." />
           </div>
 
           {/* Right actions */}
           <div className="flex items-center gap-2">
             {/* Notifications */}
             <NotificationDropdown />
+
+            <div className="hidden h-6 w-px bg-white/20 sm:block" aria-hidden="true" />
 
             {/* User menu */}
             {!loading && (
@@ -102,18 +109,14 @@ export default function Navbar() {
                   <Dropdown
                     align="right"
                     trigger={
-                      <div className="relative">
-                        <Avatar
-                          src={user.photoURL}
-                          alt={user.displayName || "User"}
-                          size="sm"
-                        />
-                        {isPlus && (
-                          <span className="absolute -right-1 -top-1 rounded-full bg-accent-400 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-950">
-                            +
-                          </span>
-                        )}
-                      </div>
+                      <Avatar
+                        src={user.photoURL}
+                        alt={user.displayName || "User"}
+                        size="sm"
+                        userId={user.uid}
+                        showPlusBadge
+                        isPlus={isPlus}
+                      />
                     }
                     items={[
                       {
@@ -148,7 +151,7 @@ export default function Navbar() {
                 ) : (
                   <Link
                     href="/auth/login"
-                    className="type-body-medium rounded-lg bg-primary-700 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-primary-800 transition-colors"
+                    className="focus-ring inline-flex min-h-10 items-center rounded-lg bg-primary-700 px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-primary-800"
                   >
                     Sign in
                   </Link>
@@ -160,7 +163,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden rounded-lg p-2 text-white/90 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+              className="focus-ring touch-target cursor-pointer rounded-lg p-2 text-white/90 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
               aria-label="Toggle menu"
               aria-expanded={mobileMenuOpen}
             >
@@ -198,15 +201,15 @@ export default function Navbar() {
         </div>
 
         {/* Desktop nav links */}
-        <nav className="hidden lg:flex gap-1 -mb-px" aria-label="Main">
+        <nav className="-mb-px hidden gap-1 lg:flex" aria-label="Main">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className={`type-body-medium px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              className={`focus-ring rounded-t-md border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors ${
                 isActive(link.href)
-                  ? "border-white text-white"
-                  : "border-transparent text-white/75 hover:text-white hover:border-white/40"
+                  ? "border-accent-300 text-white"
+                  : "border-transparent text-white/80 hover:border-white/45 hover:text-white"
               }`}
             >
               {link.label}
@@ -218,7 +221,7 @@ export default function Navbar() {
 
     {/* Mobile menu - rendered outside header to avoid stacking context issues */}
     {mobileMenuOpen && (
-      <div className="fixed inset-0 top-14 z-40 lg:hidden">
+      <div className="fixed inset-0 top-(--header-height) z-40 lg:hidden">
         {/* Backdrop overlay - below header */}
         <div
           className="absolute inset-0 bg-black/40"
@@ -236,16 +239,16 @@ export default function Navbar() {
             />
           </div>
 
-          <nav className="px-2 pt-2 pb-3 space-y-1" aria-label="Mobile">
+          <nav className="space-y-1 px-2 pb-3 pt-2" aria-label="Mobile">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                className={`focus-ring block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive(link.href)
                     ? "bg-white/10 text-white"
-                    : "text-white/80 hover:bg-white/10 hover:text-white"
+                    : "text-white/85 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {link.label}

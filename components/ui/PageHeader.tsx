@@ -13,11 +13,11 @@ export default function PageHeader({
 }: PageHeaderProps) {
   return (
     <div
-      className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${className}`}
+      className={`flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between ${className}`}
     >
       <div>
-        <h1 className="type-heading-strong text-3xl font-extrabold text-foreground sm:text-4xl">{title}</h1>
-        {subtitle && <p className="type-body-medium mt-2 text-base text-muted">{subtitle}</p>}
+        <h1 className="type-page-title text-3xl text-foreground sm:text-4xl">{title}</h1>
+        {subtitle && <p className="mt-2 text-base text-text-secondary">{subtitle}</p>}
       </div>
       {action && <div>{action}</div>}
     </div>

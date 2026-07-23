@@ -1,38 +1,69 @@
 "use client";
 
 import { type TextareaHTMLAttributes, forwardRef } from "react";
+import FormField from "./FormField";
 
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
+  description?: string;
+  helperText?: string;
+  optionalLabel?: string;
+  showCharacterCount?: boolean;
 }
 
 const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, error, className = "", id, ...props }, ref) => {
+  ({
+    label,
+    error,
+    className = "",
+    id,
+    description,
+    helperText,
+    optionalLabel,
+    showCharacterCount = false,
+    required,
+    maxLength,
+    value,
+    ...props
+  }, ref) => {
     const textareaId = id || label?.toLowerCase().replace(/\s+/g, "-");
+    const currentLength = typeof value === "string" ? value.length : undefined;
+    const describedBy = [
+      description ? `${textareaId}-description` : null,
+      helperText ? `${textareaId}-helper` : null,
+      error ? `${textareaId}-error` : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     return (
-      <div className="flex flex-col gap-1.5">
-        {label && (
-          <label
-            htmlFor={textareaId}
-            className="text-sm font-medium text-foreground"
-          >
-            {label}
-          </label>
-        )}
+      <FormField
+        id={textareaId}
+        label={label}
+        description={description}
+        error={error}
+        helperText={helperText}
+        required={required}
+        optionalLabel={optionalLabel}
+        characterCount={showCharacterCount ? currentLength : undefined}
+        maxLength={showCharacterCount ? maxLength : undefined}
+      >
         <textarea
           ref={ref}
           id={textareaId}
-          className={`w-full rounded-lg border bg-white px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-ring resize-y min-h-20 ${
+          value={value}
+          maxLength={maxLength}
+          aria-invalid={error ? "true" : undefined}
+          aria-describedby={describedBy || undefined}
+          className={`w-full min-h-24 resize-y rounded-lg border bg-white px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground transition-colors focus-ring sm:text-sm ${
             error
               ? "border-error-500 focus-visible:ring-error-500"
               : "border-border hover:border-border-strong focus-visible:border-primary-300"
           } ${className}`}
           {...props}
         />
-        {error && <p className="text-xs text-error-500">{error}</p>}
-      </div>
+      </FormField>
     );
   }
 );

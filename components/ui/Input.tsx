@@ -1,27 +1,39 @@
 "use client";
 
 import { type InputHTMLAttributes, type ReactNode, forwardRef } from "react";
+import FormField from "./FormField";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   icon?: ReactNode;
+  description?: string;
+  helperText?: string;
+  optionalLabel?: string;
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, icon, className = "", id, ...props }, ref) => {
+  ({ label, error, icon, className = "", id, description, helperText, optionalLabel, required, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, "-");
 
+    const describedBy = [
+      description ? `${inputId}-description` : null,
+      helperText ? `${inputId}-helper` : null,
+      error ? `${inputId}-error` : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
     return (
-      <div className="flex flex-col gap-1.5">
-        {label && (
-          <label
-            htmlFor={inputId}
-            className="text-sm font-medium text-foreground"
-          >
-            {label}
-          </label>
-        )}
+      <FormField
+        id={inputId}
+        label={label}
+        description={description}
+        error={error}
+        helperText={helperText}
+        required={required}
+        optionalLabel={optionalLabel}
+      >
         <div className="relative">
           {icon && (
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
@@ -32,8 +44,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             aria-invalid={error ? "true" : undefined}
-            aria-describedby={error ? `${inputId}-error` : undefined}
-            className={`w-full rounded-lg border bg-white px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-ring ${
+            aria-describedby={describedBy || undefined}
+            className={`w-full rounded-lg border bg-white px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-ring ${
               icon ? "pl-10" : ""
             } ${
               error
@@ -43,8 +55,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
         </div>
-        {error && <p id={`${inputId}-error`} role="alert" className="text-xs text-error-500">{error}</p>}
-      </div>
+      </FormField>
     );
   }
 );

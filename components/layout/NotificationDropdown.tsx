@@ -23,6 +23,9 @@ import { timeAgo } from "@/lib/utils";
 
 const TYPE_ICON: Record<NotificationType, string> = {
   "new-follower": "👤",
+  "connection-request": "🤝",
+  "connection-accepted": "✅",
+  "message-received": "✉️",
   comment: "💬",
   upvote: "⬆️",
   "badge-earned": "🏅",
@@ -175,7 +178,7 @@ export default function NotificationDropdown() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative rounded-lg p-2 transition-colors cursor-pointer hover:bg-white/10 text-white"
+        className="focus-ring touch-target relative rounded-lg p-2 text-white transition-colors cursor-pointer hover:bg-white/10"
         aria-label="Notifications"
         aria-expanded={open}
         aria-haspopup="true"
@@ -196,7 +199,7 @@ export default function NotificationDropdown() {
           role="dialog"
           aria-modal="true"
           aria-label="Notifications"
-          className="fixed left-4 right-4 top-14 rounded-xl border border-border bg-surface shadow-xl z-50 overflow-hidden sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96"
+          className="surface-panel fixed left-4 right-4 top-14 z-50 overflow-hidden rounded-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -245,7 +248,13 @@ export default function NotificationDropdown() {
                     {/* Avatar / type icon */}
                     <div className="shrink-0 mt-0.5">
                       {n.actorPhotoURL || n.actorName !== "VistaTeacher" ? (
-                        <Avatar src={n.actorPhotoURL} alt={n.actorName} size="sm" />
+                        <Avatar
+                          src={n.actorPhotoURL}
+                          alt={n.actorName}
+                          size="sm"
+                          userId={n.actorId}
+                          showPlusBadge
+                        />
                       ) : (
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary-100 text-base">
                           {TYPE_ICON[n.type]}

@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Routes that require authentication
-const protectedPrefixes = ["/profile", "/admin", "/account"];
+const protectedPrefixes = [
+  "/home",
+  "/onboarding",
+  "/profile",
+  "/network",
+  "/messages",
+  "/admin",
+  "/account",
+  "/notifications",
+  "/forums/new",
+  "/resources/upload",
+  "/inspiration/new",
+];
 
 function isProtectedLessonBuilderRoute(pathname: string): boolean {
   if (pathname.startsWith("/lesson-builder/new")) return true;
@@ -15,7 +27,7 @@ function isProtectedLessonBuilderRoute(pathname: string): boolean {
 const authRoutes = ["/auth/login", "/auth/signup"];
 
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
   const hasSession = request.cookies.has("__session");
 
   const isProtected = protectedPrefixes.some((prefix) =>
@@ -25,7 +37,9 @@ export function proxy(request: NextRequest) {
 
   // Unauthenticated user hitting a protected route → landing page
   if (isProtected && !hasSession) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const loginUrl = new URL("/auth/login", request.url);
+    loginUrl.searchParams.set("redirect", `${pathname}${search}`);
+    return NextResponse.redirect(loginUrl);
   }
 
   // Authenticated user hitting auth pages → home feed

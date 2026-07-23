@@ -37,7 +37,7 @@ export default function LessonDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const lessonPath = `/lesson-builder/${id}`;
 
@@ -96,7 +96,7 @@ export default function LessonDetailPage({
 
         const [authorData, _commentsLoaded, remixes] = await Promise.all([
           getUser(res.authorId),
-          loadComments(),
+          user ? loadComments() : Promise.resolve(null),
           getPublicRemixedLessons(res.id),
         ]);
         void _commentsLoaded;
@@ -266,6 +266,9 @@ export default function LessonDetailPage({
   }
 
   const isOwner = user?.uid === lesson.authorId;
+  const lessonOverview = lesson.steps
+    .map((step) => step.description?.trim())
+    .find((value) => Boolean(value));
 
   return (
     <div className="space-y-8 pb-8">
@@ -295,6 +298,24 @@ export default function LessonDetailPage({
           Back
         </Button>
       </div>
+
+      {!user && (
+        <Card padding="lg" className="border-primary-200 bg-primary-50">
+          <h2 className="text-lg font-semibold text-foreground">Preview Mode</h2>
+          <p className="mt-1 text-sm text-muted">
+            You are viewing a limited lesson preview with objectives and overview.
+            Sign in to unlock full lesson steps, materials, downloads, and member discussion.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Link href={`/auth/signup?redirect=${encodeURIComponent(lessonPath)}`}>
+              <Button variant="primary" size="sm">Create Account</Button>
+            </Link>
+            <Link href={`/auth/login?redirect=${encodeURIComponent(lessonPath)}`}>
+              <Button variant="outline" size="sm">Sign In</Button>
+            </Link>
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Main content */}
@@ -442,6 +463,17 @@ export default function LessonDetailPage({
               </div>
             )}
 
+            {lessonOverview && (
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">
+                  🧭 Lesson Overview
+                </h3>
+                <p className="text-sm text-muted whitespace-pre-wrap">
+                  {lessonOverview}
+                </p>
+              </div>
+            )}
+
             {/* Materials */}
             {user ? (
               lesson.materials.length > 0 && (
@@ -461,10 +493,10 @@ export default function LessonDetailPage({
                 <p className="text-sm font-medium text-foreground mb-1">📦 Materials &amp; Lesson Steps are members-only</p>
                 <p className="text-xs text-muted mb-3">Create a free account to view the full lesson plan.</p>
                 <div className="flex justify-center gap-2">
-                  <Link href="/auth/signup">
+                  <Link href={`/auth/signup?redirect=${encodeURIComponent(lessonPath)}`}>
                     <Button variant="primary" size="sm">Create Account</Button>
                   </Link>
-                  <Link href="/auth/login">
+                  <Link href={`/auth/login?redirect=${encodeURIComponent(lessonPath)}`}>
                     <Button variant="outline" size="sm">Sign In</Button>
                   </Link>
                 </div>
@@ -570,27 +602,6 @@ export default function LessonDetailPage({
                       {att.name}
                     </a>
                   ))}
-                </div>
-              </div>
-            )}
-
-            {/* Auth wall for guests */}
-            {!user && !authLoading && (
-              <div className="rounded-xl border border-border bg-secondary-50 p-6 text-center">
-                <div className="text-3xl mb-2">🔒</div>
-                <p className="text-sm font-semibold text-foreground mb-1">
-                  Sign in to view the full lesson plan
-                </p>
-                <p className="text-xs text-muted mb-4">
-                  Create a free account to view lesson steps, materials, and download complete lesson plans.
-                </p>
-                <div className="flex justify-center gap-2">
-                  <Link href="/auth/login">
-                    <Button size="sm">Sign In</Button>
-                  </Link>
-                  <Link href="/auth/signup">
-                    <Button variant="outline" size="sm">Create Account</Button>
-                  </Link>
                 </div>
               </div>
             )}
@@ -739,87 +750,106 @@ export default function LessonDetailPage({
           )}
 
           {/* Comments */}
-          <Card padding="lg">
-            <h2 className="text-xl font-semibold text-foreground mb-4">
-              Discussion, Feedback & Suggestions
-            </h2>
-            <CommentThread
-              comments={commentData}
-              loading={commentsLoading}
-              mode="like"
-              maxDepth={2}
-              onAddComment={async (content, parentId, mentionedUsers) => {
-                if (!user) throw new Error("Must be logged in");
-                const newId = await addLessonComment(lesson.id, {
-                  parentId,
-                  authorId: user.uid,
-                  authorName: user.displayName || "Anonymous",
-                  authorPhotoURL: user.photoURL,
-                  content,
-                  mentionedUsers: mentionedUsers ?? [],
-                });
-                // Notify lesson author on top-level comment (fire-and-forget)
-                if (lesson.authorId !== user.uid && !parentId) {
-                  notifyComment({
-                    recipientId: lesson.authorId,
-                    actorId: user.uid,
-                    actorName: user.displayName || "Someone",
-                    actorPhotoURL: user.photoURL,
-                    contentLabel: `your lesson "${lesson.title}"`,
-                    linkURL: lessonPath,
-                  }).catch(() => {});
-                }
-                // Notify parent comment author on reply (fire-and-forget)
-                if (parentId) {
-                  const parentComment = comments.find((c) => c.id === parentId);
-                  if (parentComment && parentComment.authorId !== user.uid) {
-                    notifyCommentReplied({
-                      recipientId: parentComment.authorId,
+          {user ? (
+            <Card padding="lg">
+              <h2 className="text-xl font-semibold text-foreground mb-4">
+                Discussion, Feedback & Suggestions
+              </h2>
+              <CommentThread
+                comments={commentData}
+                loading={commentsLoading}
+                mode="like"
+                maxDepth={2}
+                onAddComment={async (content, parentId, mentionedUsers) => {
+                  if (!user) throw new Error("Must be logged in");
+                  const newId = await addLessonComment(lesson.id, {
+                    parentId,
+                    authorId: user.uid,
+                    authorName: user.displayName || "Anonymous",
+                    authorPhotoURL: user.photoURL,
+                    content,
+                    mentionedUsers: mentionedUsers ?? [],
+                  });
+                  // Notify lesson author on top-level comment (fire-and-forget)
+                  if (lesson.authorId !== user.uid && !parentId) {
+                    notifyComment({
+                      recipientId: lesson.authorId,
                       actorId: user.uid,
                       actorName: user.displayName || "Someone",
                       actorPhotoURL: user.photoURL,
+                      contentLabel: `your lesson "${lesson.title}"`,
                       linkURL: lessonPath,
                     }).catch(() => {});
                   }
-                }
-                // Fire mention notifications (fire-and-forget)
-                if (mentionedUsers?.length) {
-                  mentionedUsers.forEach(({ uid }) => {
-                    if (uid !== user.uid) {
-                      notifyMention({
-                        recipientId: uid,
+                  // Notify parent comment author on reply (fire-and-forget)
+                  if (parentId) {
+                    const parentComment = comments.find((c) => c.id === parentId);
+                    if (parentComment && parentComment.authorId !== user.uid) {
+                      notifyCommentReplied({
+                        recipientId: parentComment.authorId,
                         actorId: user.uid,
-                        actorName: user.displayName || "Anonymous",
+                        actorName: user.displayName || "Someone",
                         actorPhotoURL: user.photoURL,
                         linkURL: lessonPath,
                       }).catch(() => {});
                     }
-                  });
-                }
-                await loadComments();
-                return newId;
-              }}
-              onUpdateComment={async (commentId, text) => {
-                await updateLessonComment(lesson.id, commentId, text);
-              }}
-              onDeleteComment={async (commentId) => {
-                await deleteLessonComment(lesson.id, commentId);
-              }}
-              onLikeComment={async (commentId) => {
-                if (!user) return;
-                const alreadyLiked = await hasLikedLessonComment(lesson.id, commentId, user.uid);
-                if (alreadyLiked) {
-                  await unlikeLessonComment(lesson.id, commentId, user.uid);
-                } else {
-                  await likeLessonComment(lesson.id, commentId, user.uid);
-                }
-              }}
-              hasLikedComment={async (commentId) => {
-                if (!user) return false;
-                return hasLikedLessonComment(lesson.id, commentId, user.uid);
-              }}
-            />
-          </Card>
+                  }
+                  // Fire mention notifications (fire-and-forget)
+                  if (mentionedUsers?.length) {
+                    mentionedUsers.forEach(({ uid }) => {
+                      if (uid !== user.uid) {
+                        notifyMention({
+                          recipientId: uid,
+                          actorId: user.uid,
+                          actorName: user.displayName || "Anonymous",
+                          actorPhotoURL: user.photoURL,
+                          linkURL: lessonPath,
+                        }).catch(() => {});
+                      }
+                    });
+                  }
+                  await loadComments();
+                  return newId;
+                }}
+                onUpdateComment={async (commentId, text) => {
+                  await updateLessonComment(lesson.id, commentId, text);
+                }}
+                onDeleteComment={async (commentId) => {
+                  await deleteLessonComment(lesson.id, commentId);
+                }}
+                onLikeComment={async (commentId) => {
+                  if (!user) return;
+                  const alreadyLiked = await hasLikedLessonComment(lesson.id, commentId, user.uid);
+                  if (alreadyLiked) {
+                    await unlikeLessonComment(lesson.id, commentId, user.uid);
+                  } else {
+                    await likeLessonComment(lesson.id, commentId, user.uid);
+                  }
+                }}
+                hasLikedComment={async (commentId) => {
+                  if (!user) return false;
+                  return hasLikedLessonComment(lesson.id, commentId, user.uid);
+                }}
+              />
+            </Card>
+          ) : (
+            <Card padding="lg" className="text-center">
+              <h2 className="text-xl font-semibold text-foreground mb-2">
+                Discussion is members-only
+              </h2>
+              <p className="text-sm text-muted mb-4">
+                Create a free account to view comments, ask questions, and share feedback on this lesson.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Link href={`/auth/signup?redirect=${encodeURIComponent(lessonPath)}`}>
+                  <Button variant="primary" size="sm">Create Account</Button>
+                </Link>
+                <Link href={`/auth/login?redirect=${encodeURIComponent(lessonPath)}`}>
+                  <Button variant="outline" size="sm">Sign In</Button>
+                </Link>
+              </div>
+            </Card>
+          )}
 
           {/* IP Notice */}
           <IPNotice />

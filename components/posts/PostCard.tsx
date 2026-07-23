@@ -229,6 +229,8 @@ export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = f
             alt={post.authorName}
             size="md"
             preferInitials={textOnlyAvatars}
+            userId={post.authorId}
+            showPlusBadge
           />
         </Link>
         <div className="flex-1 min-w-0">

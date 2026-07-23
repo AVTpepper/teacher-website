@@ -92,7 +92,7 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-description"
-            className="relative z-10 w-full max-w-md rounded-xl bg-surface border border-border shadow-xl max-h-[90vh] overflow-y-auto"
+        className="surface-panel relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl"
       >
         <div className="px-6 pt-6 pb-4">
           <h2

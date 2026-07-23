@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit --project tsconfig.typecheck.json",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run --config vitest.config.mts",
+    "test:unit:watch": "vitest --config vitest.config.mts",
+    "test:rules": "firebase emulators:exec --only firestore \"vitest run --config vitest.rules.config.mts\"",
+    "test:ci": "npm run typecheck && npm run lint && npm run test:unit && npm run test:rules && npm run build"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
@@ -16,19 +22,27 @@
     "firebase-admin": "^14.2.0",
     "lucide-react": "^1.20.0",
     "next": "^16.2.9",
-    "openai": "^6.42.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "stripe": "^22.3.2"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.4",
     "eslint": "^9",
     "eslint-config-next": "^16.2.9",
+    "firebase-tools": "^15.24.0",
+    "jsdom": "^28.1.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.10"
   }
 }

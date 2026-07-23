@@ -8,12 +8,9 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
   updatePassword,
-  deleteUser,
 } from "firebase/auth";
-import { doc, deleteDoc, collection, getDocs } from "firebase/firestore";
 
 import { useAuth } from "@/lib/auth-context";
-import { db } from "@/lib/firebase";
 import { getUser, updateUser } from "@/lib/firestore/users";
 import DiscoveryShell from "@/components/layout/DiscoveryShell";
 import { Button, Input, Card, Badge, ConfirmDialog } from "@/components/ui";
@@ -31,7 +28,7 @@ interface PasswordErrors {
 }
 
 export default function AccountManagementPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
 
   // Display name state
@@ -184,24 +181,23 @@ export default function AccountManagementPage() {
     if (!user) return;
     setDeleting(true);
     try {
-      // Delete Firebase Auth account first (most likely to require recent login).
-      // If this throws, Firestore data is untouched and the user can retry.
-      await deleteUser(user);
+      const token = await user.getIdToken();
+      const response = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-      // Auth deletion succeeded — now clean up Firestore data.
-      if (db) {
-        const uid = user.uid;
-        const SUBCOLLECTIONS = ["aiUsage", "aiRefineUsage", "followers", "following", "notifications"];
-        for (const sub of SUBCOLLECTIONS) {
-          const snap = await getDocs(collection(db, "users", uid, sub));
-          await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
-        }
-        await deleteDoc(doc(db, "users", uid));
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || "Failed to queue account deletion.");
       }
 
-      // Clear session cookie and redirect to landing page.
+      await signOut();
       document.cookie = "__session=; path=/; max-age=0";
       router.push("/");
+      addToast("Account deletion queued. Your account will be removed shortly.");
     } catch {
       setDeleting(false);
       setDeleteOpen(false);

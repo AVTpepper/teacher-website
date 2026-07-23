@@ -26,11 +26,27 @@ export interface UserProfile {
   email: string;
   photoURL: string | null;
   gradeLevel: string;
+  gradeLevels?: string[];
   subjects: string[];
+  professionalRole?: string;
+  additionalRoles?: string[];
+  professionalHeadline?: string;
+  curricula?: string[];
   country?: string;
+  city?: string;
+  languages?: string[];
   school: string;
+  schoolType?: string;
   yearsOfExperience: number;
   bio: string;
+  professionalInterests?: string[];
+  networkingGoals?: string[];
+  lookingFor?: string;
+  onboardingCompleted?: boolean;
+  onboardingCompletedAt?: unknown;
+  onboardingVersion?: number;
+  onboardingCurrentStep?: number;
+  profileCompletion?: number;
   isVerified: boolean;
   role?: "user" | "admin";
   tier?: "free" | "plus";
@@ -83,6 +99,21 @@ export async function createUser(data: UserProfileInput): Promise<void> {
     badges: [],
     followerCount: 0,
     followingCount: 0,
+    gradeLevels: data.gradeLevels ?? (data.gradeLevel ? [data.gradeLevel] : []),
+    professionalRole: data.professionalRole ?? "",
+    additionalRoles: data.additionalRoles ?? [],
+    professionalHeadline: data.professionalHeadline ?? "",
+    curricula: data.curricula ?? [],
+    city: data.city ?? "",
+    languages: data.languages ?? [],
+    schoolType: data.schoolType ?? "",
+    professionalInterests: data.professionalInterests ?? [],
+    networkingGoals: data.networkingGoals ?? [],
+    lookingFor: data.lookingFor ?? "",
+    onboardingCompleted: data.onboardingCompleted ?? false,
+    onboardingVersion: data.onboardingVersion ?? 0,
+    onboardingCurrentStep: data.onboardingCurrentStep ?? 1,
+    profileCompletion: data.profileCompletion ?? 0,
   });
 }
 
@@ -105,6 +136,72 @@ export async function updateUser(
     payload.displayNameLower = data.displayName.toLowerCase();
   }
   await updateDoc(doc(db, "users", uid), payload);
+}
+
+export async function markOnboardingCompleted(
+  uid: string,
+  data: Partial<UserProfileInput> & {
+    onboardingVersion: number;
+    onboardingCurrentStep: number;
+    profileCompletion: number;
+  }
+): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const payload: Record<string, unknown> = {
+    ...data,
+    onboardingCompleted: true,
+    onboardingCompletedAt: serverTimestamp(),
+  };
+
+  if (typeof data.displayName === "string") {
+    payload.displayNameLower = data.displayName.toLowerCase();
+  }
+
+  await updateDoc(doc(db, "users", uid), payload);
+}
+
+interface EnsureUserProfileInput {
+  uid: string;
+  displayName: string;
+  email: string;
+  photoURL: string | null;
+}
+
+export async function ensureUserProfile(input: EnsureUserProfileInput): Promise<void> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const userRef = doc(db, "users", input.uid);
+  const snapshot = await getDoc(userRef);
+  if (snapshot.exists()) return;
+
+  await createUser({
+    uid: input.uid,
+    displayName: input.displayName,
+    email: input.email,
+    photoURL: input.photoURL,
+    gradeLevel: "",
+    gradeLevels: [],
+    subjects: [],
+    professionalRole: "",
+    additionalRoles: [],
+    professionalHeadline: "",
+    curricula: [],
+    country: "",
+    city: "",
+    languages: [],
+    school: "",
+    schoolType: "",
+    yearsOfExperience: 0,
+    bio: "",
+    professionalInterests: [],
+    networkingGoals: [],
+    lookingFor: "",
+    onboardingCompleted: false,
+    onboardingVersion: 0,
+    onboardingCurrentStep: 1,
+    profileCompletion: 0,
+  });
 }
 
 export async function followUser(

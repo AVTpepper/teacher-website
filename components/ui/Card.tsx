@@ -1,22 +1,36 @@
 import { type HTMLAttributes } from "react";
 
 type CardPadding = "none" | "sm" | "md" | "lg";
+type CardVariant = "standard" | "interactive" | "compact" | "stat" | "profile" | "resource" | "community" | "job";
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   padding?: CardPadding;
   hoverable?: boolean;
+  variant?: CardVariant;
 }
 
 const paddingClasses: Record<CardPadding, string> = {
   none: "",
-  sm: "p-3",
+  sm: "p-3.5",
   md: "p-4",
   lg: "p-6",
+};
+
+const variantClasses: Record<CardVariant, string> = {
+  standard: "border-border bg-surface",
+  interactive: "border-border bg-surface",
+  compact: "border-border bg-surface px-3 py-2.5",
+  stat: "border-secondary-200 bg-surface-subtle",
+  profile: "border-primary-100 bg-surface",
+  resource: "border-secondary-200 bg-surface",
+  community: "border-primary-100 bg-surface",
+  job: "border-secondary-200 bg-surface",
 };
 
 export default function Card({
   padding = "md",
   hoverable = false,
+  variant = "standard",
   className = "",
   children,
   onClick,
@@ -24,9 +38,9 @@ export default function Card({
 }: CardProps) {
   return (
     <div
-      className={`rounded-xl border border-primary-100 bg-surface shadow-[0_12px_32px_rgba(15,76,92,0.10)] ${
+      className={`surface-panel rounded-xl ${variantClasses[variant]} ${
         hoverable
-          ? "transition-shadow hover:shadow-[0_16px_40px_rgba(15,76,92,0.14)] cursor-pointer"
+          ? "surface-panel-hover cursor-pointer"
           : ""
       } ${paddingClasses[padding]} ${className}`}
       onClick={onClick}

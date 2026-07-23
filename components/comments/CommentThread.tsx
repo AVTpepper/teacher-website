@@ -355,6 +355,8 @@ function CommentItem({
             src={comment.authorPhotoURL}
             alt={comment.authorName}
             size="sm"
+            userId={comment.authorId}
+            showPlusBadge
           />
         </Link>
         <div className="flex-1 min-w-0">
@@ -793,6 +795,8 @@ export default function CommentThread({
               src={user.photoURL}
               alt={user.displayName || "You"}
               size="md"
+              userId={user.uid}
+              showPlusBadge
             />
             <div className="flex-1 min-w-0 space-y-2">
               <MentionInput

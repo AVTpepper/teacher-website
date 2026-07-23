@@ -25,6 +25,9 @@ import { db } from "@/lib/firebase";
 
 export type NotificationType =
   | "new-follower"
+  | "connection-request"
+  | "connection-accepted"
+  | "message-received"
   | "comment"
   | "upvote"
   | "badge-earned"
@@ -289,6 +292,41 @@ export function notifyNewFollower(params: {
     actorPhotoURL: params.actorPhotoURL,
     message: `${params.actorName} started following you.`,
     linkURL: `/educators/${params.actorId}`,
+  });
+}
+
+export function notifyConnectionRequest(params: {
+  recipientId: string;
+  actorId: string;
+  actorName: string;
+  actorPhotoURL: string | null;
+}): Promise<void> {
+  return createNotification({
+    recipientId: params.recipientId,
+    type: "connection-request",
+    actorId: params.actorId,
+    actorName: params.actorName,
+    actorPhotoURL: params.actorPhotoURL,
+    message: `${params.actorName} sent you a connection request.`,
+    linkURL: "/network?tab=requests",
+  });
+}
+
+export function notifyConnectionAccepted(params: {
+  recipientId: string;
+  actorId: string;
+  actorName: string;
+  actorPhotoURL: string | null;
+  profileId: string;
+}): Promise<void> {
+  return createNotification({
+    recipientId: params.recipientId,
+    type: "connection-accepted",
+    actorId: params.actorId,
+    actorName: params.actorName,
+    actorPhotoURL: params.actorPhotoURL,
+    message: `${params.actorName} accepted your connection request.`,
+    linkURL: `/educators/${params.profileId}`,
   });
 }
 
