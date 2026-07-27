@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -9,6 +9,7 @@ import { getOnboardingEligibility } from "@/lib/onboarding";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const firebaseErrorMessages: Record<string, string> = {
   "auth/email-already-in-use": "An account with this email already exists.",
@@ -32,7 +33,7 @@ function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/home";
-  const { signUp, signInWithGoogle } = useAuth();
+  const { user, loading: authLoading, signUp, signInWithGoogle } = useAuth();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -42,6 +43,16 @@ function SignupForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace(redirectTo);
+    }
+  }, [authLoading, redirectTo, router, user]);
+
+  if (authLoading || user) {
+    return <SignupPageSkeleton />;
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -270,6 +281,26 @@ function SignupForm() {
           Sign in
         </Link>
       </p>
+    </Card>
+  );
+}
+
+function SignupPageSkeleton() {
+  return (
+    <Card padding="lg" variant="standard" className="surface-panel">
+      <div className="space-y-4">
+        <Skeleton className="mx-auto h-8 w-40" />
+        <Skeleton className="mx-auto h-4 w-56" />
+        <div className="space-y-4 pt-2">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+        <Skeleton className="mt-4 h-11 w-full" />
+        <Skeleton className="mt-5 h-11 w-full" />
+        <Skeleton className="mx-auto mt-6 h-4 w-40" />
+      </div>
     </Card>
   );
 }

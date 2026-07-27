@@ -196,6 +196,76 @@ function SectionLink({ href, label }: { href: string; label: string }) {
   );
 }
 
+function DashboardLoadingState() {
+  return (
+    <div className="space-y-6 pb-8">
+      <div className="overflow-hidden rounded-3xl border border-primary-200 bg-linear-to-r from-primary-950 via-primary-900 to-primary-800 px-6 py-6 text-white shadow-card">
+        <div className="h-4 w-40 animate-pulse rounded-full bg-white/20" />
+        <div className="mt-4 h-8 w-72 animate-pulse rounded-xl bg-white/20" />
+        <div className="mt-3 h-4 w-full max-w-2xl animate-pulse rounded-full bg-white/15" />
+        <div className="mt-6 flex flex-wrap gap-3">
+          <div className="h-11 w-36 animate-pulse rounded-xl bg-white/15" />
+          <div className="h-11 w-32 animate-pulse rounded-xl bg-white/15" />
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.9fr)]">
+        <div className="space-y-6">
+          <div className="surface-panel rounded-2xl border border-border bg-surface p-5">
+            <div className="h-5 w-40 animate-pulse rounded-full bg-secondary-100" />
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="rounded-2xl border border-border bg-surface-subtle p-4">
+                  <div className="h-4 w-20 animate-pulse rounded-full bg-secondary-100" />
+                  <div className="mt-3 h-8 w-12 animate-pulse rounded-full bg-secondary-100" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div key={index} className="surface-panel rounded-2xl border border-border bg-surface p-5">
+                <div className="flex items-start gap-3">
+                  <div className="h-12 w-12 rounded-full bg-secondary-100" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-1/2 animate-pulse rounded-full bg-secondary-100" />
+                    <div className="h-3 w-2/3 animate-pulse rounded-full bg-secondary-100" />
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <div className="h-3 w-full animate-pulse rounded-full bg-secondary-100" />
+                  <div className="h-3 w-5/6 animate-pulse rounded-full bg-secondary-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="surface-panel rounded-2xl border border-border bg-surface p-5">
+            <div className="h-5 w-48 animate-pulse rounded-full bg-secondary-100" />
+            <div className="mt-4 space-y-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="h-20 rounded-2xl bg-secondary-50 animate-pulse" />
+              ))}
+            </div>
+          </div>
+
+          <div className="surface-panel rounded-2xl border border-border bg-surface p-5">
+            <div className="h-5 w-40 animate-pulse rounded-full bg-secondary-100" />
+            <div className="mt-4 space-y-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="h-16 rounded-2xl bg-secondary-50 animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PersonalizedDashboard() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -244,6 +314,9 @@ export default function PersonalizedDashboard() {
         return;
       }
 
+      setProfile(profileFallback(user));
+      setProfileResolved(true);
+
       try {
         const data = await getUser(user.uid);
         if (!cancelled) {
@@ -260,7 +333,6 @@ export default function PersonalizedDashboard() {
       }
     }
 
-    setProfileResolved(false);
     void loadProfile();
 
     return () => {
@@ -269,7 +341,7 @@ export default function PersonalizedDashboard() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || !profileResolved) return;
+    if (!user) return;
 
     let cancelled = false;
     setConversationError(false);
@@ -280,7 +352,7 @@ export default function PersonalizedDashboard() {
 
       try {
         const token = await currentUser.getIdToken();
-        const [summaryResult, conversationsResult, connectionQuotaResult, messageQuotaResult, incomingResult, acceptedResult, sentResult, followingResult] =
+        const [summaryResult, conversationsResult, connectionQuotaResult, messageQuotaResult, incomingResult, acceptedResult, sentResult] =
           await Promise.allSettled([
             fetchNetworkSummary(() => Promise.resolve(token)),
             fetchConversations(() => Promise.resolve(token)),
@@ -289,7 +361,6 @@ export default function PersonalizedDashboard() {
             fetchIncomingRequests(() => Promise.resolve(token)),
             fetchAcceptedConnections(() => Promise.resolve(token)),
             fetchSentRequests(() => Promise.resolve(token)),
-            getFollowing(currentUser.uid),
           ]);
 
         if (cancelled) return;
@@ -312,7 +383,6 @@ export default function PersonalizedDashboard() {
         setIncomingRequests(incomingResult.status === "fulfilled" ? incomingResult.value : []);
         setAcceptedConnections(acceptedResult.status === "fulfilled" ? acceptedResult.value : []);
         setSentRequests(sentResult.status === "fulfilled" ? sentResult.value : []);
-        setFollowingProfiles(followingResult.status === "fulfilled" ? followingResult.value : []);
       } catch {
         if (!cancelled) {
           setSummary(null);
@@ -320,7 +390,6 @@ export default function PersonalizedDashboard() {
           setIncomingRequests([]);
           setAcceptedConnections([]);
           setSentRequests([]);
-          setFollowingProfiles([]);
           setConnectionQuota(null);
           setMessageQuota(null);
         }
@@ -332,10 +401,38 @@ export default function PersonalizedDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [profileResolved, user]);
+  }, [user]);
 
   useEffect(() => {
-    if (!user || !profileResolved) return;
+    if (!user) return;
+
+    let cancelled = false;
+
+    async function loadFollowingProfiles() {
+      const currentUser = user;
+      if (!currentUser) return;
+
+      try {
+        const list = await getFollowing(currentUser.uid);
+        if (!cancelled) {
+          setFollowingProfiles(list);
+        }
+      } catch {
+        if (!cancelled) {
+          setFollowingProfiles([]);
+        }
+      }
+    }
+
+    void loadFollowingProfiles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
 
     let cancelled = false;
     setRecommendationsLoading(true);
@@ -404,10 +501,10 @@ export default function PersonalizedDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [acceptedConnections, followingProfiles, incomingRequests, profile, profileResolved, sentRequests, user]);
+  }, [acceptedConnections, followingProfiles, incomingRequests, profile, sentRequests, user]);
 
   useEffect(() => {
-    if (!profileResolved) return;
+    if (!user) return;
 
     let cancelled = false;
     setResourcesLoading(true);
@@ -445,10 +542,10 @@ export default function PersonalizedDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [profile, profileResolved]);
+  }, [profile, user]);
 
   useEffect(() => {
-    if (!profileResolved) return;
+    if (!user) return;
 
     let cancelled = false;
     setJobsLoading(true);
@@ -486,7 +583,7 @@ export default function PersonalizedDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [profile, profileResolved]);
+  }, [profile, user]);
 
   useEffect(() => {
     if (!profileResolved) return;
@@ -534,7 +631,7 @@ export default function PersonalizedDashboard() {
   }, [profile, profileResolved]);
 
   useEffect(() => {
-    if (!user || !profileResolved) return;
+    if (!user) return;
 
     let cancelled = false;
     setActivityLoading(true);
@@ -575,7 +672,7 @@ export default function PersonalizedDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [acceptedConnections, followingProfiles, profileResolved, user]);
+  }, [acceptedConnections, followingProfiles, user]);
 
   const effectiveProfile = profile ?? (user ? profileFallback(user) : null);
   const profileCompletion = computeProfileCompletion(effectiveProfile ?? profileFallback(user));
@@ -611,11 +708,7 @@ export default function PersonalizedDashboard() {
   });
 
   if (authLoading || !profileResolved) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
-      </div>
-    );
+    return <DashboardLoadingState />;
   }
 
   if (!user) return null;
@@ -737,9 +830,14 @@ export default function PersonalizedDashboard() {
                 <Card>
                   <p className="text-sm font-semibold text-foreground">Improve your recommendations</p>
                   <p className="mt-1 text-sm text-text-secondary">Add your subjects, curriculum, interests, and networking goals.</p>
+                  {profileCompletion.missingRecommended.length > 0 && (
+                    <p className="mt-3 text-sm text-foreground">
+                      Missing: <span className="font-medium text-text-secondary">{profileCompletion.missingRecommended.slice(0, 3).join(", ")}</span>
+                    </p>
+                  )}
                   <div className="mt-4">
                     <Link href="/profile/edit" className="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-800">
-                      Complete Your Profile
+                      Review Profile
                     </Link>
                   </div>
                 </Card>
@@ -785,7 +883,7 @@ export default function PersonalizedDashboard() {
                         if (!user) return;
                         setConnectionLoadingIds((current) => new Set(current).add(educator.uid));
                         try {
-                          const token = await user.getIdToken();
+                          const token = await user.getIdToken(true);
                           const result = await import("@/lib/network/client").then((mod) =>
                             mod.sendConnectionRequest(() => Promise.resolve(token), {
                               recipientId: educator.uid,
@@ -1051,6 +1149,12 @@ export default function PersonalizedDashboard() {
                             ? "Improves interest-based recommendations."
                             : field === "Curriculum"
                               ? "Clarifies the teaching context you work in."
+                              : field === "Networking goals"
+                                ? "Lets the dashboard recommend the right people and actions."
+                              : field === "Profile photo"
+                                ? "Makes your profile easier to recognize."
+                              : field === "Bio"
+                                ? "Adds context for other educators viewing your profile."
                               : "Improves discoverability across the network."}
                       </p>
                     </div>

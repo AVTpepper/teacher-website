@@ -487,17 +487,19 @@ export default function EducatorProfile({ userId }: { userId: string }) {
       setFollowListLoading(true);
       setFollowListError(null);
 
+      if (!user) {
+        setFollowListRows([]);
+        setFollowListError("Sign in to view followers and following.");
+        setFollowListLoading(false);
+        return;
+      }
+
       try {
         const list = followListType === "followers"
           ? await getFollowers(userId, 200)
           : await getFollowing(userId, 200);
 
         if (cancelled) return;
-
-        if (!user) {
-          setFollowListRows(list.map((profile) => ({ profile, isFollowedByViewer: false })));
-          return;
-        }
 
         const statuses = await Promise.all(
           list.map((entry) =>
@@ -592,7 +594,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
     setConnectionError(null);
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const result = await sendConnectionRequest(() => Promise.resolve(token), {
         recipientId: userId,
         reason: payload.reason,
@@ -611,7 +613,8 @@ export default function EducatorProfile({ userId }: { userId: string }) {
         );
       }
 
-      setConnectionError(error instanceof Error ? error.message : "Could not send request.");
+      const message = error instanceof Error ? error.message : "Could not send request.";
+      setConnectionError(message === "Session expired. Please sign in again." ? "Your session expired. Please refresh and try again." : message);
       throw error;
     } finally {
       setConnectionLoading(false);
@@ -664,6 +667,11 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   }
 
   function openFollowListModal(type: FollowListType) {
+    if (!user) {
+      router.push(`/auth/login?redirect=${encodeURIComponent(`/educators/${userId}?list=${type}`)}`);
+      return;
+    }
+
     const params = new URLSearchParams(searchParams.toString());
     params.set("list", type);
     router.replace(`/educators/${userId}?${params.toString()}`, { scroll: false });

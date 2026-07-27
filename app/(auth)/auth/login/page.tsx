@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { sendPasswordResetEmail } from "firebase/auth";
@@ -11,6 +11,7 @@ import { getOnboardingEligibility } from "@/lib/onboarding";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const firebaseErrorMessages: Record<string, string> = {
   "auth/invalid-email": "Invalid email address.",
@@ -36,7 +37,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/home";
-  const { signIn, signInWithGoogle } = useAuth();
+  const { user, loading: authLoading, signIn, signInWithGoogle } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,6 +51,20 @@ function LoginForm() {
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotError, setForgotError] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace(redirectTo);
+    }
+  }, [authLoading, redirectTo, router, user]);
+
+  if (authLoading) {
+    return <LoginPageSkeleton />;
+  }
+
+  if (user) {
+    return <LoginPageSkeleton />;
+  }
 
   async function handleForgotPassword(e: FormEvent) {
     e.preventDefault();
@@ -319,6 +334,24 @@ function LoginForm() {
       </p>
         </>
       )}
+    </Card>
+  );
+}
+
+function LoginPageSkeleton() {
+  return (
+    <Card padding="lg" variant="standard" className="surface-panel">
+      <div className="space-y-4">
+        <Skeleton className="mx-auto h-8 w-32" />
+        <Skeleton className="mx-auto h-4 w-56" />
+        <div className="space-y-4 pt-2">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+        <Skeleton className="mt-4 h-11 w-full" />
+        <Skeleton className="mx-auto mt-6 h-4 w-40" />
+      </div>
     </Card>
   );
 }

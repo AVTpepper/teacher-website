@@ -57,6 +57,7 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const cursorRef = useRef<DocumentSnapshot | null>(null);
+  const prefetchedLinksRef = useRef<Set<string>>(new Set());
 
   async function load(reset: boolean) {
     if (!user) return;
@@ -91,12 +92,19 @@ export default function NotificationsPage() {
 
   async function handleClick(n: Notification) {
     if (!n.read && user) {
-      await markAsRead(user.uid, n.id).catch(console.error);
       setNotifications((prev) =>
         prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
       );
+      markAsRead(user.uid, n.id).catch(console.error);
     }
     router.push(normalizeNotificationLink(n.linkURL));
+  }
+
+  function prefetchNotificationLink(n: Notification) {
+    const href = normalizeNotificationLink(n.linkURL);
+    if (prefetchedLinksRef.current.has(href)) return;
+    prefetchedLinksRef.current.add(href);
+    router.prefetch(href);
   }
 
   async function handleMarkAllRead() {
@@ -360,6 +368,8 @@ export default function NotificationsPage() {
                   <button
                     type="button"
                     onClick={() => handleClick(n)}
+                    onMouseEnter={() => prefetchNotificationLink(n)}
+                    onFocus={() => prefetchNotificationLink(n)}
                     className="flex flex-1 items-start gap-3 text-left cursor-pointer"
                   >
                     <div className="shrink-0 mt-0.5">

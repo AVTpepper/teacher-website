@@ -58,6 +58,7 @@ export default function NotificationDropdown() {
   const [markingAll, setMarkingAll] = useState(false);
   const [removingAll, setRemovingAll] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prefetchedLinksRef = useRef<Set<string>>(new Set());
 
   // Non-dismissed notifications shown in the dropdown
   const visibleNotifications = allNotifications
@@ -118,6 +119,13 @@ export default function NotificationDropdown() {
     }
     setOpen(false);
     router.push(normalizeNotificationLink(n.linkURL), { scroll: true });
+  }
+
+  function prefetchNotificationLink(n: Notification) {
+    const href = normalizeNotificationLink(n.linkURL);
+    if (prefetchedLinksRef.current.has(href)) return;
+    prefetchedLinksRef.current.add(href);
+    router.prefetch(href);
   }
 
   function handleMarkRead(e: React.MouseEvent, n: Notification) {
@@ -199,7 +207,7 @@ export default function NotificationDropdown() {
           role="dialog"
           aria-modal="true"
           aria-label="Notifications"
-          className="surface-panel fixed left-4 right-4 top-14 z-50 overflow-hidden rounded-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96"
+          className="surface-panel fixed left-4 right-4 top-14 z-50 flex max-h-[calc(100vh-4.5rem)] flex-col overflow-hidden rounded-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -229,7 +237,7 @@ export default function NotificationDropdown() {
           </div>
 
           {/* List */}
-          <div className="overflow-y-auto max-h-105">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {visibleNotifications.length === 0 ? (
               <div className="py-12 text-center">
                 <p className="text-3xl mb-2">🔔</p>
@@ -268,6 +276,8 @@ export default function NotificationDropdown() {
                       role="button"
                       tabIndex={0}
                       onClick={() => handleView(n)}
+                      onMouseEnter={() => prefetchNotificationLink(n)}
+                      onFocus={() => prefetchNotificationLink(n)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
@@ -317,11 +327,11 @@ export default function NotificationDropdown() {
           </div>
 
           {/* Footer */}
-          <div className="border-t border-border px-4 py-2.5 text-center">
+          <div className="border-t border-border bg-surface px-3 py-3 text-center">
             <Link
               href="/notifications"
               onClick={() => setOpen(false)}
-              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-900 transition-colors hover:bg-primary-100"
             >
               View all notifications
               {extraUnread > 0 && (

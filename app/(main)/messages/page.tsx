@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar, Button, Card, EmptyState, ErrorState } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
-import { fetchConversations } from "@/lib/messages/client";
+import { MessageClientError, fetchConversations } from "@/lib/messages/client";
 import type { ConversationListItem } from "@/lib/messages/types";
 
 function formatLastActivity(value?: string): string {
@@ -23,6 +23,24 @@ export default function MessagesPage() {
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<ConversationListItem[]>([]);
 
+  async function loadConversations(currentUser: NonNullable<typeof user>) {
+    setLoading(true);
+    setError(null);
+    try {
+      const conversations = await fetchConversations(() => currentUser.getIdToken(true));
+      setItems(conversations);
+    } catch (err) {
+      if (err instanceof MessageClientError && err.message.includes("Session expired")) {
+        setError("Your session expired. Please sign in again.");
+      } else {
+        setError("We could not load your conversations right now. Please try again.");
+      }
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace(`/auth/login?redirect=${encodeURIComponent("/messages")}`);
@@ -30,15 +48,7 @@ export default function MessagesPage() {
     }
 
     if (!authLoading && user) {
-      const currentUser = user;
-
-      fetchConversations(() => currentUser.getIdToken())
-        .then(setItems)
-        .catch(() => {
-          setError("We could not load your conversations right now. Please try again.");
-          setItems([]);
-        })
-        .finally(() => setLoading(false));
+      void loadConversations(user);
     }
   }, [authLoading, router, user]);
 
@@ -58,7 +68,7 @@ export default function MessagesPage() {
   if (!user) return null;
 
   if (error) {
-    return <ErrorState message={error} onRetry={() => router.refresh()} />;
+    return <ErrorState message={error} onRetry={() => void loadConversations(user)} />;
   }
 
   return (

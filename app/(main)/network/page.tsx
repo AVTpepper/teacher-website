@@ -19,6 +19,7 @@ import { getOrCreateConversation } from "@/lib/messages/client";
 import {
   acceptConnectionRequest,
   cancelConnectionRequest,
+  ConnectionClientError,
   declineConnectionRequest,
   fetchAcceptedConnections,
   fetchIncomingRequests,
@@ -118,15 +119,15 @@ function NetworkPageInner() {
     if (!user) return;
     setLoading(true);
     setError(null);
+    const getToken = () => user.getIdToken(true);
 
     try {
-      const token = await user.getIdToken();
       const [summaryResult, connectionsResult, incomingResult, sentResult, followingResult, followersResult] =
         await Promise.allSettled([
-          fetchNetworkSummary(() => Promise.resolve(token)),
-          fetchAcceptedConnections(() => Promise.resolve(token)),
-          fetchIncomingRequests(() => Promise.resolve(token)),
-          fetchSentRequests(() => Promise.resolve(token)),
+          fetchNetworkSummary(getToken),
+          fetchAcceptedConnections(getToken),
+          fetchIncomingRequests(getToken),
+          fetchSentRequests(getToken),
           getFollowing(user.uid),
           getFollowers(user.uid),
         ]);
@@ -145,7 +146,22 @@ function NetworkPageInner() {
         sentResult.status === "rejected";
 
       if (majorRequestFailed) {
-        setError("We could not load your network right now. Please try again.");
+        const firstError =
+          summaryResult.status === "rejected"
+            ? summaryResult.reason
+            : connectionsResult.status === "rejected"
+              ? connectionsResult.reason
+              : incomingResult.status === "rejected"
+                ? incomingResult.reason
+                : sentResult.status === "rejected"
+                  ? sentResult.reason
+                  : null;
+
+        if (firstError instanceof ConnectionClientError && firstError.message.includes("Session expired")) {
+          setError("Your session expired. Please sign in again.");
+        } else {
+          setError("We could not load your network right now. Please try again.");
+        }
       }
     } catch {
       setError("We could not load your network right now. Please try again.");
@@ -167,8 +183,7 @@ function NetworkPageInner() {
   async function onAccept(item: ConnectionListItem) {
     if (!user) return;
     await runWithLoadingKey(item.participantKey, async () => {
-      const token = await user.getIdToken();
-      await acceptConnectionRequest(() => Promise.resolve(token), item.participantKey);
+      await acceptConnectionRequest(() => user.getIdToken(true), item.participantKey);
       await loadData();
     });
   }
@@ -176,8 +191,7 @@ function NetworkPageInner() {
   async function onDecline(item: ConnectionListItem) {
     if (!user) return;
     await runWithLoadingKey(item.participantKey, async () => {
-      const token = await user.getIdToken();
-      await declineConnectionRequest(() => Promise.resolve(token), item.participantKey);
+      await declineConnectionRequest(() => user.getIdToken(true), item.participantKey);
       await loadData();
     });
   }
@@ -185,8 +199,7 @@ function NetworkPageInner() {
   async function onCancel(item: ConnectionListItem) {
     if (!user) return;
     await runWithLoadingKey(item.participantKey, async () => {
-      const token = await user.getIdToken();
-      await cancelConnectionRequest(() => Promise.resolve(token), item.participantKey);
+      await cancelConnectionRequest(() => user.getIdToken(true), item.participantKey);
       await loadData();
     });
   }
@@ -194,8 +207,7 @@ function NetworkPageInner() {
   async function onRemoveConnection(item: ConnectionListItem) {
     if (!user) return;
     await runWithLoadingKey(item.participantKey, async () => {
-      const token = await user.getIdToken();
-      await removeConnection(() => Promise.resolve(token), item.participantKey);
+      await removeConnection(() => user.getIdToken(true), item.participantKey);
       await loadData();
     });
   }
@@ -204,8 +216,7 @@ function NetworkPageInner() {
     if (!user || !item.otherUser?.uid) return;
     try {
       await runWithLoadingKey(`message:${item.participantKey}`, async () => {
-        const token = await user.getIdToken();
-        const conversation = await getOrCreateConversation(() => Promise.resolve(token), item.otherUser!.uid);
+        const conversation = await getOrCreateConversation(() => user.getIdToken(true), item.otherUser!.uid);
         router.push(`/messages/${conversation.conversationId}`);
       });
     } catch {
@@ -224,6 +235,14 @@ function NetworkPageInner() {
   if (!user) return null;
 
   if (error) {
+    if (error.includes("session expired")) {
+      return (
+        <ErrorState
+          message={error}
+          onRetry={() => router.replace(`/auth/login?redirect=${encodeURIComponent("/network")}`)}
+        />
+      );
+    }
     return <ErrorState message={error} onRetry={() => void loadData()} />;
   }
 

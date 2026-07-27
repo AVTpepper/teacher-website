@@ -88,7 +88,7 @@ export default function ConnectionRequestDialog({
             id="connection-intro-message"
             value={introMessage}
             onChange={(event) => setIntroMessage(event.target.value.slice(0, MAX_CONNECTION_INTRO_MESSAGE_LENGTH))}
-            className="mt-2 min-h-28 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none focus:border-primary-400"
+            className="mt-2 min-h-28 w-full rounded-lg border border-border bg-surface px-3 py-2 text-base text-foreground outline-none focus:border-primary-400 sm:text-sm"
             placeholder="Hi! I noticed we both teach similar students and I'd love to exchange ideas."
           />
           <p className="mt-1 text-xs text-muted" aria-live="polite">

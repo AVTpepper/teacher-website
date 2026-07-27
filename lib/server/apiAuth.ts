@@ -22,7 +22,7 @@ export async function requireAuthenticatedUser(
     const decoded = await getFirebaseAdminAuth().verifyIdToken(token);
     return { uid: decoded.uid, token };
   } catch {
-    throw new ApiAuthError("Invalid or expired session.");
+    throw new ApiAuthError("Session expired. Please sign in again.");
   }
 }
 

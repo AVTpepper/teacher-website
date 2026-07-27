@@ -41,6 +41,25 @@ async function authHeaders(getToken: () => Promise<string>): Promise<HeadersInit
   };
 }
 
+async function fetchWithAuthRetry(
+  url: string,
+  init: RequestInit,
+  getToken: () => Promise<string>,
+): Promise<Response> {
+  let response = await fetch(url, init);
+  if (response.status !== 401) return response;
+
+  response = await fetch(url, {
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      Authorization: `Bearer ${await getToken()}`,
+    },
+  });
+
+  return response;
+}
+
 export async function fetchConnectionStatuses(
   getToken: () => Promise<string>,
   targetUids: string[],
@@ -63,11 +82,11 @@ export async function sendConnectionRequest(
   getToken: () => Promise<string>,
   input: { recipientId: string; reason?: ConnectionRequestReason; introMessage?: string },
 ): Promise<ConnectionStatusPayload> {
-  const response = await fetch("/api/network/requests", {
+  const response = await fetchWithAuthRetry("/api/network/requests", {
     method: "POST",
     headers: await authHeaders(getToken),
     body: JSON.stringify(input),
-  });
+  }, getToken);
 
   const payload = await parseResponse<{ result: { participantKey: string; state: ConnectionRelationshipState } }>(
     response,

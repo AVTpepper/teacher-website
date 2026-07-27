@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { Viewport } from "next";
 import { Nunito_Sans } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
 import RouteScrollManager from "@/components/layout/RouteScrollManager";
@@ -29,6 +30,12 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

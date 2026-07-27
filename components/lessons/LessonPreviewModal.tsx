@@ -82,10 +82,10 @@ export default function LessonPreviewModal({
       role="dialog"
       aria-modal="true"
       aria-label="Lesson Plan Preview"
-      className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-secondary-950"
+      className="fixed inset-0 z-50 flex flex-col bg-white"
     >
       {/* Sticky header bar — hidden on print */}
-      <div className="lesson-preview-header flex items-center justify-between gap-3 border-b border-secondary-200 bg-white dark:bg-secondary-900 px-4 py-3 shrink-0 print:hidden">
+      <div className="lesson-preview-header flex items-center justify-between gap-3 border-b border-secondary-200 bg-white px-4 py-3 shrink-0 print:hidden">
         <h2 className="text-base font-semibold text-foreground truncate">
           Preview: {lesson.title}
         </h2>
@@ -152,8 +152,8 @@ export default function LessonPreviewModal({
       </div>
 
       {/* Scrollable content area */}
-      <div className="flex-1 overflow-y-auto bg-secondary-50 dark:bg-secondary-950 px-4 py-8">
-        <div className="lesson-preview-content mx-auto max-w-3xl bg-white dark:bg-secondary-900 rounded-xl border border-secondary-200 p-8 space-y-6">
+      <div className="flex-1 overflow-y-auto bg-secondary-50 px-4 py-8">
+        <div className="lesson-preview-content mx-auto max-w-3xl rounded-xl border border-secondary-200 bg-white p-8 space-y-6">
 
           {/* Lesson header */}
           <div className="border-b border-secondary-200 pb-4">
