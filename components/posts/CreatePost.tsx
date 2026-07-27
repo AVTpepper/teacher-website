@@ -4,7 +4,6 @@ import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { createPost, type PostType, type MentionedUserRef } from "@/lib/firestore/posts";
 import { notifyMention } from "@/lib/notifications";
-import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import { TextButton } from "@/components/ui";
 import Tag from "@/components/ui/Tag";
@@ -105,7 +104,7 @@ export default function CreatePost({ onPostCreated, embedded = false }: CreatePo
           actorId: user!.uid,
           actorName: user!.displayName || "Anonymous",
           actorPhotoURL: user!.photoURL,
-          linkURL: `/home?post=${postId}`,
+          linkURL: `/feed?post=${postId}`,
         }).catch(() => {});
       });
       void postId;
@@ -128,27 +127,18 @@ export default function CreatePost({ onPostCreated, embedded = false }: CreatePo
     <div className={embedded
       ? "rounded-2xl border border-secondary-200 bg-surface-hover/85 p-4"
       : "rounded-xl border border-border bg-surface shadow-card p-4"}>
-      <div className="flex gap-3">
-        <Avatar
-          src={user.photoURL}
-          alt={user.displayName || "You"}
-          size="md"
-          userId={user.uid}
-          showPlusBadge
+      <div className="flex-1 min-w-0">
+        <MentionInput
+          ref={mentionInputRef}
+          multiline
+          value={content}
+          onChange={setContent}
+          onMentionsChange={setMentions}
+          onFocus={() => setExpanded(true)}
+          placeholder="Share an idea, resource, or start a discussion... (type @ to mention someone)"
+          rows={expanded ? 4 : 2}
+          className={`w-full resize-none rounded-lg border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${embedded ? "border-secondary-200 bg-white hover:border-border-strong focus-visible:border-primary-300" : "border-border bg-white hover:border-border-strong focus-visible:border-primary-300"}`}
         />
-        <div className="flex-1 min-w-0">
-          <MentionInput
-            ref={mentionInputRef}
-            multiline
-            value={content}
-            onChange={setContent}
-            onMentionsChange={setMentions}
-            onFocus={() => setExpanded(true)}
-            placeholder="Share an idea, resource, or start a discussion... (type @ to mention someone)"
-            rows={expanded ? 4 : 2}
-            className={`w-full resize-none rounded-lg border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${embedded ? "border-secondary-200 bg-white hover:border-border-strong focus-visible:border-primary-300" : "border-border bg-white hover:border-border-strong focus-visible:border-primary-300"}`}
-          />
-        </div>
       </div>
 
       {expanded && (

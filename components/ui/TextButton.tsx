@@ -10,7 +10,7 @@ const TextButton = forwardRef<HTMLButtonElement, TextButtonProps>(
       <button
         ref={ref}
         type={type}
-        className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-muted transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${className}`}
+        className={`touch-target inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground focus-ring disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${className}`}
         {...props}
       >
         {children}

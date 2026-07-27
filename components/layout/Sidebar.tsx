@@ -82,7 +82,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
             {trendingPosts.map((post) => (
               <li key={post.id}>
                 <Link
-                  href={`/?post=${post.id}`}
+                  href={`/feed?post=${post.id}`}
                   onClick={onClose}
                   className="group block rounded-lg border border-secondary-200/80 bg-white/65 px-2 py-2 transition-colors hover:border-primary-200 hover:bg-white"
                 >

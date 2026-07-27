@@ -83,7 +83,9 @@ export default function Modal({
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-4"
       onClick={(e) => {
-        if (e.target === overlayRef.current) onClose();
+        if (dialogRef.current && !dialogRef.current.contains(e.target as Node)) {
+          onClose();
+        }
       }}
     >
       <div className="fixed inset-0 bg-black/40" aria-hidden="true" />

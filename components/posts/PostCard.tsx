@@ -9,6 +9,8 @@ import {
   hasLikedPost,
   commentOnPost,
   getPostComments,
+  getPostCommentsCount,
+  getPostLikers,
   likeComment,
   unlikeComment,
   hasLikedComment,
@@ -18,12 +20,14 @@ import {
   deletePost,
   type Post,
   type PostComment,
+  type PostLiker,
 } from "@/lib/firestore/posts";
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Dropdown from "@/components/ui/Dropdown";
+import Modal from "@/components/ui/Modal";
 import ContentCommentSection from "@/components/comments/ContentCommentSection";
 import { type CommentData } from "@/components/comments/CommentThread";
 import { timeAgo, normalizeMultilineText, getCollapsedPreview } from "@/lib/utils";
@@ -79,9 +83,10 @@ interface PostCardProps {
   onDelete?: (postId: string) => void;
   onUpdate?: (updated: Post) => void;
   textOnlyAvatars?: boolean;
+  isAdmin?: boolean;
 }
 
-export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = false }: PostCardProps) {
+export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = false, isAdmin = false }: PostCardProps) {
   const { user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likesCount);
@@ -100,6 +105,10 @@ export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = f
   const [localContent, setLocalContent] = useState(post.content);
   const [localUpdatedAt, setLocalUpdatedAt] = useState(post.updatedAt);
   const [showFullContent, setShowFullContent] = useState(false);
+  const [likesModalOpen, setLikesModalOpen] = useState(false);
+  const [likers, setLikers] = useState<PostLiker[]>([]);
+  const [loadingLikers, setLoadingLikers] = useState(false);
+  const [copiedPostId, setCopiedPostId] = useState(false);
   const isAuthor = user?.uid === post.authorId;
 
   useEffect(() => {
@@ -111,6 +120,20 @@ export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = f
   useEffect(() => {
     setCommentCount(post.commentCount);
   }, [post.id, post.commentCount]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getPostCommentsCount(post.id)
+      .then((count) => {
+        if (!cancelled) setCommentCount(count);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [post.id]);
 
   const displayedCommentCount = showComments ? comments.length : commentCount;
 
@@ -152,8 +175,32 @@ export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = f
     }
   }
 
+  async function openLikesModal() {
+    if (likesCount <= 0 || loadingLikers) return;
+    setLikesModalOpen(true);
+    setLoadingLikers(true);
+    try {
+      const people = await getPostLikers(post.id);
+      setLikers(people);
+    } catch {
+      setLikers([]);
+    } finally {
+      setLoadingLikers(false);
+    }
+  }
+
+  async function copyPostId() {
+    try {
+      await navigator.clipboard.writeText(post.id);
+      setCopiedPostId(true);
+      window.setTimeout(() => setCopiedPostId(false), 1500);
+    } catch {
+      // ignore
+    }
+  }
+
   function handleShare() {
-    const url = `${window.location.origin}/home?post=${post.id}`;
+    const url = `${window.location.origin}/feed?post=${post.id}`;
     if (navigator.share) {
       navigator.share({ title: `Post by ${post.authorName}`, url });
     } else {
@@ -216,6 +263,8 @@ export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = f
   const renderedContent = showFullContent || !collapsed.truncated
     ? normalizedContent
     : collapsed.preview;
+  const actionButtonBase =
+    "inline-flex min-h-10 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-semibold transition-all duration-150 ease-out";
 
   if (deleted) return null;
 
@@ -317,6 +366,49 @@ export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = f
         isLoading={deleting}
       />
 
+      <Modal
+        open={likesModalOpen}
+        onClose={() => setLikesModalOpen(false)}
+        title={likesCount === 1 ? "1 like" : `${likesCount} likes`}
+      >
+        {loadingLikers ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-10 animate-pulse rounded-lg bg-secondary-100" />
+            ))}
+          </div>
+        ) : likers.length === 0 ? (
+          <p className="text-sm text-muted">No likes yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {likers.map((liker) => (
+              <li key={liker.uid}>
+                <Link
+                  href={`/educators/${liker.uid}`}
+                  onClick={() => setLikesModalOpen(false)}
+                  className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2 hover:bg-surface-hover"
+                >
+                  <Avatar
+                    src={liker.photoURL}
+                    alt={liker.displayName}
+                    size="sm"
+                    userId={liker.uid}
+                    showPlusBadge
+                    isPlus={liker.tier === "plus"}
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">{liker.displayName}</p>
+                    <p className="truncate text-xs text-muted">
+                      {liker.professionalHeadline?.trim() || liker.professionalRole?.trim() || "Professional educator"}
+                    </p>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Modal>
+
       {/* Content - click to expand comments */}
       {!editing && (
         <div className="mt-3">
@@ -368,9 +460,13 @@ export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = f
       {/* Stats bar */}
       <div className="type-body-light mt-3 flex items-center gap-4 text-xs text-muted">
         {likesCount > 0 && (
-          <span>
+          <button
+            type="button"
+            onClick={openLikesModal}
+            className="cursor-pointer hover:underline"
+          >
             {likesCount} {likesCount === 1 ? "like" : "likes"}
-          </span>
+          </button>
         )}
         {displayedCommentCount > 0 && (
           <button
@@ -381,19 +477,31 @@ export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = f
             {displayedCommentCount} {displayedCommentCount === 1 ? "comment" : "comments"}
           </button>
         )}
+        {isAdmin && (
+          <div className="ml-auto flex items-center gap-2 rounded-full border border-border bg-surface px-2.5 py-1">
+            <span className="font-mono text-[11px] text-muted">ID: {post.id}</span>
+            <button
+              type="button"
+              onClick={copyPostId}
+              className="font-semibold text-primary-900 hover:underline"
+            >
+              {copiedPostId ? "Copied" : "Copy"}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Action buttons */}
-      <div className="mt-2 pt-2 border-t border-border flex flex-wrap items-center gap-1">
+      <div className="mt-2 border-t border-border pt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={handleLike}
           disabled={!user}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer ${
+          className={`${actionButtonBase} cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
             liked
-              ? "text-error-700 bg-error-100 hover:bg-error-200"
-              : "text-muted hover:bg-surface-hover hover:text-foreground"
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
+              ? "border-error-200 bg-error-50 text-error-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] hover:bg-error-100"
+              : "border-border bg-surface text-muted hover:border-primary-200 hover:bg-surface-hover hover:text-foreground"
+          }`}
         >
           <svg
             className="h-4 w-4"
@@ -414,7 +522,7 @@ export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = f
         <button
           type="button"
           onClick={toggleComments}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted hover:bg-surface-hover hover:text-foreground transition-colors cursor-pointer"
+          className={`${actionButtonBase} cursor-pointer border-border bg-surface text-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] hover:border-primary-200 hover:bg-surface-hover hover:text-foreground`}
         >
           <svg
             className="h-4 w-4"
@@ -435,7 +543,7 @@ export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = f
         <button
           type="button"
           onClick={handleShare}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted hover:bg-surface-hover hover:text-foreground transition-colors cursor-pointer"
+          className={`${actionButtonBase} cursor-pointer border-border bg-surface text-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] hover:border-primary-200 hover:bg-surface-hover hover:text-foreground`}
         >
           <svg
             className="h-4 w-4"
@@ -477,7 +585,7 @@ export default function PostCard({ post, onDelete, onUpdate, textOnlyAvatars = f
             title="Comments"
             ownerId={post.authorId}
             contentLabel="your post"
-            linkURL={`/home?post=${post.id}`}
+            linkURL={`/feed?post=${post.id}`}
             maxDepth={1}
             mode="like"
             composerPlaceholder="Add a comment..."

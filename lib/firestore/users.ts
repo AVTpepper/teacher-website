@@ -47,12 +47,23 @@ export interface UserProfile {
   onboardingVersion?: number;
   onboardingCurrentStep?: number;
   profileCompletion?: number;
+  profileCardTheme?: "classic" | "ocean" | "forest" | "sunset" | "midnight";
   isVerified: boolean;
   role?: "user" | "admin";
   tier?: "free" | "plus";
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
+  stripeSubscriptionStatus?: string;
+  stripeCurrentPeriodEnd?: number | null;
+  stripeCancelAt?: number | null;
+  stripeCancelAtPeriodEnd?: boolean;
+  stripeCanceledAt?: number | null;
+  stripeLastSyncedAt?: unknown;
   billingStatus?: string;
+  updatedAt?: unknown;
+  deletionStatus?: string;
+  deletionRequestedAt?: unknown;
+  showcaseBadges?: string[];
   createdAt: unknown;
   badges: string[];
   followerCount: number;
@@ -61,7 +72,7 @@ export interface UserProfile {
 
 export type UserProfileInput = Omit<
   UserProfile,
-  "createdAt" | "badges" | "followerCount" | "followingCount" | "isVerified" | "displayNameLower" | "role" | "tier" | "stripeCustomerId" | "stripeSubscriptionId" | "billingStatus"
+  "createdAt" | "badges" | "followerCount" | "followingCount" | "isVerified" | "displayNameLower" | "role" | "tier" | "stripeCustomerId" | "stripeSubscriptionId" | "stripeSubscriptionStatus" | "stripeCurrentPeriodEnd" | "stripeCancelAt" | "stripeCancelAtPeriodEnd" | "stripeCanceledAt" | "stripeLastSyncedAt" | "billingStatus" | "updatedAt" | "deletionStatus" | "deletionRequestedAt"
 >;
 
 export { GRADE_LEVELS } from "@/lib/constants";
@@ -114,6 +125,7 @@ export async function createUser(data: UserProfileInput): Promise<void> {
     onboardingVersion: data.onboardingVersion ?? 0,
     onboardingCurrentStep: data.onboardingCurrentStep ?? 1,
     profileCompletion: data.profileCompletion ?? 0,
+    profileCardTheme: data.profileCardTheme ?? "classic",
   });
 }
 
@@ -127,7 +139,7 @@ export async function getUser(uid: string): Promise<UserProfile | null> {
 
 export async function updateUser(
   uid: string,
-  data: Partial<UserProfileInput>
+  data: Partial<UserProfileInput> & { showcaseBadges?: string[] }
 ): Promise<void> {
   if (!db) throw new Error("Firestore is not initialized");
 
@@ -264,6 +276,26 @@ export async function isFollowing(
     doc(db, "users", currentUid, "following", targetUid)
   );
   return snap.exists();
+}
+
+export async function getUsersByIds(userIds: string[]): Promise<UserProfile[]> {
+  if (!db) throw new Error("Firestore is not initialized");
+  const firestore = db;
+
+  const uniqueIds = Array.from(
+    new Set(userIds.map((id) => id.trim()).filter(Boolean))
+  );
+
+  if (uniqueIds.length === 0) return [];
+
+  const docs = await Promise.all(
+    uniqueIds.map(async (uid) => {
+      const snap = await getDoc(doc(firestore, "users", uid));
+      return snap.exists() ? (snap.data() as UserProfile) : null;
+    })
+  );
+
+  return docs.filter((profile): profile is UserProfile => profile !== null);
 }
 
 // --- Educator discovery ---

@@ -153,6 +153,30 @@ function toSummary(data: Record<string, unknown> | null, uid: string): Connectio
   };
 }
 
+function toMillis(value: unknown): number {
+  if (value instanceof Timestamp) return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "object" && value !== null && "toDate" in value) {
+    const cast = value as { toDate?: () => Date };
+    if (typeof cast.toDate === "function") {
+      try {
+        return cast.toDate().getTime();
+      } catch {
+        return 0;
+      }
+    }
+  }
+  return 0;
+}
+
+function sortByUpdatedAtDesc(records: ConnectionRecord[]): ConnectionRecord[] {
+  return [...records].sort((left, right) => {
+    const rightTime = toMillis(right.updatedAt) || toMillis(right.createdAt);
+    const leftTime = toMillis(left.updatedAt) || toMillis(left.createdAt);
+    return rightTime - leftTime;
+  });
+}
+
 async function getTier(uid: string): Promise<"free" | "plus"> {
   const profileSnap = await getFirebaseAdminDb().collection("users").doc(uid).get();
   const data = profileSnap.exists ? (profileSnap.data() as Record<string, unknown>) : null;
@@ -590,15 +614,34 @@ export async function removeConnection(participantKey: string, uid: string): Pro
 }
 
 export async function listIncomingRequests(uid: string, pageSize = 20): Promise<ConnectionListItem[]> {
-  const snap = await getFirebaseAdminDb()
-    .collection("connections")
-    .where("recipientId", "==", uid)
-    .where("status", "==", PENDING)
-    .orderBy("updatedAt", "desc")
-    .limit(pageSize)
-    .get();
+  const db = getFirebaseAdminDb();
+  let records: ConnectionRecord[] = [];
 
-  const records = snap.docs.map((docSnap) => parseConnection(docSnap.id, docSnap.data()));
+  try {
+    const indexedSnap = await db
+      .collection("connections")
+      .where("recipientId", "==", uid)
+      .where("status", "==", PENDING)
+      .orderBy("updatedAt", "desc")
+      .limit(pageSize)
+      .get();
+
+    records = indexedSnap.docs.map((docSnap) => parseConnection(docSnap.id, docSnap.data()));
+  } catch {
+    // Fallback path for environments where the composite index is missing.
+    const fallbackSnap = await db
+      .collection("connections")
+      .where("recipientId", "==", uid)
+      .limit(Math.min(pageSize * 3, 100))
+      .get();
+
+    records = sortByUpdatedAtDesc(
+      fallbackSnap.docs
+        .map((docSnap) => parseConnection(docSnap.id, docSnap.data()))
+        .filter((record) => record.status === PENDING),
+    ).slice(0, pageSize);
+  }
+
   const usersById = await hydrateOtherUsers(records, uid);
 
   return records.map((record) => {
@@ -608,15 +651,34 @@ export async function listIncomingRequests(uid: string, pageSize = 20): Promise<
 }
 
 export async function listSentRequests(uid: string, pageSize = 20): Promise<ConnectionListItem[]> {
-  const snap = await getFirebaseAdminDb()
-    .collection("connections")
-    .where("requesterId", "==", uid)
-    .where("status", "==", PENDING)
-    .orderBy("updatedAt", "desc")
-    .limit(pageSize)
-    .get();
+  const db = getFirebaseAdminDb();
+  let records: ConnectionRecord[] = [];
 
-  const records = snap.docs.map((docSnap) => parseConnection(docSnap.id, docSnap.data()));
+  try {
+    const indexedSnap = await db
+      .collection("connections")
+      .where("requesterId", "==", uid)
+      .where("status", "==", PENDING)
+      .orderBy("updatedAt", "desc")
+      .limit(pageSize)
+      .get();
+
+    records = indexedSnap.docs.map((docSnap) => parseConnection(docSnap.id, docSnap.data()));
+  } catch {
+    // Fallback path for environments where the composite index is missing.
+    const fallbackSnap = await db
+      .collection("connections")
+      .where("requesterId", "==", uid)
+      .limit(Math.min(pageSize * 3, 100))
+      .get();
+
+    records = sortByUpdatedAtDesc(
+      fallbackSnap.docs
+        .map((docSnap) => parseConnection(docSnap.id, docSnap.data()))
+        .filter((record) => record.status === PENDING),
+    ).slice(0, pageSize);
+  }
+
   const usersById = await hydrateOtherUsers(records, uid);
 
   return records.map((record) => {
@@ -626,15 +688,34 @@ export async function listSentRequests(uid: string, pageSize = 20): Promise<Conn
 }
 
 export async function listAcceptedConnections(uid: string, pageSize = 30): Promise<ConnectionListItem[]> {
-  const snap = await getFirebaseAdminDb()
-    .collection("connections")
-    .where("participantIds", "array-contains", uid)
-    .where("status", "==", ACCEPTED)
-    .orderBy("updatedAt", "desc")
-    .limit(pageSize)
-    .get();
+  const db = getFirebaseAdminDb();
+  let records: ConnectionRecord[] = [];
 
-  const records = snap.docs.map((docSnap) => parseConnection(docSnap.id, docSnap.data()));
+  try {
+    const indexedSnap = await db
+      .collection("connections")
+      .where("participantIds", "array-contains", uid)
+      .where("status", "==", ACCEPTED)
+      .orderBy("updatedAt", "desc")
+      .limit(pageSize)
+      .get();
+
+    records = indexedSnap.docs.map((docSnap) => parseConnection(docSnap.id, docSnap.data()));
+  } catch {
+    // Fallback path for environments where the composite index is missing.
+    const fallbackSnap = await db
+      .collection("connections")
+      .where("participantIds", "array-contains", uid)
+      .limit(Math.min(pageSize * 3, 100))
+      .get();
+
+    records = sortByUpdatedAtDesc(
+      fallbackSnap.docs
+        .map((docSnap) => parseConnection(docSnap.id, docSnap.data()))
+        .filter((record) => record.status === ACCEPTED),
+    ).slice(0, pageSize);
+  }
+
   const usersById = await hydrateOtherUsers(records, uid);
 
   return records.map((record) => {

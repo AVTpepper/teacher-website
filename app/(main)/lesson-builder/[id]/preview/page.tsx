@@ -91,14 +91,14 @@ export default function LessonPreviewPage({
   const year = new Date().getFullYear();
 
   return (
-    <div className="mx-auto max-w-5xl py-8 space-y-5">
+    <div className="mx-auto max-w-5xl overflow-x-clip py-8 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-muted">
+        <div className="min-w-0 flex items-center gap-2 text-sm text-muted">
           <Link href="/lesson-builder" className="hover:text-foreground transition-colors">
             Lesson Builder
           </Link>
           <span>/</span>
-          <Link href={`/lesson-builder/${lesson.id}`} className="hover:text-foreground transition-colors">
+          <Link href={`/lesson-builder/${lesson.id}`} className="truncate hover:text-foreground transition-colors">
             {lesson.title}
           </Link>
           <span>/</span>
@@ -120,14 +120,14 @@ export default function LessonPreviewPage({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-foreground">Preview: {lesson.title}</h1>
+        <h1 className="break-words text-xl font-semibold text-foreground">Preview: {lesson.title}</h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleDownload}>Download PDF</Button>
           <Button variant="secondary" size="sm" onClick={() => window.print()}>Print</Button>
         </div>
       </div>
 
-      <Card className="p-8 space-y-6">
+      <Card className="space-y-6 break-words p-8">
         <div className="border-b border-secondary-200 pb-4">
           <div className="mb-2 flex flex-wrap gap-2">
             {lesson.gradeLevel && (

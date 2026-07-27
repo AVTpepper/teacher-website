@@ -121,8 +121,8 @@ function NetworkPageInner() {
 
     try {
       const token = await user.getIdToken();
-      const [nextSummary, nextConnections, nextIncoming, nextSent, nextFollowing, nextFollowers] =
-        await Promise.all([
+      const [summaryResult, connectionsResult, incomingResult, sentResult, followingResult, followersResult] =
+        await Promise.allSettled([
           fetchNetworkSummary(() => Promise.resolve(token)),
           fetchAcceptedConnections(() => Promise.resolve(token)),
           fetchIncomingRequests(() => Promise.resolve(token)),
@@ -131,12 +131,22 @@ function NetworkPageInner() {
           getFollowers(user.uid),
         ]);
 
-      setSummary(nextSummary);
-      setConnections(nextConnections);
-      setIncoming(nextIncoming);
-      setSent(nextSent);
-      setFollowing(nextFollowing);
-      setFollowers(nextFollowers);
+      setSummary(summaryResult.status === "fulfilled" ? summaryResult.value : null);
+      setConnections(connectionsResult.status === "fulfilled" ? connectionsResult.value : []);
+      setIncoming(incomingResult.status === "fulfilled" ? incomingResult.value : []);
+      setSent(sentResult.status === "fulfilled" ? sentResult.value : []);
+      setFollowing(followingResult.status === "fulfilled" ? followingResult.value : []);
+      setFollowers(followersResult.status === "fulfilled" ? followersResult.value : []);
+
+      const majorRequestFailed =
+        summaryResult.status === "rejected" &&
+        connectionsResult.status === "rejected" &&
+        incomingResult.status === "rejected" &&
+        sentResult.status === "rejected";
+
+      if (majorRequestFailed) {
+        setError("We could not load your network right now. Please try again.");
+      }
     } catch {
       setError("We could not load your network right now. Please try again.");
     } finally {

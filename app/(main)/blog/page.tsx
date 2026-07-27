@@ -1,20 +1,45 @@
+import Link from "next/link";
+import DiscoveryShell from "@/components/layout/DiscoveryShell";
+import { Button, Card } from "@/components/ui";
+
 export default function BlogPage() {
   return (
-    <div className="max-w-3xl mx-auto py-12 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Blog</h1>
-        <p className="mt-3 text-muted text-base leading-relaxed">
-          Tips, stories, and updates from the VistaTeacher team and educator community.
-        </p>
-      </div>
+    <div className="space-y-6 pb-8">
+      <DiscoveryShell
+        eyebrow="Blog"
+        title="Updates, essays, and practical stories from VistaTeacher"
+        subtitle="This will be the home for product updates, educator spotlights, and writing about how professional networks can better serve teaching practice."
+      />
 
-      <div className="rounded-xl border border-dashed border-border bg-secondary-50 p-10 text-center">
-        <p className="text-4xl mb-3">📝</p>
-        <h2 className="text-lg font-semibold text-foreground">Coming Soon</h2>
-        <p className="text-sm text-muted mt-2">
-          Our blog is on its way. Check back soon for articles, educator spotlights, and platform updates.
-        </p>
-      </div>
+      <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <Card padding="lg" className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">What will appear here</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Expect platform updates, product decisions, educator interviews, and posts that explain how VistaTeacher is evolving. The goal is useful signal, not filler.
+            </p>
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Why wait before publishing</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              It is better to launch a small archive of meaningful posts than a placeholder stream of generic content. We will publish when there is something worth reading.
+            </p>
+          </div>
+        </Card>
+
+        <Card padding="lg" className="border-dashed border-border bg-secondary-50/80 text-center">
+          <p className="mb-3 text-4xl">📝</p>
+          <h2 className="text-lg font-semibold text-foreground">Coming soon</h2>
+          <p className="mt-2 text-sm text-muted">
+            The first posts are being prepared now. Check back soon for articles, educator spotlights, and product notes.
+          </p>
+          <div className="mt-5">
+            <Link href="/contact">
+              <Button variant="outline">Contact the team</Button>
+            </Link>
+          </div>
+        </Card>
+      </section>
     </div>
   );
 }

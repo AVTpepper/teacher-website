@@ -260,7 +260,7 @@ export default function ConversationPage({
 
       {quota && !quota.isUnlimited && !quota.canSend && (
         <Card className="border-warning-200 bg-warning-50 text-warning-900">
-          You reached your monthly free message limit. Upgrade to Plus for unlimited messaging.
+          You reached your monthly free message limit. <Link href="/pricing" className="underline">See Free vs Plus</Link> for unlimited messaging.
         </Card>
       )}
 

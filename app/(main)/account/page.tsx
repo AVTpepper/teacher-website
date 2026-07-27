@@ -11,7 +11,7 @@ import {
 } from "firebase/auth";
 
 import { useAuth } from "@/lib/auth-context";
-import { getUser, updateUser } from "@/lib/firestore/users";
+import { getUser, updateUser, type UserProfile } from "@/lib/firestore/users";
 import DiscoveryShell from "@/components/layout/DiscoveryShell";
 import { Button, Input, Card, Badge, ConfirmDialog } from "@/components/ui";
 
@@ -27,9 +27,127 @@ interface PasswordErrors {
   confirmPassword?: string;
 }
 
+type BillingProfileSnapshot = Pick<
+  UserProfile,
+  | "stripeCustomerId"
+  | "stripeSubscriptionId"
+  | "stripeSubscriptionStatus"
+  | "stripeCurrentPeriodEnd"
+  | "stripeCancelAt"
+  | "stripeCancelAtPeriodEnd"
+  | "stripeCanceledAt"
+  | "stripeLastSyncedAt"
+  | "billingStatus"
+  | "updatedAt"
+>;
+
+function toBillingProfileSnapshot(
+  profile: UserProfile | null
+): BillingProfileSnapshot | null {
+  if (!profile) return null;
+
+  return {
+    stripeCustomerId: profile.stripeCustomerId,
+    stripeSubscriptionId: profile.stripeSubscriptionId,
+    stripeSubscriptionStatus: profile.stripeSubscriptionStatus,
+    stripeCurrentPeriodEnd: profile.stripeCurrentPeriodEnd,
+    stripeCancelAt: profile.stripeCancelAt,
+    stripeCancelAtPeriodEnd: profile.stripeCancelAtPeriodEnd,
+    stripeCanceledAt: profile.stripeCanceledAt,
+    stripeLastSyncedAt: profile.stripeLastSyncedAt,
+    billingStatus: profile.billingStatus,
+    updatedAt: profile.updatedAt,
+  };
+}
+
+function maskStripeId(value?: string): string {
+  if (!value) return "Not linked";
+  if (value.length <= 10) return value;
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
+function formatBillingStatus(status?: string): string {
+  if (!status) return "No subscription yet";
+  return status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatDateTime(value: unknown): string {
+  if (!value) return "Not available";
+
+  let date: Date | null = null;
+
+  if (typeof value === "number") {
+    date = new Date(value * 1000);
+  } else if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === "string") {
+    const parsed = new Date(value);
+    date = Number.isNaN(parsed.getTime()) ? null : parsed;
+  } else if (
+    typeof value === "object" &&
+    value !== null &&
+    "seconds" in value &&
+    typeof (value as { seconds?: unknown }).seconds === "number"
+  ) {
+    date = new Date(((value as { seconds: number }).seconds) * 1000);
+  } else if (
+    typeof value === "object" &&
+    value !== null &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    date = (value as { toDate: () => Date }).toDate();
+  }
+
+  if (!date || Number.isNaN(date.getTime())) return "Not available";
+
+  return date.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getBillingCycleLabel(
+  profile: BillingProfileSnapshot | null,
+  tier: "free" | "plus" | null
+): string {
+  if (!profile) return "No billing cycle yet";
+
+  const cycleEnd =
+    profile.stripeCurrentPeriodEnd ??
+    profile.stripeCancelAt ??
+    profile.stripeCanceledAt;
+
+  if (!cycleEnd) {
+    return tier === "plus"
+      ? "Awaiting Stripe sync"
+      : "No active billing cycle";
+  }
+
+  if (profile.stripeCancelAtPeriodEnd) {
+    return `Access ends ${formatDateTime(cycleEnd)}`;
+  }
+
+  if (tier === "plus") {
+    return `Renews ${formatDateTime(cycleEnd)}`;
+  }
+
+  return `Ended ${formatDateTime(cycleEnd)}`;
+}
+
 export default function AccountManagementPage() {
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
+  const isSandboxBilling =
+    (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "").startsWith(
+      "pk_test_"
+    );
 
   // Display name state
   const [displayName, setDisplayName] = useState("");
@@ -38,6 +156,9 @@ export default function AccountManagementPage() {
   // Tier state
   const [tier, setTier] = useState<"free" | "plus" | null>(null);
   const [loadingTier, setLoadingTier] = useState(true);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingProfile, setBillingProfile] =
+    useState<BillingProfileSnapshot | null>(null);
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -49,10 +170,12 @@ export default function AccountManagementPage() {
   // Delete account state
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cancelSubscriptionOpen, setCancelSubscriptionOpen] = useState(false);
 
   // Toast state
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastCounter = useRef(0);
+  const tierRefreshTimerRef = useRef<number | null>(null);
 
   function addToast(message: string, type: "success" | "error" = "success") {
     const id = ++toastCounter.current;
@@ -72,17 +195,87 @@ export default function AccountManagementPage() {
   // Pre-fill display name and load tier from Firestore
   useEffect(() => {
     if (!user) return;
-    setDisplayName(user.displayName || "");
-    getUser(user.uid)
-      .then((profile) => {
-        if (profile) {
-          setTier(profile.tier ?? "free");
-        } else {
+
+    let cancelled = false;
+    const uid = user.uid;
+
+    async function loadProfile() {
+      try {
+        const profile = await getUser(uid);
+        if (cancelled) return;
+        setTier(profile?.tier ?? "free");
+        setBillingProfile(toBillingProfileSnapshot(profile));
+      } catch {
+        if (!cancelled) {
           setTier("free");
+          setBillingProfile(null);
         }
-      })
-      .catch(() => setTier("free"))
-      .finally(() => setLoadingTier(false));
+      } finally {
+        if (!cancelled) setLoadingTier(false);
+      }
+    }
+
+    setDisplayName(user.displayName || "");
+    setLoadingTier(true);
+    void loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const uid = user.uid;
+
+    const params = new URLSearchParams(window.location.search);
+    const billing = params.get("billing");
+
+    const clearTierRefreshTimer = () => {
+      if (tierRefreshTimerRef.current !== null) {
+        window.clearTimeout(tierRefreshTimerRef.current);
+        tierRefreshTimerRef.current = null;
+      }
+    };
+
+    const refreshProfile = async () => {
+      try {
+        const profile = await getUser(uid);
+        setTier(profile?.tier ?? "free");
+        setBillingProfile(toBillingProfileSnapshot(profile));
+      } catch {
+        setTier("free");
+        setBillingProfile(null);
+      }
+    };
+
+    if (billing === "success") {
+      addToast("Subscription updated. Your Plus access will refresh shortly.");
+      params.delete("billing");
+      const qs = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        qs ? `${window.location.pathname}?${qs}` : window.location.pathname
+      );
+
+      clearTierRefreshTimer();
+      void refreshProfile();
+      tierRefreshTimerRef.current = window.setTimeout(() => {
+        void refreshProfile();
+      }, 2500);
+    } else if (billing === "cancelled") {
+      addToast("Checkout was cancelled.", "error");
+      params.delete("billing");
+      const qs = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        qs ? `${window.location.pathname}?${qs}` : window.location.pathname
+      );
+    }
+
+    return clearTierRefreshTimer;
   }, [user]);
 
   if (authLoading || !user) {
@@ -208,6 +401,88 @@ export default function AccountManagementPage() {
     }
   }
 
+  function beginCheckout() {
+    if (billingLoading) return;
+    setBillingLoading(true);
+    router.push("/pricing?source=account");
+  }
+
+  async function openBillingPortal() {
+    if (!user || billingLoading) return;
+
+    setBillingLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/billing/portal", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        url?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error ?? "portal_failed");
+      }
+
+      window.location.assign(payload.url);
+    } catch {
+      addToast("Unable to open billing portal right now.", "error");
+      setBillingLoading(false);
+    }
+  }
+
+  async function cancelSubscription() {
+    if (!user || billingLoading) return;
+
+    setBillingLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/billing/cancel", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "cancel_failed");
+      }
+
+      setTier("free");
+      setBillingProfile((prev) => ({
+        stripeCustomerId: prev?.stripeCustomerId,
+        stripeSubscriptionId: prev?.stripeSubscriptionId,
+        stripeSubscriptionStatus: "canceled",
+        stripeCurrentPeriodEnd: prev?.stripeCurrentPeriodEnd ?? null,
+        stripeCancelAt: prev?.stripeCancelAt ?? null,
+        stripeCancelAtPeriodEnd: false,
+        stripeCanceledAt: Math.floor(Date.now() / 1000),
+        stripeLastSyncedAt: new Date(),
+        billingStatus: prev?.billingStatus,
+        updatedAt: prev?.updatedAt,
+      }));
+      setCancelSubscriptionOpen(false);
+      addToast(
+        "Subscription canceled. Your account has been moved back to Free."
+      );
+    } catch {
+      addToast("Unable to cancel subscription right now.", "error");
+    } finally {
+      setBillingLoading(false);
+    }
+  }
+
   return (
     <>
       {/* Toast notifications */}
@@ -242,6 +517,19 @@ export default function AccountManagementPage() {
         isLoading={deleting}
       />
 
+      <ConfirmDialog
+        isOpen={cancelSubscriptionOpen}
+        onClose={() => {
+          if (!billingLoading) setCancelSubscriptionOpen(false);
+        }}
+        onConfirm={cancelSubscription}
+        title="Cancel Plus subscription"
+        description="This immediately cancels the current Stripe subscription and moves the account back to the Free tier."
+        confirmLabel="Cancel Subscription"
+        isDestructive
+        isLoading={billingLoading}
+      />
+
       <div className="max-w-3xl mx-auto space-y-6 pb-12">
         <DiscoveryShell
           eyebrow="Account"
@@ -258,13 +546,13 @@ export default function AccountManagementPage() {
             <Link href="/profile/edit">
               <Button variant="outline" size="sm">Edit profile</Button>
             </Link>
-            <Link href="/account/plans">
+            <Link href="/pricing?source=account">
               <Button variant="outline" size="sm">Compare Free vs Plus</Button>
             </Link>
             {tier !== "plus" && (
-              <Link href="/account/upgrade">
-                <Button size="sm">Upgrade to Plus</Button>
-              </Link>
+              <Button size="sm" onClick={beginCheckout} isLoading={billingLoading}>
+                Upgrade to Plus
+              </Button>
             )}
           </div>
         </Card>
@@ -293,7 +581,7 @@ export default function AccountManagementPage() {
                       {tier === "plus" ? "Plus" : "Free"}
                     </Badge>
                     <Link
-                      href="/account/plans"
+                      href="/pricing?source=account"
                       className="text-sm text-primary-900 hover:underline font-medium"
                     >
                       View plan details
@@ -320,6 +608,145 @@ export default function AccountManagementPage() {
               Save name
             </Button>
           </form>
+        </Card>
+
+        <Card padding="lg">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                Billing & Subscription
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Review your Stripe status and manage your current plan.
+              </p>
+            </div>
+            {!loadingTier && (
+              <Badge variant={tier === "plus" ? "success" : "default"}>
+                {tier === "plus" ? "Plus active" : "Free plan"}
+              </Badge>
+            )}
+          </div>
+
+          {isSandboxBilling && tier !== "plus" && (
+            <div className="mt-4 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
+              <p className="font-semibold">Sandbox early-access Plus</p>
+              <p className="mt-1">
+                This site is using Stripe test mode. You can upgrade with the
+                Stripe test card <span className="font-medium">4242 4242 4242 4242</span>.
+              </p>
+              <p className="mt-1 text-xs">
+                Use any future expiry date, any 3-digit CVC, and any ZIP/postcode.
+              </p>
+            </div>
+          )}
+
+          {loadingTier ? (
+            <div className="mt-4 h-24 rounded-xl bg-secondary-100 animate-pulse" />
+          ) : (
+            <div className="mt-4 space-y-4">
+              <div className="flex flex-wrap gap-3">
+                {tier !== "plus" ? (
+                  <Button size="sm" onClick={beginCheckout} isLoading={billingLoading}>
+                    Upgrade to Plus
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={openBillingPortal}
+                      isLoading={billingLoading}
+                    >
+                      Manage Billing
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setCancelSubscriptionOpen(true)}
+                      isLoading={billingLoading}
+                    >
+                      Cancel Subscription
+                    </Button>
+                  </>
+                )}
+                <Link href="/pricing?source=account">
+                  <Button variant="outline" size="sm">View Plan Details</Button>
+                </Link>
+              </div>
+
+              <div className="rounded-xl border border-border bg-secondary-50/70 px-4 py-4">
+                <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                      Mode
+                    </dt>
+                    <dd className="mt-1 text-foreground">
+                      {isSandboxBilling ? "Sandbox / Test" : "Live"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                      Subscription Status
+                    </dt>
+                    <dd className="mt-1 text-foreground">
+                      {formatBillingStatus(
+                        billingProfile?.stripeSubscriptionStatus ??
+                          billingProfile?.billingStatus
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                      Renews / Ends
+                    </dt>
+                    <dd className="mt-1 text-foreground">
+                      {getBillingCycleLabel(billingProfile, tier)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                      Customer Record
+                    </dt>
+                    <dd className="mt-1 text-foreground">
+                      {billingProfile?.stripeCustomerId ? "Linked" : "Not linked"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                      Customer ID
+                    </dt>
+                    <dd className="mt-1 font-mono text-foreground">
+                      {maskStripeId(billingProfile?.stripeCustomerId)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                      Subscription ID
+                    </dt>
+                    <dd className="mt-1 font-mono text-foreground">
+                      {maskStripeId(billingProfile?.stripeSubscriptionId)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                      Last Stripe Sync
+                    </dt>
+                    <dd className="mt-1 text-foreground">
+                      {formatDateTime(billingProfile?.stripeLastSyncedAt)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                      Profile Updated
+                    </dt>
+                    <dd className="mt-1 text-foreground">
+                      {formatDateTime(billingProfile?.updatedAt)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Change Password */}

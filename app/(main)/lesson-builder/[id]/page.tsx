@@ -22,11 +22,10 @@ import {
 import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { getUserRating, submitRating } from "@/lib/firestore/ratings";
 import { Avatar, Badge, Button, Card, ConfirmDialog, IPNotice } from "@/components/ui";
-import CommentThread, {
-  type CommentData,
-} from "@/components/comments/CommentThread";
+import ContentCommentSection from "@/components/comments/ContentCommentSection";
+import { type CommentData } from "@/components/comments/CommentThread";
 import { timeAgo } from "@/lib/utils";
-import { notifyComment, notifyLessonRated, notifyLessonDownloaded, notifyLessonShared, notifyCommentReplied, notifyMention } from "@/lib/notifications";
+import { notifyLessonRated, notifyLessonDownloaded, notifyLessonShared } from "@/lib/notifications";
 import { pdf } from "@react-pdf/renderer";
 import LessonPDFDocument from "@/components/lessons/LessonPDFDocument";
 import LessonPreviewModal from "@/components/lessons/LessonPreviewModal";
@@ -271,10 +270,10 @@ export default function LessonDetailPage({
     .find((value) => Boolean(value));
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="space-y-8 overflow-x-clip pb-8">
       {/* Breadcrumb + back */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-muted">
+        <div className="min-w-0 flex items-center gap-2 text-sm text-muted">
           <Link
             href="/lesson-builder"
             className="hover:text-foreground transition-colors"
@@ -321,7 +320,7 @@ export default function LessonDetailPage({
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Lesson card */}
-          <Card padding="lg" className="space-y-6">
+          <Card padding="lg" className="space-y-6 break-words">
             {/* Header */}
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -584,7 +583,7 @@ export default function LessonDetailPage({
                       href={att.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-primary-900 hover:underline"
+                      className="flex items-center gap-2 break-all text-sm text-primary-900 hover:underline"
                     >
                       <svg
                         className="h-4 w-4"
@@ -752,70 +751,35 @@ export default function LessonDetailPage({
           {/* Comments */}
           {user ? (
             <Card padding="lg">
-              <h2 className="text-xl font-semibold text-foreground mb-4">
-                Discussion, Feedback & Suggestions
-              </h2>
-              <CommentThread
+              <ContentCommentSection
                 comments={commentData}
                 loading={commentsLoading}
+                title="Discussion, Feedback & Suggestions"
+                description="Ask a question, share feedback, or suggest an improvement for this lesson."
+                ownerId={lesson.authorId}
+                contentLabel={`your lesson \"${lesson.title}\"`}
+                linkURL={lessonPath}
                 mode="like"
-                maxDepth={2}
-                onAddComment={async (content, parentId, mentionedUsers) => {
-                  if (!user) throw new Error("Must be logged in");
-                  const newId = await addLessonComment(lesson.id, {
+                maxDepth={1}
+                composerPlaceholder="Add a comment..."
+                addComment={async ({ parentId, authorId, authorName, authorPhotoURL, content, mentionedUsers }) => {
+                  return addLessonComment(lesson.id, {
                     parentId,
-                    authorId: user.uid,
-                    authorName: user.displayName || "Anonymous",
-                    authorPhotoURL: user.photoURL,
+                    authorId,
+                    authorName,
+                    authorPhotoURL,
                     content,
-                    mentionedUsers: mentionedUsers ?? [],
+                    mentionedUsers,
                   });
-                  // Notify lesson author on top-level comment (fire-and-forget)
-                  if (lesson.authorId !== user.uid && !parentId) {
-                    notifyComment({
-                      recipientId: lesson.authorId,
-                      actorId: user.uid,
-                      actorName: user.displayName || "Someone",
-                      actorPhotoURL: user.photoURL,
-                      contentLabel: `your lesson "${lesson.title}"`,
-                      linkURL: lessonPath,
-                    }).catch(() => {});
-                  }
-                  // Notify parent comment author on reply (fire-and-forget)
-                  if (parentId) {
-                    const parentComment = comments.find((c) => c.id === parentId);
-                    if (parentComment && parentComment.authorId !== user.uid) {
-                      notifyCommentReplied({
-                        recipientId: parentComment.authorId,
-                        actorId: user.uid,
-                        actorName: user.displayName || "Someone",
-                        actorPhotoURL: user.photoURL,
-                        linkURL: lessonPath,
-                      }).catch(() => {});
-                    }
-                  }
-                  // Fire mention notifications (fire-and-forget)
-                  if (mentionedUsers?.length) {
-                    mentionedUsers.forEach(({ uid }) => {
-                      if (uid !== user.uid) {
-                        notifyMention({
-                          recipientId: uid,
-                          actorId: user.uid,
-                          actorName: user.displayName || "Anonymous",
-                          actorPhotoURL: user.photoURL,
-                          linkURL: lessonPath,
-                        }).catch(() => {});
-                      }
-                    });
-                  }
-                  await loadComments();
-                  return newId;
                 }}
-                onUpdateComment={async (commentId, text) => {
+                updateComment={async (commentId, text) => {
                   await updateLessonComment(lesson.id, commentId, text);
                 }}
-                onDeleteComment={async (commentId) => {
-                  await deleteLessonComment(lesson.id, commentId);
+                deleteComment={async (commentId) => {
+                  return deleteLessonComment(lesson.id, commentId);
+                }}
+                refreshComments={async () => {
+                  await loadComments();
                 }}
                 onLikeComment={async (commentId) => {
                   if (!user) return;

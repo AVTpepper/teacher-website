@@ -193,12 +193,23 @@ export default function JobsPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="py-16 text-center text-sm text-muted">Loading jobs…</div>
+        <Card padding="lg">
+          <div className="border-b border-border/70 pb-3">
+            <h2 className="text-base font-semibold text-foreground">Open roles</h2>
+            <p className="mt-1 text-sm text-muted">Current opportunities across teaching and the wider education sector.</p>
+          </div>
+          <p className="py-10 text-center text-sm text-muted">Loading jobs…</p>
+        </Card>
       )}
 
       {/* Empty */}
       {!loading && visibleJobs.length === 0 && (
-        <div className="py-16 text-center">
+        <Card padding="lg">
+          <div className="border-b border-border/70 pb-3">
+            <h2 className="text-base font-semibold text-foreground">Open roles</h2>
+            <p className="mt-1 text-sm text-muted">Current opportunities across teaching and the wider education sector.</p>
+          </div>
+          <div className="py-12 text-center">
           <p className="text-4xl mb-3">💼</p>
           <p className="text-foreground font-medium">No jobs found</p>
           <p className="text-sm text-muted mt-1">
@@ -209,16 +220,23 @@ export default function JobsPage() {
               Clear Filters
             </Button>
           )}
-        </div>
+          </div>
+        </Card>
       )}
 
       {/* Job list */}
       {!loading && visibleJobs.length > 0 && (
-        <div className="space-y-3">
+        <Card padding="lg" className="space-y-4">
+          <div className="border-b border-border/70 pb-3">
+            <h2 className="text-base font-semibold text-foreground">Open roles</h2>
+            <p className="mt-1 text-sm text-muted">Current opportunities across teaching and the wider education sector.</p>
+          </div>
+          <div className="space-y-3">
           {visibleJobs.map((job) => (
             <JobCard key={job.id} job={job} />
           ))}
-        </div>
+          </div>
+        </Card>
       )}
 
       {/* Load more */}

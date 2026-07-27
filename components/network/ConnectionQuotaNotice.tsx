@@ -17,7 +17,7 @@ export default function ConnectionQuotaNotice({ quota }: { quota: ConnectionQuot
       </p>
       {quota.remaining <= 0 && (
         <p className="mt-1 text-xs text-muted">
-          You reached this month&apos;s free limit. <Link href="/account/upgrade" className="text-primary-900 underline">Upgrade to Plus</Link> for unlimited requests.
+          You reached this month&apos;s free limit. <Link href="/pricing" className="text-primary-900 underline">See Free vs Plus</Link> for unlimited requests.
         </p>
       )}
       {quota.remaining > 0 && (

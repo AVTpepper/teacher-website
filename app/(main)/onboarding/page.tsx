@@ -953,7 +953,7 @@ function OnboardingPageContent() {
           </p>
         )}
 
-        <div className="sticky bottom-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-3">
+        <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-page-background-soft px-3 py-3 shadow-[0_8px_22px_rgba(8,31,35,0.12)] backdrop-blur">
           <Button type="button" variant="outline" onClick={() => void handleBack()} disabled={step === 1 || saving || uploading}>
             Back
           </Button>

@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { ApiAuthError, requireAuthenticatedUser } from "@/lib/server/apiAuth";
+import { getUserBillingEntitlements } from "@/lib/server/billing";
 import { getFirebaseAdminDb } from "@/lib/server/firebaseAdmin";
 import { captureServerError } from "@/lib/server/monitoring";
 import { getStripeClient } from "@/lib/server/stripe";
@@ -32,10 +33,18 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
+    const entitlements = await getUserBillingEntitlements(uid);
+    if (!entitlements.billingManagementAvailable) {
+      return Response.json(
+        { error: "No billing customer is associated with this account yet." },
+        { status: 400 },
+      );
+    }
+
     const stripe = getStripeClient();
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
-      return_url: `${getAppOrigin(request)}/account`,
+      return_url: process.env.STRIPE_BILLING_PORTAL_RETURN_URL ?? `${getAppOrigin(request)}/account`,
     });
 
     return Response.json({ url: session.url });

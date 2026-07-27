@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 const FULL_BLEED_ROUTES = [
   /^\/educators$/,
   /^\/forums$/,
+  /^\/feed$/,
   /^\/home$/,
   /^\/inspiration$/,
   /^\/jobs$/,

@@ -1,6 +1,12 @@
 ﻿import type { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { createPublicKey, createVerify } from "crypto";
+import {
+  FREE_DAILY_LESSON_AI_LIMIT,
+  FREE_MONTHLY_LESSON_AI_REFINE_LIMIT,
+  FREE_GENERATED_ASSET_LIMIT_PER_LESSON,
+  PLUS_GENERATED_ASSET_LIMIT_PER_LESSON,
+} from "@/lib/ai/limits";
 
 // ─── Firebase ID Token Verification ──────────────────────────────────────────
 // Tokens are RS256 JWTs; we verify against Google's published X.509 certs.
@@ -66,10 +72,10 @@ async function verifyFirebaseToken(token: string): Promise<string | null> {
 // firebase-admin. The token was already verified above, so Firestore rules that
 // check `request.auth.uid` will accept these calls.
 
-const FREE_DAILY_LIMIT = 10;
-const FREE_MONTHLY_REFINE_LIMIT = 20;
-const FREE_GENERATED_ASSET_LIMIT = 2;
-const PLUS_GENERATED_ASSET_LIMIT = 2;
+const FREE_DAILY_LIMIT = FREE_DAILY_LESSON_AI_LIMIT;
+const FREE_MONTHLY_REFINE_LIMIT = FREE_MONTHLY_LESSON_AI_REFINE_LIMIT;
+const FREE_GENERATED_ASSET_LIMIT = FREE_GENERATED_ASSET_LIMIT_PER_LESSON;
+const PLUS_GENERATED_ASSET_LIMIT = PLUS_GENERATED_ASSET_LIMIT_PER_LESSON;
 
 const VALID_ACTIVITY_STYLES = [
   "Hands-on exploration",

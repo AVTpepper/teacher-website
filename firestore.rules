@@ -21,22 +21,79 @@ service cloud.firestore {
              && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function hasPublicShowcaseConfig() {
+      return exists(/databases/$(database)/documents/siteConfig/publicShowcase);
+    }
+
+    function isPublicShowcaseEducator(userId) {
+      return hasPublicShowcaseConfig()
+             && userId in get(/databases/$(database)/documents/siteConfig/publicShowcase).data.educatorProfileIds;
+    }
+
+    function isPublicShowcaseLesson(lessonId) {
+      return hasPublicShowcaseConfig()
+             && lessonId in get(/databases/$(database)/documents/siteConfig/publicShowcase).data.lessonPlanIds;
+    }
+
+    function isPublicShowcaseDiscussion(threadId) {
+      return hasPublicShowcaseConfig()
+             && threadId in get(/databases/$(database)/documents/siteConfig/publicShowcase).data.discussionIds;
+    }
+
+    function isPublicShowcaseInspiration(itemId) {
+      return hasPublicShowcaseConfig()
+             && itemId in get(/databases/$(database)/documents/siteConfig/publicShowcase).data.inspirationIds;
+    }
+
     // -----------------------------------------------------------------------
     // users/{userId}
     // -----------------------------------------------------------------------
     match /users/{userId} {
-      // Anyone (even unauthenticated) can read profiles — public directory
-      allow read: if true;
+      // Anonymous users can only read explicitly showcased profiles.
+      allow read: if isAuth() || isPublicShowcaseEducator(userId);
       // Only the owner can create or update their own profile
       allow create: if isOwner(userId)
             && request.resource.data.role == 'user'
             && request.resource.data.tier == 'free'
-            && !request.resource.data.keys().hasAny(['stripeCustomerId', 'stripeSubscriptionId', 'billingStatus', 'billingUpdatedAt']);
+            && request.resource.data.isVerified == false
+            && request.resource.data.followerCount == 0
+            && request.resource.data.followingCount == 0
+            && !request.resource.data.keys().hasAny([
+              'stripeCustomerId',
+              'stripeSubscriptionId',
+              'stripeSubscriptionStatus',
+              'stripeCurrentPeriodEnd',
+              'stripeCancelAt',
+              'stripeCancelAtPeriodEnd',
+              'stripeCanceledAt',
+              'stripeLastSyncedAt',
+              'billingStatus',
+              'updatedAt',
+              'deletionStatus',
+              'deletionRequestedAt'
+            ]);
       // Owner can update their profile but cannot change protected fields (tier, role, billing)
       // Any authenticated user can increment/decrement followerCount (follow/unfollow)
       allow update: if (isOwner(userId)
                         && !request.resource.data.diff(resource.data)
-          .affectedKeys().hasAny(['tier', 'createdAt', 'role', 'isVerified', 'stripeCustomerId', 'stripeSubscriptionId', 'billingStatus', 'billingUpdatedAt']))
+          .affectedKeys().hasAny([
+            'tier',
+            'createdAt',
+            'role',
+            'isVerified',
+            'stripeCustomerId',
+            'stripeSubscriptionId',
+            'stripeSubscriptionStatus',
+            'stripeCurrentPeriodEnd',
+            'stripeCancelAt',
+            'stripeCancelAtPeriodEnd',
+            'stripeCanceledAt',
+            'stripeLastSyncedAt',
+            'billingStatus',
+            'updatedAt',
+            'deletionStatus',
+            'deletionRequestedAt'
+          ]))
                     || (isAuth() && request.resource.data.diff(resource.data)
                            .affectedKeys().hasOnly(['followerCount']));
       // Only the owner can delete their own profile (account deletion)
@@ -44,13 +101,13 @@ service cloud.firestore {
 
       // followers sub-collection — users/{userId}/followers/{followerId}
       match /followers/{followerId} {
-        allow read: if true;
+        allow read: if isAuth();
         allow write: if isOwner(followerId);
       }
 
       // following sub-collection — users/{userId}/following/{followingId}
       match /following/{followingId} {
-        allow read: if true;
+        allow read: if isAuth();
         allow write: if isOwner(userId);
       }
 
@@ -87,7 +144,7 @@ service cloud.firestore {
     // posts/{postId}
     // -----------------------------------------------------------------------
     match /posts/{postId} {
-      allow read: if true;
+      allow read: if isAuth();
       allow create: if isAuth()
                     && request.resource.data.authorId == request.auth.uid;
       allow update: if isAuth()
@@ -102,13 +159,13 @@ service cloud.firestore {
 
       // likes sub-collection — posts/{postId}/likes/{userId}
       match /likes/{userId} {
-        allow read: if true;
+        allow read: if isAuth();
         allow write: if isOwner(userId);
       }
 
       // comments sub-collection — posts/{postId}/comments/{commentId}
       match /comments/{commentId} {
-        allow read: if true;
+        allow read: if isAuth();
         allow create: if isAuth()
                       && request.resource.data.authorId == request.auth.uid;
         allow update: if isAuth()
@@ -124,7 +181,7 @@ service cloud.firestore {
 
         // comment likes — posts/{postId}/comments/{commentId}/likes/{userId}
         match /likes/{userId} {
-          allow read: if true;
+          allow read: if isAuth();
           allow write: if isOwner(userId);
         }
       }
@@ -134,8 +191,8 @@ service cloud.firestore {
     // resources/{resourceId}
     // -----------------------------------------------------------------------
     match /resources/{resourceId} {
-      allow read: if true;
-      allow create: if isAuth()
+      allow read: if isAuth();
+        allow read: if isAuth();
                     && request.resource.data.authorId == request.auth.uid;
       allow update: if isAuth()
                     && (
@@ -148,19 +205,19 @@ service cloud.firestore {
 
       // ratings sub-collection — resources/{resourceId}/ratings/{userId}
       match /ratings/{userId} {
-        allow read: if true;
+        allow read: if isAuth();
         allow write: if isOwner(userId);
       }
 
       // saves sub-collection — resources/{resourceId}/saves/{userId}
       match /saves/{userId} {
-        allow read: if true;
-        allow write: if isOwner(userId);
+        allow read: if isAuth();
+          allow read: if isAuth();
       }
 
       // comments sub-collection — resources/{resourceId}/comments/{commentId}
       match /comments/{commentId} {
-        allow read: if true;
+        allow read: if isAuth();
         allow create: if isAuth()
                       && request.resource.data.authorId == request.auth.uid;
         allow update: if isAuth()
@@ -176,11 +233,7 @@ service cloud.firestore {
     // lessons/{lessonId}
     // -----------------------------------------------------------------------
     match /lessons/{lessonId} {
-      // Allow all reads — Firestore cannot combine an inequality (prefix-range
-      // title search) with an equality filter (isPublic) in the same query.
-      // Draft privacy is enforced in the app: drafts are never linked or
-      // listed outside the author's own lesson builder view.
-      allow read: if true;
+      allow read: if isAuth();
       allow create: if isAuth()
                     && request.resource.data.authorId == request.auth.uid;
       allow update: if isAuth()
@@ -200,7 +253,7 @@ service cloud.firestore {
 
       // comments sub-collection — lessons/{lessonId}/comments/{commentId}
       match /comments/{commentId} {
-        allow read: if true;
+        allow read: if isAuth();
         allow create: if isAuth()
                       && request.resource.data.authorId == request.auth.uid;
         allow update: if isAuth()
@@ -216,14 +269,14 @@ service cloud.firestore {
     // forums/{categoryId}  +  forums/{categoryId}/threads/{threadId}
     // -----------------------------------------------------------------------
     match /forums/{categoryId} {
-      allow read: if true;
+      allow read: if isAuth();
       // Category docs are managed by the app (ensureCategory helper) — any
       // authenticated user can trigger the upsert.
       allow create, update: if isAuth();
       allow delete: if false;
 
       match /threads/{threadId} {
-        allow read: if true;
+        allow read: if isAuth() || isPublicShowcaseDiscussion(threadId);
         allow create: if isAuth()
                       && request.resource.data.authorId == request.auth.uid;
         allow update: if isAuth()
@@ -237,7 +290,7 @@ service cloud.firestore {
 
         // comments — forums/{categoryId}/threads/{threadId}/comments/{commentId}
         match /comments/{commentId} {
-          allow read: if true;
+          allow read: if isAuth() || isPublicShowcaseDiscussion(threadId);
           allow create: if isAuth()
                         && request.resource.data.authorId == request.auth.uid;
           allow update: if isAuth()
@@ -257,14 +310,14 @@ service cloud.firestore {
     // collectionGroup("threads") — required for cross-category search queries
     // -----------------------------------------------------------------------
     match /{path=**}/threads/{threadId} {
-      allow read: if true;
+      allow read: if isAuth() || isPublicShowcaseDiscussion(threadId);
     }
 
     // -----------------------------------------------------------------------
     // inspiration/{itemId}
     // -----------------------------------------------------------------------
     match /inspiration/{itemId} {
-      allow read: if true;
+      allow read: if isAuth() || isPublicShowcaseInspiration(itemId);
       allow create: if isAuth();
       allow update, delete: if isAuth()
                             && resource.data.submittedBy == request.auth.uid;
@@ -274,8 +327,17 @@ service cloud.firestore {
     // jobs/{jobId}
     // -----------------------------------------------------------------------
     match /jobs/{jobId} {
-      allow read: if true;
+      allow read: if isAuth();
       allow create, update, delete: if isAdmin();
+    }
+
+    // -----------------------------------------------------------------------
+    // siteConfig/publicShowcase
+    // Public showcase IDs determine which detail pages guests can view.
+    // -----------------------------------------------------------------------
+    match /siteConfig/publicShowcase {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // -----------------------------------------------------------------------

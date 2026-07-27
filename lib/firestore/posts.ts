@@ -19,6 +19,7 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getUser, type UserProfile } from "@/lib/firestore/users";
 import { byCreatedAtDesc } from "@/lib/utils";
 import {
   deleteCommentWithReplies,
@@ -93,6 +94,15 @@ export interface PostCommentInput {
   authorPhotoURL: string | null;
   content: string;
   mentionedUsers?: MentionedUserRef[];
+}
+
+export interface PostLiker {
+  uid: string;
+  displayName: string;
+  photoURL: string | null;
+  professionalHeadline?: string;
+  professionalRole?: string;
+  tier?: "free" | "plus";
 }
 
 // --- Post CRUD ---
@@ -313,6 +323,35 @@ export async function getPostCommentsCount(postId: string): Promise<number> {
   );
 
   return snapshot.data().count;
+}
+
+export async function getPostLikers(postId: string): Promise<PostLiker[]> {
+  if (!db) throw new Error("Firestore is not initialized");
+
+  const likesSnapshot = await getDocs(
+    query(
+      collection(db, "posts", postId, "likes"),
+      orderBy("likedAt", "desc"),
+      limit(200),
+    ),
+  );
+
+  if (likesSnapshot.empty) return [];
+
+  const likerProfiles = await Promise.all(
+    likesSnapshot.docs.map((docSnap) => getUser(docSnap.id)),
+  );
+
+  return likerProfiles
+    .filter((profile): profile is UserProfile => profile !== null)
+    .map((profile) => ({
+      uid: profile.uid,
+      displayName: profile.displayName || "Deleted account",
+      photoURL: profile.photoURL ?? null,
+      professionalHeadline: profile.professionalHeadline,
+      professionalRole: profile.professionalRole,
+      tier: profile.tier === "plus" ? "plus" : "free",
+    }));
 }
 
 export async function likeComment(

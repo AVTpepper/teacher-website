@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   getUser,
@@ -34,12 +34,12 @@ import {
   threadSlug,
   type ForumThread,
 } from "@/lib/firestore/forums";
-import { Avatar, Badge, Button, Card, Tabs } from "@/components/ui";
-import { BadgeList } from "@/components/badges/BadgeIcon";
+import { getFollowers, getFollowing, isFollowing } from "@/lib/firestore/follows";
+import { Avatar, Badge, Button, Card, Modal, Tabs } from "@/components/ui";
 import ConnectionButton from "@/components/network/ConnectionButton";
-import { BADGE_LIST } from "@/lib/badges";
 import { notifyNewFollower } from "@/lib/notifications";
 import { timeAgo } from "@/lib/utils";
+import { getProfileCardThemeStyle } from "@/lib/profile-card-theme";
 import { getSharedContextReasons } from "@/lib/profile/sharedContext";
 import {
   ConnectionClientError,
@@ -64,8 +64,25 @@ interface OverviewFeed {
   discussions: ForumThread[];
 }
 
+type FollowListType = "followers" | "following";
+
+interface FollowListRow {
+  profile: UserProfile;
+  isFollowedByViewer: boolean;
+}
+
 function toList(values?: string[]): string[] {
-  return (values ?? []).map((item) => item.trim()).filter(Boolean);
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const value of values ?? []) {
+    const clean = value.trim();
+    if (!clean || seen.has(clean)) continue;
+    seen.add(clean);
+    normalized.push(clean);
+  }
+
+  return normalized;
 }
 
 function formatYearsOfExperience(years: number): string {
@@ -91,6 +108,7 @@ function roleHeading(profile: UserProfile): string {
 export default function EducatorProfile({ userId }: { userId: string }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [viewerProfile, setViewerProfile] = useState<UserProfile | null>(null);
@@ -143,6 +161,12 @@ export default function EducatorProfile({ userId }: { userId: string }) {
   const [threads, setThreads] = useState<ForumThread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
   const [threadsLoaded, setThreadsLoaded] = useState(false);
+
+  const [followListType, setFollowListType] = useState<FollowListType | null>(null);
+  const [followListRows, setFollowListRows] = useState<FollowListRow[]>([]);
+  const [followListLoading, setFollowListLoading] = useState(false);
+  const [followListError, setFollowListError] = useState<string | null>(null);
+  const [followListActionLoadingIds, setFollowListActionLoadingIds] = useState<Set<string>>(new Set());
 
   const isOwnProfile = user?.uid === userId;
   const canViewSensitiveProfileInfo = Boolean(user);
@@ -444,6 +468,70 @@ export default function EducatorProfile({ userId }: { userId: string }) {
     };
   }, [activeTab, threadsLoaded, userId]);
 
+  useEffect(() => {
+    const list = searchParams.get("list");
+    if (list === "followers" || list === "following") {
+      setFollowListType(list);
+      return;
+    }
+
+    setFollowListType((current) => (current ? null : current));
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!followListType) return;
+
+    let cancelled = false;
+
+    async function loadFollowList() {
+      setFollowListLoading(true);
+      setFollowListError(null);
+
+      try {
+        const list = followListType === "followers"
+          ? await getFollowers(userId, 200)
+          : await getFollowing(userId, 200);
+
+        if (cancelled) return;
+
+        if (!user) {
+          setFollowListRows(list.map((profile) => ({ profile, isFollowedByViewer: false })));
+          return;
+        }
+
+        const statuses = await Promise.all(
+          list.map((entry) =>
+            entry.uid === user.uid ? Promise.resolve(false) : isFollowing(user.uid, entry.uid),
+          ),
+        );
+
+        if (cancelled) return;
+
+        setFollowListRows(
+          list.map((profile, index) => ({
+            profile,
+            isFollowedByViewer: statuses[index] ?? false,
+          })),
+        );
+      } catch {
+        if (!cancelled) {
+          setFollowListRows([]);
+          setFollowListError("Unable to load this list right now.");
+        }
+      } finally {
+        if (!cancelled) {
+          setFollowListLoading(false);
+        }
+      }
+    }
+
+    void loadFollowList();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [followListType, user, userId]);
+
   async function handleFollowToggle() {
     if (!user || !profile) return;
     setFollowLoading(true);
@@ -575,6 +663,66 @@ export default function EducatorProfile({ userId }: { userId: string }) {
     }
   }
 
+  function openFollowListModal(type: FollowListType) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("list", type);
+    router.replace(`/educators/${userId}?${params.toString()}`, { scroll: false });
+    setFollowListType(type);
+  }
+
+  function closeFollowListModal() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("list");
+    const query = params.toString();
+    router.replace(query ? `/educators/${userId}?${query}` : `/educators/${userId}`, { scroll: false });
+    setFollowListType(null);
+  }
+
+  async function handleToggleFollowInList(targetUid: string) {
+    if (!user) {
+      router.push(`/auth/login?redirect=${encodeURIComponent(`/educators/${userId}`)}`);
+      return;
+    }
+
+    const index = followListRows.findIndex((row) => row.profile.uid === targetUid);
+    if (index === -1) return;
+
+    const wasFollowing = followListRows[index]?.isFollowedByViewer ?? false;
+
+    setFollowListActionLoadingIds((current) => new Set(current).add(targetUid));
+    setFollowListRows((current) =>
+      current.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, isFollowedByViewer: !wasFollowing } : row,
+      ),
+    );
+
+    try {
+      if (wasFollowing) {
+        await unfollowUser(user.uid, targetUid);
+      } else {
+        await followUser(user.uid, targetUid);
+        notifyNewFollower({
+          recipientId: targetUid,
+          actorId: user.uid,
+          actorName: user.displayName || "Someone",
+          actorPhotoURL: user.photoURL,
+        }).catch(() => {});
+      }
+    } catch {
+      setFollowListRows((current) =>
+        current.map((row, rowIndex) =>
+          rowIndex === index ? { ...row, isFollowedByViewer: wasFollowing } : row,
+        ),
+      );
+    } finally {
+      setFollowListActionLoadingIds((current) => {
+        const next = new Set(current);
+        next.delete(targetUid);
+        return next;
+      });
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -603,12 +751,13 @@ export default function EducatorProfile({ userId }: { userId: string }) {
 
   const subjects = toList(profile.subjects);
   const gradeLevels = toList([...(profile.gradeLevels ?? []), profile.gradeLevel]);
+  const cardTheme = getProfileCardThemeStyle(profile.profileCardTheme, profile.tier);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 py-8">
-      <Card className="overflow-hidden p-0">
-        <div className="bg-linear-to-r from-primary-900 via-primary-800 to-secondary-900 p-6 text-white sm:p-8">
-          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+      <section className="overflow-hidden rounded-2xl border border-primary-900/20 shadow-[0_8px_24px_rgba(7,36,42,0.22)]">
+        <div className={`${cardTheme.gradientClass} p-6 text-white sm:p-8`}>
+          <div className="space-y-4">
             <div className="flex items-start gap-4">
               <Avatar
                 src={profile.photoURL}
@@ -631,63 +780,74 @@ export default function EducatorProfile({ userId }: { userId: string }) {
                 {profile.professionalRole && profile.professionalHeadline && (
                   <p className="mt-1 text-xs text-primary-200">{profile.professionalRole}</p>
                 )}
-
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-primary-100">
-                  {gradeLevels.slice(0, 2).map((grade) => (
-                    <span key={grade} className="rounded-full border border-primary-500/60 px-2 py-0.5">
-                      {grade}
-                    </span>
-                  ))}
-                  {subjects.slice(0, 3).map((subject) => (
-                    <span key={subject} className="rounded-full border border-primary-500/60 px-2 py-0.5">
-                      {subject}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="mt-4 flex items-center gap-5 text-sm">
-                  <Link href={`/educators/${userId}/followers`} className="underline-offset-4 hover:underline">
-                    <strong>{profile.followerCount}</strong> {profile.followerCount === 1 ? "Follower" : "Followers"}
-                  </Link>
-                  <Link href={`/educators/${userId}/following`} className="underline-offset-4 hover:underline">
-                    <strong>{profile.followingCount}</strong> Following
-                  </Link>
-                </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 md:justify-end">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-white/90">
+              {gradeLevels.slice(0, 2).map((grade) => (
+                <span key={grade} className={`rounded-full border px-2 py-0.5 ${cardTheme.chipClass}`}>
+                  {grade}
+                </span>
+              ))}
+              {subjects.slice(0, 3).map((subject) => (
+                <span key={subject} className={`rounded-full border px-2 py-0.5 ${cardTheme.chipClass}`}>
+                  {subject}
+                </span>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-5 text-sm">
+              <button
+                type="button"
+                onClick={() => openFollowListModal("followers")}
+                className="cursor-pointer underline-offset-4 hover:underline"
+              >
+                <strong>{profile.followerCount}</strong> {profile.followerCount === 1 ? "Follower" : "Followers"}
+              </button>
+              <button
+                type="button"
+                onClick={() => openFollowListModal("following")}
+                className="cursor-pointer underline-offset-4 hover:underline"
+              >
+                <strong>{profile.followingCount}</strong> Following
+              </button>
+            </div>
+
+            <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {!authLoading && !isOwnProfile && user && (
-                <ConnectionButton
-                  targetDisplayName={profile.displayName}
-                  relationshipState={connectionState}
-                  quota={connectionQuota}
-                  loading={connectionLoading}
-                  onSendRequest={handleSendConnectionRequest}
-                  onRespond={() => router.push("/network?tab=requests")}
-                />
+                <div className="shrink-0">
+                  <ConnectionButton
+                    targetDisplayName={profile.displayName}
+                    relationshipState={connectionState}
+                    quota={connectionQuota}
+                    loading={connectionLoading}
+                    onSendRequest={handleSendConnectionRequest}
+                    onRespond={() => router.push("/network?tab=requests")}
+                  />
+                </div>
               )}
               {!authLoading && !isOwnProfile && user && (
                 <Button
+                  size="sm"
                   variant={following ? "outline" : "primary"}
                   isLoading={followLoading}
                   onClick={handleFollowToggle}
-                  className={following ? "border-primary-100 bg-white text-primary-900" : "bg-accent-300 text-primary-950 hover:bg-accent-200"}
+                  className={`shrink-0 ${following ? "border-white/55 bg-white/10 text-white hover:bg-white/20 hover:border-white/80" : "bg-accent-300 text-primary-950 hover:bg-accent-200"}`}
                 >
                   {following ? "Following" : "Follow"}
                 </Button>
               )}
               {!authLoading && !isOwnProfile && user && connectionState === "connected" && (
-                <Button variant="secondary" onClick={handleMessageEducator} isLoading={messageLoading}>
+                <Button size="sm" variant="outline" onClick={handleMessageEducator} isLoading={messageLoading} className="shrink-0 border-white/55 bg-white/10 text-white hover:bg-white/20 hover:border-white/80">
                   Message
                 </Button>
               )}
               {isOwnProfile && (
-                <Button variant="outline" onClick={() => router.push("/profile/edit", { scroll: true })}>
+                <Button size="sm" variant="outline" onClick={() => router.push("/profile/edit", { scroll: true })} className="shrink-0 border-white/55 bg-white/10 text-white hover:bg-white/20 hover:border-white/80">
                   Edit Profile
                 </Button>
               )}
-              <Button variant="outline" onClick={handleShareProfile}>
+              <Button size="sm" variant="outline" onClick={handleShareProfile} className="shrink-0 border-white/55 bg-white/10 text-white hover:bg-white/20 hover:border-white/80">
                 Share Profile
               </Button>
             </div>
@@ -698,7 +858,7 @@ export default function EducatorProfile({ userId }: { userId: string }) {
           {messageError && <p role="alert" className="mt-2 text-xs text-warning-200">{messageError}</p>}
           {shareMessage && <p role="status" className="mt-2 text-xs text-primary-100">{shareMessage}</p>}
         </div>
-      </Card>
+      </section>
 
       {showCompletionPrompt && (
         <Card className="border-accent-200 bg-accent-50">
@@ -722,29 +882,23 @@ export default function EducatorProfile({ userId }: { userId: string }) {
           </Link>
         </div>
 
-        {profile.badges.length === 0 ? (
+        {(profile.showcaseBadges ?? []).length === 0 ? (
           <p className="text-sm text-muted">
-            No achievements unlocked yet. Milestones appear here as this educator contributes.
+            No profile badges selected yet.
           </p>
         ) : (
-          (["verification", "contribution", "milestone", "expertise"] as const).map((category) => {
-            const categoryBadges = profile.badges.filter(
-              (id) => BADGE_LIST.find((badge) => badge.id === id)?.category === category,
-            );
-            if (categoryBadges.length === 0) return null;
-            const labelMap = {
-              verification: "Verification",
-              contribution: "Contribution",
-              milestone: "Milestones",
-              expertise: "Expertise",
-            };
-            return (
-              <div key={category} className="mb-4 last:mb-0">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{labelMap[category]}</p>
-                <BadgeList badgeIds={categoryBadges} />
-              </div>
-            );
-          })
+          <div>
+            <div className="flex flex-wrap gap-2">
+              {(profile.showcaseBadges ?? []).slice(0, 4).map((badgeName) => (
+                <span
+                  key={badgeName}
+                  className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-900"
+                >
+                  {badgeName}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
       </Card>
 
@@ -798,6 +952,78 @@ export default function EducatorProfile({ userId }: { userId: string }) {
           )}
         </Card>
       </div>
+
+      <Modal
+        open={Boolean(followListType)}
+        onClose={closeFollowListModal}
+        title={
+          followListType === "followers"
+            ? `${profile.displayName}'s followers`
+            : followListType === "following"
+              ? `${profile.displayName} is following`
+              : "Connections"
+        }
+      >
+        {followListLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((index) => (
+              <div key={index} className="h-12 animate-pulse rounded-lg bg-secondary-100" />
+            ))}
+          </div>
+        ) : followListError ? (
+          <p className="text-sm text-error-700">{followListError}</p>
+        ) : followListRows.length === 0 ? (
+          <p className="text-sm text-muted">
+            {followListType === "followers" ? "No followers yet." : "Not following anyone yet."}
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {followListRows.map((row) => (
+              <li
+                key={row.profile.uid}
+                className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2"
+              >
+                <Link
+                  href={`/educators/${row.profile.uid}`}
+                  onClick={closeFollowListModal}
+                  className="min-w-0 flex flex-1 items-center gap-3"
+                >
+                  <Avatar
+                    src={row.profile.photoURL}
+                    alt={row.profile.displayName}
+                    size="sm"
+                    userId={row.profile.uid}
+                    showPlusBadge
+                    isPlus={row.profile.tier === "plus"}
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">{row.profile.displayName}</p>
+                    <p className="truncate text-xs text-muted">
+                      {row.profile.professionalHeadline?.trim() || row.profile.professionalRole?.trim() || "Professional educator"}
+                    </p>
+                  </div>
+                </Link>
+
+                {user && user.uid !== row.profile.uid && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={row.isFollowedByViewer ? "outline" : "primary"}
+                    isLoading={followListActionLoadingIds.has(row.profile.uid)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void handleToggleFollowInList(row.profile.uid);
+                    }}
+                  >
+                    {row.isFollowedByViewer ? "Following" : "Follow"}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -894,7 +1120,7 @@ function OverviewTabContent({
       <section>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-base font-semibold text-foreground">Recent Contributions</h3>
-          <Link href="/home" className="text-xs font-medium text-primary-800 hover:underline">
+          <Link href="/feed" className="text-xs font-medium text-primary-800 hover:underline">
             View all activity
           </Link>
         </div>
@@ -908,12 +1134,12 @@ function OverviewTabContent({
             <RecentContributionCard
               title="Posts"
               count={overviewFeed.posts.length}
-              link="/home"
+              link="/feed"
               items={overviewFeed.posts.map((item) => ({
                 id: item.id,
                 title: item.content,
                 subtitle: formatRelativeTime(item.createdAt as { seconds: number } | null),
-                href: `/home?post=${item.id}`,
+                href: `/feed?post=${item.id}`,
               }))}
             />
             <RecentContributionCard
@@ -1071,13 +1297,14 @@ function PostsTabContent({
       ))}
 
       {hasMore && (
-        <button
+        <Button
           type="button"
-          className="w-full rounded-lg py-2 text-sm font-medium text-primary-900 transition-colors hover:bg-surface-hover"
+          variant="ghost"
+          className="w-full"
           onClick={() => setVisibleCount((current) => current + POSTS_PER_PAGE)}
         >
           Show more ({posts.length - visibleCount} remaining)
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -790,40 +790,31 @@ export default function CommentThread({
       {/* Comment input */}
       {user && (
         <div className="rounded-2xl border border-secondary-200 bg-surface-hover/85 p-4">
-          <div className="flex gap-3">
-            <Avatar
-              src={user.photoURL}
-              alt={user.displayName || "You"}
-              size="md"
-              userId={user.uid}
-              showPlusBadge
+          <div className="space-y-2">
+            <MentionInput
+              value={replyText}
+              onChange={setReplyText}
+              onMentionsChange={setTopLevelMentions}
+              placeholder={composerPlaceholder}
+              multiline
+              rows={2}
+              className={COMMENT_TEXTAREA_CLASS}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  handleTopLevelComment();
+                }
+              }}
             />
-            <div className="flex-1 min-w-0 space-y-2">
-              <MentionInput
-                value={replyText}
-                onChange={setReplyText}
-                onMentionsChange={setTopLevelMentions}
-                placeholder={composerPlaceholder}
-                multiline
-                rows={2}
-                className={COMMENT_TEXTAREA_CLASS}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    handleTopLevelComment();
-                  }
-                }}
-              />
-              <div className="flex items-center justify-end">
-                <Button
-                  size="sm"
-                  onClick={handleTopLevelComment}
-                  disabled={!replyText.trim()}
-                  isLoading={submitting}
-                >
-                  Post
-                </Button>
-              </div>
+            <div className="flex items-center justify-end">
+              <Button
+                size="sm"
+                onClick={handleTopLevelComment}
+                disabled={!replyText.trim()}
+                isLoading={submitting}
+              >
+                Post
+              </Button>
             </div>
           </div>
         </div>

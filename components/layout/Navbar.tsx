@@ -10,9 +10,11 @@ import Avatar from "@/components/ui/Avatar";
 import Dropdown from "@/components/ui/Dropdown";
 import NotificationDropdown from "@/components/layout/NotificationDropdown";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import PublicNavbar from "@/components/layout/PublicNavbar";
 
-const navLinks = [
+const authenticatedNavLinks = [
   { href: "/home", label: "Home" },
+  { href: "/feed", label: "Feed" },
   { href: "/discover", label: "Discover" },
   { href: "/network", label: "Network" },
   { href: "/messages", label: "Messages" },
@@ -23,6 +25,17 @@ const navLinks = [
   { href: "/jobs", label: "Jobs" },
 ];
 
+const trustRoutePatterns = [
+  /^\/about$/,
+  /^\/blog$/,
+  /^\/careers$/,
+  /^\/contact$/,
+  /^\/cookies$/,
+  /^\/pricing$/,
+  /^\/privacy$/,
+  /^\/terms$/,
+];
+
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -31,6 +44,11 @@ export default function Navbar() {
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isPlus, setIsPlus] = useState(false);
+  const isTrustRoute = trustRoutePatterns.some((pattern) =>
+    pattern.test(pathname ?? "")
+  );
+  const showAuthenticatedNavigation = Boolean(user && !isTrustRoute);
+  const navLinks = authenticatedNavLinks;
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +81,10 @@ export default function Navbar() {
     return pathname.startsWith(href);
   }
 
+  if (!showAuthenticatedNavigation) {
+    return <PublicNavbar />;
+  }
+
   return (
     <>
     <ConfirmDialog
@@ -90,7 +112,6 @@ export default function Navbar() {
             VistaTeacher
           </Link>
 
-          {/* Search - hidden on mobile, shown md+ */}
           <div className="mx-4 hidden max-w-xl flex-1 md:block">
             <NavSearchBar placeholder="Search educators, resources, communities..." />
           </div>
@@ -105,57 +126,48 @@ export default function Navbar() {
             {/* User menu */}
             {!loading && (
               <>
-                {user ? (
-                  <Dropdown
-                    align="right"
-                    trigger={
-                      <Avatar
-                        src={user.photoURL}
-                        alt={user.displayName || "User"}
-                        size="sm"
-                        userId={user.uid}
-                        showPlusBadge
-                        isPlus={isPlus}
-                      />
-                    }
-                    items={[
-                      {
-                        label: "Profile",
-                        onClick: () => {
-                          router.push("/profile");
-                        },
+                <Dropdown
+                  align="right"
+                  trigger={
+                    <Avatar
+                      src={user.photoURL}
+                      alt={user.displayName || "User"}
+                      size="sm"
+                      userId={user.uid}
+                      showPlusBadge
+                      isPlus={isPlus}
+                    />
+                  }
+                  items={[
+                    {
+                      label: "Profile",
+                      onClick: () => {
+                        router.push("/profile");
                       },
-                      {
-                        label: "Account Management",
-                        onClick: () => {
-                          router.push("/account");
-                        },
+                    },
+                    {
+                      label: "Account Management",
+                      onClick: () => {
+                        router.push("/account");
                       },
-                      ...(isAdmin
-                        ? [
-                            {
-                              label: "Admin Console",
-                              onClick: () => {
-                                router.push("/admin");
-                              },
+                    },
+                    ...(isAdmin
+                      ? [
+                          {
+                            label: "Admin Console",
+                            onClick: () => {
+                              router.push("/admin");
                             },
-                          ]
-                        : []),
-                      {
-                        label: "Sign out",
-                        onClick: () => setSignOutOpen(true),
-                        destructive: true,
-                      },
-                    ]}
-                  />
-                ) : (
-                  <Link
-                    href="/auth/login"
-                    className="focus-ring inline-flex min-h-10 items-center rounded-lg bg-primary-700 px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-primary-800"
-                  >
-                    Sign in
-                  </Link>
-                )}
+                          },
+                        ]
+                      : []),
+                    {
+                      label: "Sign out",
+                      onClick: () => setSignOutOpen(true),
+                      destructive: true,
+                    },
+                  ]}
+                />
               </>
             )}
 
@@ -201,21 +213,23 @@ export default function Navbar() {
         </div>
 
         {/* Desktop nav links */}
-        <nav className="-mb-px hidden gap-1 lg:flex" aria-label="Main">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`focus-ring rounded-t-md border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors ${
-                isActive(link.href)
-                  ? "border-accent-300 text-white"
-                  : "border-transparent text-white/80 hover:border-white/45 hover:text-white"
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+        {showAuthenticatedNavigation && (
+          <nav className="-mb-px hidden gap-1 lg:flex" aria-label="Main">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`focus-ring rounded-t-md border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors ${
+                  isActive(link.href)
+                    ? "border-accent-300 text-white"
+                    : "border-transparent text-white/80 hover:border-white/45 hover:text-white"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        )}
       </div>
     </header>
 

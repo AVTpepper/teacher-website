@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Nunito_Sans } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
+import RouteScrollManager from "@/components/layout/RouteScrollManager";
 import "./globals.css";
 
 const nunitoSans = Nunito_Sans({
@@ -41,7 +42,10 @@ export default function RootLayout({
       className={`${nunitoSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <RouteScrollManager />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

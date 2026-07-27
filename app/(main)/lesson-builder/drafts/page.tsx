@@ -49,7 +49,7 @@ export default function LessonDraftsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 pb-8">
+    <div className="space-y-6 pb-8">
       <DiscoveryShell
         title="Lesson Drafts"
         subtitle="Continue editing your saved lesson drafts."

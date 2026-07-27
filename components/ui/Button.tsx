@@ -14,24 +14,24 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-primary-700 text-white hover:bg-primary-800 active:bg-primary-900",
+    "bg-primary-700 text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:bg-primary-800 hover:shadow-[0_6px_14px_rgba(0,0,0,0.18)] active:bg-primary-900",
   secondary:
-    "bg-secondary-100 text-primary-900 hover:bg-secondary-200 active:bg-secondary-300",
+    "bg-secondary-100 text-primary-900 shadow-[0_1px_2px_rgba(0,0,0,0.08)] hover:bg-secondary-200 hover:shadow-[0_4px_10px_rgba(0,0,0,0.12)] active:bg-secondary-300",
   outline:
-    "border border-border-strong text-foreground hover:bg-surface-hover active:bg-secondary-200",
+    "border border-border-strong bg-surface text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] hover:bg-surface-hover hover:border-primary-300 active:bg-secondary-200",
   ghost:
     "text-primary-700 hover:bg-surface-hover hover:text-foreground active:bg-secondary-200",
   destructive:
-    "bg-error-500 text-white hover:bg-error-700 active:bg-error-700",
+    "bg-error-500 text-white shadow-[0_1px_2px_rgba(0,0,0,0.14)] hover:bg-error-700 hover:shadow-[0_6px_14px_rgba(0,0,0,0.18)] active:bg-error-700",
   link:
     "bg-transparent p-0 text-primary-700 underline-offset-4 hover:underline hover:text-primary-800",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "min-h-10 rounded-md px-3 py-1.5 text-sm gap-1.5",
-  md: "min-h-11 rounded-lg px-4 py-2 text-sm gap-2",
-  lg: "min-h-12 rounded-lg px-5 py-2.5 text-base gap-2",
-  icon: "h-11 w-11 rounded-lg p-0",
+  sm: "min-h-10 rounded-lg px-3 py-1.5 text-sm gap-1.5",
+  md: "min-h-11 rounded-xl px-4 py-2 text-sm gap-2",
+  lg: "min-h-12 rounded-xl px-5 py-2.5 text-base gap-2",
+  icon: "h-11 w-11 rounded-xl p-0",
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -53,7 +53,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || isLoading}
         aria-busy={isLoading || undefined}
-        className={`touch-target inline-flex items-center justify-center font-semibold transition-colors focus-ring disabled:opacity-55 disabled:pointer-events-none cursor-pointer ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+        className={`touch-target inline-flex items-center justify-center font-semibold transition-all duration-150 ease-out focus-ring disabled:opacity-55 disabled:pointer-events-none cursor-pointer ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
         {...props}
       >
         <span className="relative inline-flex items-center justify-center gap-2">

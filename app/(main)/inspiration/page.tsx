@@ -382,42 +382,60 @@ export default function InspirationPage() {
 
       {/* Empty state */}
       {!loading && items.length === 0 && (
-        <div className="py-16 text-center">
-          <p className="text-4xl mb-3">🔍</p>
-          <p className="text-foreground font-medium">No content found</p>
-          <p className="text-sm text-muted mt-1">
-            {activeCategory !== "all"
-              ? "No items in this category yet."
-              : "Be the first to submit inspiring content!"}
-          </p>
-        </div>
+        <Card padding="lg" className="text-center">
+          <div className="border-b border-border/70 pb-3">
+            <h2 className="text-base font-semibold text-foreground">Browse inspiration</h2>
+            <p className="mt-1 text-sm text-muted">Curated ideas, resources, and stories for educators.</p>
+          </div>
+          <div className="py-12">
+            <p className="text-4xl mb-3">🔍</p>
+            <p className="text-foreground font-medium">No content found</p>
+            <p className="text-sm text-muted mt-1">
+              {activeCategory !== "all"
+                ? "No items in this category yet."
+                : "Be the first to submit inspiring content!"}
+            </p>
+          </div>
+        </Card>
       )}
 
       {/* Magazine layout */}
       {!loading && items.length > 0 && (
         <div className="space-y-6">
           {featured && (
-            <FeaturedCard
-              item={featured}
-              currentUserId={user?.uid ?? null}
-              onEdit={handleEditOpen}
-              onDelete={handleDeleteOpen}
-              onOpen={handleOpen}
-            />
+            <Card padding="lg" className="space-y-4">
+              <div className="border-b border-border/70 pb-3">
+                <h2 className="text-base font-semibold text-foreground">Featured now</h2>
+                <p className="mt-1 text-sm text-muted">A highlighted piece to start with before browsing the wider archive.</p>
+              </div>
+              <FeaturedCard
+                item={featured}
+                currentUserId={user?.uid ?? null}
+                onEdit={handleEditOpen}
+                onDelete={handleDeleteOpen}
+                onOpen={handleOpen}
+              />
+            </Card>
           )}
           {rest.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {rest.map((item) => (
-                <InspirationCard
-                  key={item.id}
-                  item={item}
-                  currentUserId={user?.uid ?? null}
-                  onEdit={handleEditOpen}
-                  onDelete={handleDeleteOpen}
-                  onOpen={handleOpen}
-                />
-              ))}
-            </div>
+            <Card padding="lg" className="space-y-4">
+              <div className="border-b border-border/70 pb-3">
+                <h2 className="text-base font-semibold text-foreground">Browse archive</h2>
+                <p className="mt-1 text-sm text-muted">Recent inspiration items across all currently loaded categories.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {rest.map((item) => (
+                  <InspirationCard
+                    key={item.id}
+                    item={item}
+                    currentUserId={user?.uid ?? null}
+                    onEdit={handleEditOpen}
+                    onDelete={handleDeleteOpen}
+                    onOpen={handleOpen}
+                  />
+                ))}
+              </div>
+            </Card>
           )}
         </div>
       )}

@@ -157,54 +157,66 @@ export default function ForumsPage() {
       {!selectedCategory ? (
         /* ===== Category Cards ===== */
         loadingCategories ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-border bg-surface shadow-card p-5 animate-pulse"
-              >
-                <div className="h-10 w-10 rounded-lg bg-secondary-100 mb-3" />
-                <div className="h-4 w-2/3 bg-secondary-100 rounded mb-2" />
-                <div className="h-3 w-full bg-secondary-100 rounded mb-1" />
-                <div className="h-3 w-3/4 bg-secondary-100 rounded" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categories.map((cat) => (
-              <Card
-                key={cat.id}
-                padding="lg"
-                hoverable
-                onClick={() => selectCategory(cat.id)}
-              >
-                <div className="text-3xl mb-3">{cat.icon}</div>
-                <h3 className="text-base font-semibold text-foreground">
-                  {cat.name}
-                </h3>
-                <p className="text-sm text-muted mt-1 line-clamp-2">
-                  {cat.description}
-                </p>
-                <div className="mt-3 flex items-center gap-3 text-xs text-muted">
-                  <span>
-                    {cat.threadCount}{" "}
-                    {cat.threadCount === 1 ? "thread" : "threads"}
-                  </span>
-                  <span>·</span>
-                  <span>
-                    {cat.lastActivityAt
-                      ? timeAgo(cat.lastActivityAt as { seconds: number })
-                      : "No activity yet"}
-                  </span>
+          <Card padding="lg">
+            <div className="border-b border-border/70 pb-3">
+              <h2 className="text-base font-semibold text-foreground">Browse categories</h2>
+              <p className="mt-1 text-sm text-muted">Start with the discussion spaces that match your current need.</p>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-border bg-surface shadow-card p-5 animate-pulse"
+                >
+                  <div className="h-10 w-10 rounded-lg bg-secondary-100 mb-3" />
+                  <div className="h-4 w-2/3 bg-secondary-100 rounded mb-2" />
+                  <div className="h-3 w-full bg-secondary-100 rounded mb-1" />
+                  <div className="h-3 w-3/4 bg-secondary-100 rounded" />
                 </div>
-              </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          </Card>
+        ) : (
+          <Card padding="lg">
+            <div className="border-b border-border/70 pb-3">
+              <h2 className="text-base font-semibold text-foreground">Browse categories</h2>
+              <p className="mt-1 text-sm text-muted">Start with the discussion spaces that match your current need.</p>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {categories.map((cat) => (
+                <Card
+                  key={cat.id}
+                  padding="lg"
+                  hoverable
+                  onClick={() => selectCategory(cat.id)}
+                >
+                  <div className="text-3xl mb-3">{cat.icon}</div>
+                  <h3 className="text-base font-semibold text-foreground">
+                    {cat.name}
+                  </h3>
+                  <p className="text-sm text-muted mt-1 line-clamp-2">
+                    {cat.description}
+                  </p>
+                  <div className="mt-3 flex items-center gap-3 text-xs text-muted">
+                    <span>
+                      {cat.threadCount}{" "}
+                      {cat.threadCount === 1 ? "thread" : "threads"}
+                    </span>
+                    <span>·</span>
+                    <span>
+                      {cat.lastActivityAt
+                        ? timeAgo(cat.lastActivityAt as { seconds: number })
+                        : "No activity yet"}
+                    </span>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </Card>
         )
       ) : (
         /* ===== Thread Listing for Selected Category ===== */
-        <div className="space-y-4">
+        <Card padding="lg" className="space-y-4">
           {/* Back button + category header */}
           <div className="flex items-center gap-3">
             <button
@@ -242,7 +254,12 @@ export default function ForumsPage() {
             </div>
           )}
 
-          <Card padding="md" className="space-y-3">
+          <div className="rounded-2xl border border-border bg-surface-subtle p-4">
+            <div className="border-b border-border/70 pb-3">
+              <h3 className="text-base font-semibold text-foreground">Filter discussions</h3>
+              <p className="mt-1 text-sm text-muted">Narrow this category by title, content, grade, or subject.</p>
+            </div>
+            <div className="mt-4 space-y-3">
             <Input
               label="Search discussions"
               value={searchQuery}
@@ -269,7 +286,8 @@ export default function ForumsPage() {
                 ]}
               />
             </div>
-          </Card>
+            </div>
+          </div>
 
           {/* Thread list */}
           {loadingThreads && threads.length === 0 ? (
@@ -401,10 +419,10 @@ export default function ForumsPage() {
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                                d="M5 15l7-7 7 7"
+                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
                               />
                             </svg>
-                            {thread.upvotes - thread.downvotes}
+                            {Math.max(0, thread.upvotes - thread.downvotes)} likes
                           </span>
                           <span className="flex items-center gap-1">
                             <svg
@@ -443,7 +461,7 @@ export default function ForumsPage() {
               )}
             </div>
           )}
-        </div>
+        </Card>
       )}
     </div>
   );

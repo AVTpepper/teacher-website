@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import type Stripe from "stripe";
 import { ApiAuthError, requireAuthenticatedUser } from "@/lib/server/apiAuth";
+import { getUserBillingEntitlements } from "@/lib/server/billing";
 import { getFirebaseAdminDb } from "@/lib/server/firebaseAdmin";
 import { captureServerError } from "@/lib/server/monitoring";
 import { getStripeClient } from "@/lib/server/stripe";
@@ -9,6 +10,7 @@ import { getStripeClient } from "@/lib/server/stripe";
 interface CheckoutBody {
   priceId?: string;
   uiMode?: "hosted" | "embedded";
+  flow?: "account" | "pricing";
 }
 
 function getAppOrigin(request: NextRequest): string {
@@ -23,12 +25,26 @@ export async function POST(request: NextRequest): Promise<Response> {
     const { uid } = await requireAuthenticatedUser(request);
     const body = (await request.json().catch(() => ({}))) as CheckoutBody;
     const uiMode = body.uiMode === "embedded" ? "embedded" : "hosted";
+    const flow = body.flow === "pricing" ? "pricing" : "account";
 
-    const priceId = body.priceId ?? process.env.STRIPE_PLUS_PRICE_ID;
+    const configuredPriceId = process.env.STRIPE_PLUS_PRICE_ID;
+    const priceId = configuredPriceId ?? null;
     if (!priceId) {
       return Response.json(
         { error: "Billing is not configured yet. Missing STRIPE_PLUS_PRICE_ID." },
         { status: 503 },
+      );
+    }
+
+    if (body.priceId && body.priceId !== priceId) {
+      return Response.json({ error: "Invalid billing price." }, { status: 400 });
+    }
+
+    const entitlements = await getUserBillingEntitlements(uid);
+    if (entitlements.plusAccessActive) {
+      return Response.json(
+        { error: "You already have an active Plus subscription." },
+        { status: 409 },
       );
     }
 
@@ -66,6 +82,11 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     const origin = getAppOrigin(request);
+    const successUrl =
+      flow === "pricing"
+        ? `${origin}/pricing/success?session_id={CHECKOUT_SESSION_ID}`
+        : `${origin}/account?billing=success&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = flow === "pricing" ? `${origin}/pricing?billing=cancelled` : `${origin}/account?billing=cancelled`;
 
     const baseParams: Pick<
       Stripe.Checkout.SessionCreateParams,
@@ -88,12 +109,12 @@ export async function POST(request: NextRequest): Promise<Response> {
         ? {
             ...baseParams,
             ui_mode: "embedded_page" as unknown as Stripe.Checkout.SessionCreateParams.UiMode,
-            return_url: `${origin}/account?billing=success&session_id={CHECKOUT_SESSION_ID}`,
+            return_url: successUrl,
           }
         : {
             ...baseParams,
-            success_url: `${origin}/account?billing=success`,
-            cancel_url: `${origin}/account?billing=cancelled`,
+            success_url: successUrl,
+            cancel_url: cancelUrl,
           };
 
     const session = await stripe.checkout.sessions.create(sessionParams);

@@ -349,15 +349,47 @@ export async function listConversations(uid: string, pageSize = 20): Promise<Con
     throw new MessageServiceError("AUTH_REQUIRED", "Authentication required.", 401);
   }
 
-  const snap = await getFirebaseAdminDb()
-    .collection("conversations")
-    .where("participantIds", "array-contains", currentUid)
-    .where("status", "==", ACTIVE_STATUS)
-    .orderBy("lastMessageAt", "desc")
-    .limit(pageSize)
-    .get();
+  const db = getFirebaseAdminDb();
+  let records: MessageConversationRecord[] = [];
 
-  const records = snap.docs.map((docSnap) => parseConversation(docSnap.id, docSnap.data()));
+  try {
+    const indexedSnap = await db
+      .collection("conversations")
+      .where("participantIds", "array-contains", currentUid)
+      .where("status", "==", ACTIVE_STATUS)
+      .orderBy("lastMessageAt", "desc")
+      .limit(pageSize)
+      .get();
+
+    records = indexedSnap.docs.map((docSnap) => parseConversation(docSnap.id, docSnap.data()));
+  } catch {
+    // Fallback path for environments where the composite index is missing.
+    const fallbackSnap = await db
+      .collection("conversations")
+      .where("participantIds", "array-contains", currentUid)
+      .limit(Math.min(pageSize * 3, 100))
+      .get();
+
+    records = fallbackSnap.docs
+      .map((docSnap) => parseConversation(docSnap.id, docSnap.data()))
+      .filter((record) => record.status === ACTIVE_STATUS)
+      .sort((left, right) => {
+        const leftTime =
+          (left.lastMessageAt instanceof Timestamp
+            ? left.lastMessageAt.toMillis()
+            : left.updatedAt instanceof Timestamp
+              ? left.updatedAt.toMillis()
+              : 0);
+        const rightTime =
+          (right.lastMessageAt instanceof Timestamp
+            ? right.lastMessageAt.toMillis()
+            : right.updatedAt instanceof Timestamp
+              ? right.updatedAt.toMillis()
+              : 0);
+        return rightTime - leftTime;
+      })
+      .slice(0, pageSize);
+  }
   const otherUids = records
     .map((record) => record.participantIds.find((id) => id !== currentUid) ?? "")
     .filter(Boolean);
@@ -377,7 +409,7 @@ export async function listConversations(uid: string, pageSize = 20): Promise<Con
 
   const uniqueConnectionKeys = Array.from(new Set(connectionKeys.map((value) => value.key)));
   const connRefs = uniqueConnectionKeys.map((key) => connectionRef(key));
-  const connSnaps = connRefs.length > 0 ? await getFirebaseAdminDb().getAll(...connRefs) : [];
+  const connSnaps = connRefs.length > 0 ? await db.getAll(...connRefs) : [];
   const acceptedByKey = new Map<string, boolean>();
   connSnaps.forEach((docSnap) => {
     acceptedByKey.set(docSnap.id, docSnap.exists && docSnap.data()?.status === "accepted");

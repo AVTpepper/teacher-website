@@ -48,7 +48,7 @@ export default function ForumThreadPage({
 
   // Thread voting
   const [vote, setVote] = useState<"up" | "down" | null>(null);
-  const [upvotes, setUpvotes] = useState(0);
+  const [likes, setLikes] = useState(0);
   const [voteLoading, setVoteLoading] = useState(false);
 
   // Comments
@@ -82,7 +82,7 @@ export default function ForumThreadPage({
         }
         setThread(result.thread);
         setCategoryId(result.categoryId);
-        setUpvotes(result.thread.upvotes);
+        setLikes(Math.max(0, result.thread.upvotes - result.thread.downvotes));
         loadComments(result.categoryId);
       } catch {
         setNotFound(true);
@@ -102,19 +102,18 @@ export default function ForumThreadPage({
     }
   }, [user, categoryId, threadId]);
 
-  async function handleUpvote() {
+  async function handleLike() {
     if (!user || !categoryId || voteLoading) return;
-    if (thread?.authorId === user.uid) return; // no self-voting
+    if (thread?.authorId === user.uid) return;
     setVoteLoading(true);
     try {
       await upvoteThread(categoryId, threadId, user.uid);
       if (vote === "up") {
         setVote(null);
-        setUpvotes((c) => c - 1);
+        setLikes((count) => Math.max(0, count - 1));
       } else {
         setVote("up");
-        setUpvotes((c) => c + 1);
-        // Notify thread author (fire-and-forget, only on first upvote)
+        setLikes((count) => count + 1);
         if (thread && thread.authorId !== user.uid) {
           notifyUpvote({
             recipientId: thread.authorId,
@@ -247,9 +246,7 @@ export default function ForumThreadPage({
         </Button>
       </div>
 
-      <div className="rounded-2xl border border-border bg-surface/75 p-4 shadow-sm backdrop-blur-sm sm:p-6">
-        {/* Thread card */}
-        <div className="rounded-xl border border-border bg-surface shadow-card">
+      <div className="rounded-xl border border-border bg-surface shadow-card">
           <div className="p-6">
             {/* Title */}
             <h1 className="text-xl font-bold text-foreground">{thread.title}</h1>
@@ -318,25 +315,25 @@ export default function ForumThreadPage({
             )}
           </div>
 
-          {/* Vote bar */}
+          {/* Like bar */}
           <div className="px-6 py-3 border-t border-border flex items-center gap-4">
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={handleUpvote}
+                onClick={handleLike}
                 disabled={!user || isOwnThread}
-                title={isOwnThread ? "You can't upvote your own discussion" : !user ? "Sign in to upvote" : undefined}
+                title={isOwnThread ? "You can't like your own discussion" : !user ? "Sign in to like" : undefined}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
                   vote === "up"
-                    ? "text-primary-900 bg-primary-100"
+                    ? "text-error-700 bg-error-50"
                     : "text-muted hover:text-foreground hover:bg-surface-hover"
                 }`}
-                aria-label="Upvote"
+                aria-label="Like"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                <svg className="h-4 w-4" fill={vote === "up" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
-                <span>{upvotes}</span>
+                <span>{likes}</span>
               </button>
             </div>
 
@@ -356,7 +353,6 @@ export default function ForumThreadPage({
             </button>
           </div>
         </div>
-      </div>
 
       {/* Comments section */}
       <div>

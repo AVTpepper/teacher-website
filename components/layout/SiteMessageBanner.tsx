@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getUser } from "@/lib/firestore/users";
 
 export default function SiteMessageBanner() {
   const { user, loading } = useAuth();
-  const pathname = usePathname();
   const [isPlus, setIsPlus] = useState(false);
 
   useEffect(() => {
@@ -33,7 +31,6 @@ export default function SiteMessageBanner() {
     };
   }, [user]);
 
-  if (pathname === "/home") return null;
   if (loading) return null;
   if (user && isPlus) return null;
 
@@ -47,7 +44,7 @@ export default function SiteMessageBanner() {
       </p>
       <p className="mt-2 text-sm text-white/85">
         Continue with a free account or upgrade to{" "}
-        <Link href="/account/plans" className="font-semibold text-white underline decoration-white/70 underline-offset-3 hover:text-accent-200">
+        <Link href="/pricing" className="font-semibold text-white underline decoration-white/70 underline-offset-3 hover:text-accent-200">
           Plus
         </Link>
         {" "}anytime for a fancy badge and expanded AI workflows when you are ready.

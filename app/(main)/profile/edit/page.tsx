@@ -18,6 +18,11 @@ import {
   type UserProfileInput,
 } from "@/lib/firestore/users";
 import {
+  PROFILE_CARD_THEME_OPTIONS,
+  resolveProfileCardTheme,
+  getProfileCardThemeStyle,
+} from "@/lib/profile-card-theme";
+import {
   computeProfileCompletion,
   CURRICULA,
   LANGUAGES,
@@ -48,6 +53,7 @@ type EditState = {
   professionalInterests: string[];
   networkingGoals: string[];
   lookingFor: string;
+  profileCardTheme: "classic" | "ocean" | "forest" | "sunset" | "midnight";
 };
 
 function initialState(): EditState {
@@ -70,6 +76,7 @@ function initialState(): EditState {
     professionalInterests: [],
     networkingGoals: [],
     lookingFor: "",
+    profileCardTheme: "classic",
   };
 }
 
@@ -91,6 +98,7 @@ export default function EditProfilePage() {
   const [photoError, setPhotoError] = useState("");
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [tier, setTier] = useState<"free" | "plus">("free");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -113,6 +121,11 @@ export default function EditProfilePage() {
 
         if (profile) {
           setIsExisting(true);
+          setTier(profile.tier === "plus" ? "plus" : "free");
+          const safeTheme = resolveProfileCardTheme(
+            profile.profileCardTheme,
+            profile.tier
+          );
           setState({
             displayName: profile.displayName || currentUser.displayName || "",
             photoURL: profile.photoURL ?? currentUser.photoURL,
@@ -135,19 +148,24 @@ export default function EditProfilePage() {
             professionalInterests: profile.professionalInterests ?? [],
             networkingGoals: profile.networkingGoals ?? [],
             lookingFor: profile.lookingFor || "",
+            profileCardTheme: safeTheme,
           });
         } else {
+          setTier("free");
           setState((prev) => ({
             ...prev,
             displayName: currentUser.displayName || "",
             photoURL: currentUser.photoURL,
+            profileCardTheme: "classic",
           }));
         }
       } catch {
+        setTier("free");
         setState((prev) => ({
           ...prev,
           displayName: currentUser.displayName || "",
           photoURL: currentUser.photoURL,
+          profileCardTheme: "classic",
         }));
       } finally {
         if (!cancelled) setLoadingProfile(false);
@@ -228,6 +246,10 @@ export default function EditProfilePage() {
         professionalInterests: state.professionalInterests,
         networkingGoals: state.networkingGoals,
         lookingFor: state.lookingFor.trim(),
+        profileCardTheme:
+          tier === "plus"
+            ? resolveProfileCardTheme(state.profileCardTheme, "plus")
+            : "classic",
         onboardingVersion: ONBOARDING_VERSION,
         onboardingCurrentStep: 7,
       };
@@ -273,6 +295,8 @@ export default function EditProfilePage() {
   }
 
   if (!user) return null;
+
+  const themePreview = getProfileCardThemeStyle(state.profileCardTheme, tier);
 
   return (
     <div className="space-y-6 pb-8">
@@ -456,6 +480,71 @@ export default function EditProfilePage() {
               ))}
             </div>
           </div>
+        </Card>
+
+        <Card className="space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Profile card style</h2>
+          <p className="text-sm text-muted">
+            Choose the header gradient shown on your public educator profile.
+          </p>
+
+          <div className={`overflow-hidden rounded-2xl border border-primary-900/20 ${themePreview.gradientClass}`}>
+            <div className="bg-black/8 px-4 py-5 text-white">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/75">Preview</p>
+              <p className="mt-1 text-xl font-bold">
+                {state.displayName.trim() || "Your name"}
+              </p>
+              <p className="text-sm text-white/85">
+                {state.professionalHeadline.trim() || state.professionalRole || "Educator"}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {PROFILE_CARD_THEME_OPTIONS.map((option) => {
+              const locked = option.plusOnly && tier !== "plus";
+              const selected = state.profileCardTheme === option.id;
+
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => {
+                    if (locked) return;
+                    setState((prev) => ({ ...prev, profileCardTheme: option.id }));
+                  }}
+                  disabled={locked}
+                  className={`w-full rounded-xl border px-3 py-3 text-left transition-all ${
+                    selected
+                      ? "border-primary-600 bg-primary-50"
+                      : "border-border bg-surface"
+                  } ${locked ? "opacity-60" : "hover:border-primary-300 hover:bg-surface-hover"}`}
+                >
+                  <span className={`mb-2 block h-8 w-full rounded-lg ${option.swatchClass}`} />
+                  <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    {option.label}
+                    {option.plusOnly && (
+                      <span className="rounded-full border border-accent-300 bg-accent-100 px-2 py-0.5 text-[11px] font-bold text-primary-900">
+                        Plus
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-1 block text-xs text-muted">{option.description}</span>
+                  {locked && (
+                    <span className="mt-1 block text-xs font-medium text-primary-900">
+                      Upgrade to Plus to unlock
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {tier !== "plus" && (
+            <p className="text-xs text-muted">
+              Plus members can choose premium profile gradients in addition to the Classic style.
+            </p>
+          )}
         </Card>
 
         <Card className="space-y-4">

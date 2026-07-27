@@ -1,4 +1,5 @@
-import Link from "next/link";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 import { NarrowFormLayout } from "@/components/ui/PageLayout";
 
 export default function AuthLayout({
@@ -7,14 +8,14 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-full flex-col items-center justify-center bg-linear-to-b from-page-background to-page-background-soft px-4 py-10 sm:py-14">
-      <Link
-        href="/"
-        className="type-heading-strong mb-8 text-2xl text-primary-900"
-      >
-        VistaTeacher
-      </Link>
-      <NarrowFormLayout>{children}</NarrowFormLayout>
-    </div>
+    <>
+      <Navbar />
+      <div className="flex min-h-[calc(100dvh-var(--header-height))] flex-col items-center justify-center bg-linear-to-b from-page-background to-page-background-soft px-4 py-10 sm:py-14">
+        <main className="w-full">
+          <NarrowFormLayout>{children}</NarrowFormLayout>
+        </main>
+      </div>
+      <Footer />
+    </>
   );
 }

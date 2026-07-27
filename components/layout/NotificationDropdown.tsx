@@ -117,7 +117,7 @@ export default function NotificationDropdown() {
       );
     }
     setOpen(false);
-    router.push(normalizeNotificationLink(n.linkURL));
+    router.push(normalizeNotificationLink(n.linkURL), { scroll: true });
   }
 
   function handleMarkRead(e: React.MouseEvent, n: Notification) {

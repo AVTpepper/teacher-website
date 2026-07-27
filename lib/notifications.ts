@@ -68,15 +68,22 @@ export function normalizeNotificationLink(linkURL: string): string {
       ? new URL(trimmed)
       : new URL(trimmed, "http://localhost");
 
-    if (parsed.pathname === "/" && parsed.searchParams.has("post")) {
-      return `/home${parsed.search}${parsed.hash}`;
+    if (
+      (parsed.pathname === "/" || parsed.pathname === "/home") &&
+      parsed.searchParams.has("post")
+    ) {
+      return `/feed${parsed.search}${parsed.hash}`;
     }
 
     const normalizedPath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
     return normalizedPath || "/notifications";
   } catch {
     if (trimmed.startsWith("/?post=")) {
-      return `/home${trimmed.slice(1)}`;
+      return `/feed${trimmed.slice(1)}`;
+    }
+
+    if (trimmed.startsWith("/home?post=")) {
+      return `/feed${trimmed.slice(5)}`;
     }
 
     return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
@@ -363,7 +370,7 @@ export function notifyUpvote(params: {
     actorId: params.actorId,
     actorName: params.actorName,
     actorPhotoURL: params.actorPhotoURL,
-    message: `${params.actorName} upvoted your discussion "${params.threadTitle}".`,
+    message: `${params.actorName} liked your discussion "${params.threadTitle}".`,
     linkURL: params.linkURL,
   });
 }

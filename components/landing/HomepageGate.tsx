@@ -15,7 +15,7 @@ function HomepageGateContent() {
   useEffect(() => {
     if (!loading && user) {
       const target = linkedPostId
-        ? `/home?post=${encodeURIComponent(linkedPostId)}`
+          ? `/feed?post=${encodeURIComponent(linkedPostId)}`
         : "/home";
       router.replace(target);
     }

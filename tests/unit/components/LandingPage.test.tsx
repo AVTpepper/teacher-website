@@ -3,44 +3,42 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import LandingPage from "@/components/landing/LandingPage";
 
 const mockUseAuth = vi.fn();
-const mockSearchEducators = vi.fn();
+const fetchMock = vi.fn();
 
 vi.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-vi.mock("@/lib/firestore/users", () => ({
-  searchEducators: (...args: unknown[]) => mockSearchEducators(...args),
-}));
-
 describe("LandingPage", () => {
   beforeEach(() => {
     mockUseAuth.mockReset();
-    mockSearchEducators.mockReset();
+    fetchMock.mockReset();
     mockUseAuth.mockReturnValue({ user: null, loading: false });
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ educators: [] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
   });
 
   it("shows signup primary CTA for signed-out users", async () => {
-    mockSearchEducators.mockResolvedValue({ educators: [], lastDoc: null });
-
     render(<LandingPage />);
 
     await waitFor(() => {
-      expect(mockSearchEducators).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith("/api/public/showcase", { cache: "no-store" });
     });
 
-    expect(screen.getAllByRole("link", { name: "Create Your Free Profile" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: "Join VistaTeacher - It is Free" })).toHaveAttribute("href", "/auth/signup");
+    expect(screen.getAllByRole("link", { name: "Create Your Profile" }).length).toBeGreaterThan(0);
   });
 
   it("shows dashboard primary CTA for authenticated users", async () => {
     mockUseAuth.mockReturnValue({ user: { uid: "u-1" }, loading: false });
-    mockSearchEducators.mockResolvedValue({ educators: [], lastDoc: null });
 
     render(<LandingPage />);
 
     await waitFor(() => {
-      expect(mockSearchEducators).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     expect(screen.getAllByRole("link", { name: "Go to Your Dashboard" }).length).toBeGreaterThan(0);
@@ -48,7 +46,10 @@ describe("LandingPage", () => {
   });
 
   it("renders error state when educator preview loading fails", async () => {
-    mockSearchEducators.mockRejectedValue(new Error("network"));
+    fetchMock.mockResolvedValue({
+      ok: false,
+      json: async () => ({}),
+    });
 
     render(<LandingPage />);
 
@@ -56,19 +57,21 @@ describe("LandingPage", () => {
   });
 
   it("renders live educator preview cards when data is available", async () => {
-    mockSearchEducators.mockResolvedValue({
-      educators: [
-        {
-          uid: "edu-1",
-          displayName: "Ava Patel",
-          photoURL: null,
-          gradeLevel: "Middle School",
-          subjects: ["Math", "STEM"],
-          country: "Canada",
-          bio: "Curriculum and assessment educator.",
-        },
-      ],
-      lastDoc: null,
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        educators: [
+          {
+            uid: "edu-1",
+            displayName: "Ava Patel",
+            photoURL: null,
+            gradeLevel: "Middle School",
+            subjects: ["Math", "STEM"],
+            country: "Canada",
+            bio: "Curriculum and assessment educator.",
+          },
+        ],
+      }),
     });
 
     render(<LandingPage />);
