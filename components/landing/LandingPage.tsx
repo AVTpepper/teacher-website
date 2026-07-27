@@ -345,10 +345,10 @@ export default function LandingPage() {
               description="Start with your intent. Then create your profile to unlock full educator discovery."
               action={
                 <Link
-                  href={isAuthenticated ? "/educators" : "/auth/signup"}
+                  href="/explore-educators"
                   className="focus-ring inline-flex min-h-11 items-center justify-center rounded-lg bg-accent-500 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-accent-600"
                 >
-                  {isAuthenticated ? "Explore Educators" : "Create Free Account"}
+                  Explore Educators
                 </Link>
               }
             >
@@ -545,7 +545,7 @@ export default function LandingPage() {
                 {finalCta.label}
               </Link>
               <Link
-                href="/educators"
+                href="/explore-educators"
                 className="focus-ring inline-flex min-h-11 items-center justify-center rounded-lg border border-white/55 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10"
                 onClick={() => trackHomepageAction("final_secondary_cta")}
               >

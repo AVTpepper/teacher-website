@@ -61,17 +61,27 @@ export default function PublicNavbar() {
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setMobileOpen((value) => !value)}
-            className="focus-ring touch-target rounded-lg p-2 lg:hidden"
-            aria-expanded={mobileOpen}
-            aria-label="Toggle public menu"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2 lg:hidden">
+            {!user && (
+              <Link
+                href="/auth/login"
+                className="focus-ring rounded-md px-2.5 py-2 text-sm font-semibold text-white/90 hover:text-white"
+              >
+                Log In
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => setMobileOpen((value) => !value)}
+              className="focus-ring touch-target rounded-lg p-2"
+              aria-expanded={mobileOpen}
+              aria-label="Toggle public menu"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
