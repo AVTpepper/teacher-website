@@ -6,7 +6,7 @@ import DiscoveryShell from "@/components/layout/DiscoveryShell";
 import { Avatar, Badge, Button, Card, EmptyState, ErrorState, Input, Select } from "@/components/ui";
 import { GRADE_LEVELS } from "@/lib/constants";
 import { SUBJECTS } from "@/lib/firestore/users";
-import { COUNTRIES, PROFESSIONAL_ROLES } from "@/lib/onboarding";
+import { PROFESSIONAL_ROLES } from "@/lib/onboarding";
 
 type PublicEducatorCard = {
   uid: string;
@@ -38,7 +38,6 @@ export default function PublicEducatorDirectory({
   const [role, setRole] = useState("");
   const [grade, setGrade] = useState("");
   const [subject, setSubject] = useState("");
-  const [country, setCountry] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -79,7 +78,6 @@ export default function PublicEducatorDirectory({
     return educators.filter((educator) => {
       if (role && educator.professionalRole !== role) return false;
       if (grade && educator.gradeLevel !== grade) return false;
-      if (country && educator.country !== country) return false;
       if (subject && !educator.subjects.includes(subject)) return false;
 
       if (!q) return true;
@@ -98,7 +96,7 @@ export default function PublicEducatorDirectory({
 
       return contains(haystack, q);
     });
-  }, [country, educators, grade, role, search, subject]);
+  }, [educators, grade, role, search, subject]);
 
   return (
     <div className="space-y-6 pb-8">
@@ -108,7 +106,7 @@ export default function PublicEducatorDirectory({
         subtitle={
           showAccessNotice
             ? "Browse public educator cards with basic profile context. Create an account to view full profiles and connect."
-            : "Browse educator cards and use filters to discover people by role, grade, subject, and country."
+            : "Browse educator cards and use filters to discover people by role, grade, and subject."
         }
       />
 
@@ -131,7 +129,7 @@ export default function PublicEducatorDirectory({
       )}
 
       <Card padding="lg" className="space-y-3">
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <Input
             label="Search"
             value={search}
@@ -155,12 +153,6 @@ export default function PublicEducatorDirectory({
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
             options={[{ value: "", label: "All subjects" }, ...SUBJECTS.map((item) => ({ value: item, label: item }))]}
-          />
-          <Select
-            label="Country"
-            value={country}
-            onChange={(event) => setCountry(event.target.value)}
-            options={[{ value: "", label: "All countries" }, ...COUNTRIES.map((item) => ({ value: item, label: item }))]}
           />
         </div>
       </Card>
