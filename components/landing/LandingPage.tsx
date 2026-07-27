@@ -240,12 +240,12 @@ export default function LandingPage() {
                   {primaryHeroCta.label}
                 </Link>
                 <Link
-                  href="/educators"
+                  href="/pricing"
                   className="focus-ring inline-flex min-h-11 items-center justify-center rounded-lg border border-white/50 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                   onClick={() => trackHomepageAction("hero_secondary_cta")}
                 >
                   <Map className="mr-2 h-4 w-4" />
-                  Explore Educators
+                  View Plans
                 </Link>
               </div>
 

@@ -6,6 +6,7 @@ export interface PricingPlanConfig {
   tagline: string;
   priceLabel?: string;
   description: string;
+  featureBullets: string[];
   ctaLabel: string;
 }
 
@@ -28,19 +29,31 @@ export const PRICING_PLANS: PricingPlanConfig[] = [
   {
     id: "free",
     name: "VistaTeacher Free",
-    tagline: "Start building your educator network.",
+    tagline: "Start with the core educator experience.",
     priceLabel: "Free",
     description:
-      "A meaningful free plan for creating a profile, browsing educators, joining communities, and sending a small number of new connection requests and messages each month.",
-    ctaLabel: "Create Profile",
+      "Create your profile, explore the network, and make a limited number of new connections each month.",
+    featureBullets: [
+      "Create your educator profile",
+      "Browse educators, resources, and communities",
+      `${FREE_MONTHLY_CONNECTION_REQUEST_LIMIT} connection requests per month`,
+      `${FREE_MONTHLY_MESSAGE_LIMIT} messages per month`,
+    ],
+    ctaLabel: "Create account",
   },
   {
     id: "plus",
     name: "VistaTeacher Plus",
-    tagline: "Grow your professional network without limits.",
+    tagline: "For educators actively building their network.",
     description:
-      "Unlimited outgoing networking and messaging, expanded recommendations, and premium profile presentation options.",
-    ctaLabel: "Upgrade to VistaTeacher Plus",
+      "Unlock unlimited outreach, stronger discovery, premium profile presentation, and broader AI usage.",
+    featureBullets: [
+      "Unlimited connection requests",
+      "Unlimited messaging",
+      "Expanded recommendations",
+      "Premium profile and AI access",
+    ],
+    ctaLabel: "Start with Plus account",
   },
 ];
 
