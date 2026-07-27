@@ -35,6 +35,11 @@ function isGuestPreviewRoute(pathname: string | null): boolean {
   return /^\/forums\/[^/]+$/.test(pathname) || /^\/inspiration\/[^/]+$/.test(pathname);
 }
 
+function isGuestAllowedPublicRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return /^\/explore-educators$/.test(pathname);
+}
+
 export default function MainAppFrame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
@@ -54,6 +59,7 @@ export default function MainAppFrame({ children }: { children: React.ReactNode }
   const showcaseTarget = useMemo(() => getShowcaseTarget(pathname), [pathname]);
   const isGuest = !loading && !user;
   const allowGuestPreviewRoute = isGuestPreviewRoute(pathname);
+  const allowGuestPublicRoute = isGuestAllowedPublicRoute(pathname);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +92,7 @@ export default function MainAppFrame({ children }: { children: React.ReactNode }
   const isAllowedShowcase = isShowcaseTargetAllowed(showcaseTarget, showcaseConfig);
   const isShowcaseAccessPending = isGuest && !useTrustShell && Boolean(showcaseTarget) && !showcaseConfigResolved;
   const shouldShowRestrictedGate =
-    isGuest && !useTrustShell && !allowGuestPreviewRoute && !isShowcaseAccessPending && !isAllowedShowcase;
+    isGuest && !useTrustShell && !allowGuestPublicRoute && !allowGuestPreviewRoute && !isShowcaseAccessPending && !isAllowedShowcase;
   const loginHref = `/auth/login?redirect=${encodeURIComponent(pathname || "/")}`;
 
   return (

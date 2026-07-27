@@ -1,5 +1,5 @@
 import PublicEducatorDirectory from "@/components/educators/PublicEducatorDirectory";
 
 export default function ExploreEducatorsPage() {
-  return <PublicEducatorDirectory />;
+  return <PublicEducatorDirectory showAccessNotice={false} />;
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import DiscoveryShell from "@/components/layout/DiscoveryShell";
-import { Badge, Button, Card, EmptyState, ErrorState, Input, Select } from "@/components/ui";
+import { Avatar, Badge, Button, Card, EmptyState, ErrorState, Input, Select } from "@/components/ui";
 import { GRADE_LEVELS } from "@/lib/constants";
 import { SUBJECTS } from "@/lib/firestore/users";
 import { COUNTRIES, PROFESSIONAL_ROLES } from "@/lib/onboarding";
@@ -19,11 +19,17 @@ type PublicEducatorCard = {
   bio: string;
 };
 
+interface PublicEducatorDirectoryProps {
+  showAccessNotice?: boolean;
+}
+
 function contains(value: string, needle: string): boolean {
   return value.toLowerCase().includes(needle);
 }
 
-export default function PublicEducatorDirectory() {
+export default function PublicEducatorDirectory({
+  showAccessNotice = true,
+}: PublicEducatorDirectoryProps) {
   const [educators, setEducators] = useState<PublicEducatorCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -99,24 +105,30 @@ export default function PublicEducatorDirectory() {
       <DiscoveryShell
         eyebrow="Educator Directory"
         title="Explore educators on VistaTeacher"
-        subtitle="Browse public educator cards with basic profile context. Create an account to view full profiles and connect."
+        subtitle={
+          showAccessNotice
+            ? "Browse public educator cards with basic profile context. Create an account to view full profiles and connect."
+            : "Browse educator cards and use filters to discover people by role, grade, subject, and country."
+        }
       />
 
-      <Card padding="md" className="border-primary-100 bg-primary-50/40">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-foreground">
-            Restricted view: public cards only.
-          </p>
-          <div className="flex gap-2">
-            <Link href="/auth/login">
-              <Button variant="outline" size="sm">Log in</Button>
-            </Link>
-            <Link href="/auth/signup?redirect=/explore-educators">
-              <Button size="sm">Create account</Button>
-            </Link>
+      {showAccessNotice && (
+        <Card padding="md" className="border-primary-100 bg-primary-50/40">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-foreground">
+              Restricted view: public cards only.
+            </p>
+            <div className="flex gap-2">
+              <Link href="/auth/login">
+                <Button variant="outline" size="sm">Log in</Button>
+              </Link>
+              <Link href="/auth/signup?redirect=/explore-educators">
+                <Button size="sm">Create account</Button>
+              </Link>
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       <Card padding="lg" className="space-y-3">
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
@@ -178,10 +190,20 @@ export default function PublicEducatorDirectory() {
             {filtered.map((educator) => (
               <Card key={educator.uid} padding="md" className="h-full border-primary-100">
                 <div className="space-y-2">
-                  <p className="line-clamp-1 text-sm font-semibold text-foreground">{educator.displayName}</p>
-                  <p className="line-clamp-1 text-xs text-muted">{educator.professionalRole || "Educator"}</p>
+                  <div className="flex items-start gap-2.5">
+                    <Avatar
+                      src={educator.photoURL}
+                      alt={educator.displayName}
+                      size="md"
+                      className="mt-0.5"
+                    />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="line-clamp-1 text-sm font-semibold text-foreground">{educator.displayName}</p>
+                      <p className="line-clamp-1 text-xs text-muted">{educator.professionalRole || "Educator"}</p>
+                    </div>
+                  </div>
                   <p className="text-xs text-muted">
-                    {[educator.gradeLevel, educator.country].filter(Boolean).join(" - ") || "Profile details available after sign in"}
+                    {educator.gradeLevel || "Profile details available after sign in"}
                   </p>
                   {educator.subjects.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-1">
