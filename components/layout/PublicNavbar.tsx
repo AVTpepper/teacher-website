@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const publicNavLinks = [
   { href: "/pricing", label: "Plans" },
@@ -16,9 +17,16 @@ export default function PublicNavbar() {
 
   if (loading) {
     return (
-      <header className="sticky top-0 z-50 border-b border-primary-900/70 bg-primary-950 text-white">
-        <div className="app-container flex h-(--header-height) items-center justify-between">
-          <span className="type-heading-strong text-lg">VistaTeacher</span>
+      <header className="sticky top-0 z-50 border-b border-primary-900/70 bg-primary-950 text-white backdrop-blur supports-backdrop-filter:bg-primary-950/95">
+        <div className="app-container">
+          <div className="flex h-(--header-height) items-center justify-between gap-4">
+            <Skeleton className="h-6 w-36 bg-white/15" />
+            <div className="hidden items-center gap-2 lg:flex">
+              <Skeleton className="h-9 w-16 rounded-lg bg-white/10" />
+              <Skeleton className="h-9 w-24 rounded-lg bg-white/10" />
+            </div>
+            <Skeleton className="h-10 w-10 rounded-lg bg-white/10" />
+          </div>
         </div>
       </header>
     );
