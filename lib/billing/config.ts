@@ -35,7 +35,7 @@ export const PRICING_PLANS: PricingPlanConfig[] = [
       "Create your profile, explore the network, and make a limited number of new connections each month.",
     featureBullets: [
       "Create your educator profile",
-      "Browse educators, resources, and communities",
+      "Browse educators, resources, and the forum",
       `${FREE_MONTHLY_CONNECTION_REQUEST_LIMIT} connection requests per month`,
       `${FREE_MONTHLY_MESSAGE_LIMIT} messages per month`,
     ],
@@ -96,7 +96,7 @@ export const PRICING_FAQ: PricingFaqItem[] = [
   {
     question: "Can I use VistaTeacher for free?",
     answer:
-      "Yes. VistaTeacher Free lets you create a professional profile, browse educators, follow educators, join communities, and use the core content and lesson-building tools.",
+      "Yes. VistaTeacher Free lets you create a professional profile, browse educators, follow educators, use the forum, and use the core content and lesson-building tools.",
   },
   {
     question: "What happens when I reach my connection-request limit?",

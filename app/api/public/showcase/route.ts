@@ -24,7 +24,6 @@ type PublicEvidenceItem = {
 
 type PublicEvidenceStats = {
   educators: number;
-  lessons: number;
   discussions: number;
   inspiration: number;
   liveExamples: number;
@@ -32,7 +31,6 @@ type PublicEvidenceStats = {
 
 const EMPTY_STATS: PublicEvidenceStats = {
   educators: 0,
-  lessons: 0,
   discussions: 0,
   inspiration: 0,
   liveExamples: 0,
@@ -85,24 +83,6 @@ function mapEducatorPreview(uid: string, value: unknown): PublicEducatorPreview 
     professionalRole: typeof data.professionalRole === "string" ? data.professionalRole : undefined,
     country: typeof data.country === "string" ? data.country : undefined,
     bio: typeof data.bio === "string" ? data.bio : undefined,
-  };
-}
-
-function mapLessonEvidence(id: string, value: unknown): PublicEvidenceItem | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const data = value as Record<string, unknown>;
-  const title = typeof data.title === "string" ? data.title.trim() : "";
-  if (!title) return null;
-
-  const gradeLevel = typeof data.gradeLevel === "string" ? data.gradeLevel.trim() : "";
-  const subject = typeof data.subject === "string" ? data.subject.trim() : "";
-
-  return {
-    id,
-    kind: "lesson",
-    title,
-    subtitle: [gradeLevel, subject].filter(Boolean).join(" · ") || "Lesson plan",
-    href: `/lesson-builder/${id}`,
   };
 }
 
@@ -230,7 +210,6 @@ export async function GET(): Promise<Response> {
     const evidenceItems = [...discussions, ...inspiration].slice(0, 8);
     const stats: PublicEvidenceStats = {
       educators: educators.length,
-      lessons: 0,
       discussions: discussions.length,
       inspiration: inspiration.length,
       liveExamples: educators.length + discussions.length + inspiration.length,

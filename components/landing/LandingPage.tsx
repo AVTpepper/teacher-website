@@ -108,8 +108,8 @@ const intentCards = [
 
 const ecosystemCards = [
   {
-    title: "Communities",
-    description: "Discuss shared challenges and practical ideas with educators.",
+    title: "Forum",
+    description: "Join forum posts about shared challenges and practical ideas with educators.",
     icon: Users,
   },
   {
@@ -331,7 +331,7 @@ export default function LandingPage() {
                   <Handshake className="h-4 w-4" />
                 </div>
                 <h3 className="type-card-title mt-2 text-lg text-primary-900">Collaborate</h3>
-                <p className="mt-2 text-sm text-text-secondary">Turn connections into practical outcomes through communities, resources, and shared ideas.</p>
+                <p className="mt-2 text-sm text-text-secondary">Turn connections into practical outcomes through forum posts, resources, and shared ideas.</p>
                 <p className="mt-4 text-xs font-semibold uppercase tracking-[0.1em] text-primary-800">Turn ideas into practice</p>
               </Card>
             </div>
@@ -371,7 +371,7 @@ export default function LandingPage() {
 
         <section className="app-container py-12 sm:py-14">
           <Section
-            title="Preview real profiles, discussions, and inspiration"
+            title="Preview real profiles, forum posts, and inspiration"
             description="These are live showcased pages from VistaTeacher, available to browse before you join."
             action={
               <Link href={isAuthenticated ? "/educators" : "/auth/signup"} className="focus-ring rounded-md text-sm font-semibold text-primary-800 hover:underline">
@@ -393,7 +393,7 @@ export default function LandingPage() {
                     No featured educator profiles have been added yet.
                   </div>
                   <div className="rounded-2xl border border-border bg-surface p-4 text-sm text-text-secondary">
-                    No featured discussions or inspiration posts have been added yet.
+                    No featured forum posts or inspiration posts have been added yet.
                   </div>
                 </div>
               </div>
@@ -455,7 +455,7 @@ export default function LandingPage() {
                   ))}
                   {evidenceItems.length === 0 ? (
                     <Card variant="compact" className="border-secondary-300 bg-white p-4 text-sm text-text-secondary">
-                      No featured discussions or inspiration posts have been added yet.
+                      No featured forum posts or inspiration posts have been added yet.
                     </Card>
                   ) : null}
                 </div>
@@ -466,7 +466,7 @@ export default function LandingPage() {
 
         <section className="bg-linear-to-b from-primary-50/70 to-secondary-50/70">
           <div className="app-container py-12 sm:py-14">
-            <Section title="Tools that strengthen your educator network" description="Keep your people connections active with discussions, shared resources, planning support, and career opportunities.">
+            <Section title="Tools that strengthen your educator network" description="Keep your people connections active with forum posts, shared resources, planning support, and career opportunities.">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {ecosystemCards.map((card) => (
                   <div key={card.title} className="block">

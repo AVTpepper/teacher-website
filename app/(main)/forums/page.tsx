@@ -256,12 +256,12 @@ export default function ForumsPage() {
 
           <div className="rounded-2xl border border-border bg-surface-subtle p-4">
             <div className="border-b border-border/70 pb-3">
-              <h3 className="text-base font-semibold text-foreground">Filter discussions</h3>
-              <p className="mt-1 text-sm text-muted">Narrow this category by title, content, grade, or subject.</p>
+              <h3 className="text-base font-semibold text-foreground">Filter forum posts</h3>
+              <p className="mt-1 text-sm text-muted">Narrow this forum category by title, content, grade, or subject.</p>
             </div>
             <div className="mt-4 space-y-3">
             <Input
-              label="Search discussions"
+              label="Search forum posts"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search title, content, or tags"
@@ -312,19 +312,19 @@ export default function ForumsPage() {
             <Card padding="lg" className="text-center">
               <div className="text-4xl mb-3">💬</div>
               <h3 className="text-lg font-semibold text-foreground">
-                No discussions yet
+                No forum posts yet
               </h3>
               <p className="text-sm text-muted mt-1">
                 {user
-                  ? "Start the first discussion in this category!"
-                  : "Sign in to start a discussion."}
+                  ? "Start the first forum post in this category!"
+                  : "Sign in to start a forum post."}
               </p>
               {user && (
                 <Button
                   className="mt-4"
                   onClick={() => openNewThread()}
                 >
-                  Start a Discussion
+                  Start a Forum Post
                 </Button>
               )}
             </Card>
@@ -332,7 +332,7 @@ export default function ForumsPage() {
             <Card padding="lg" className="text-center">
               <div className="text-4xl mb-3">💬</div>
               <h3 className="text-lg font-semibold text-foreground">
-                No matching discussions
+                No matching forum posts
               </h3>
               <p className="text-sm text-muted mt-1">
                 Try adjusting your search or filters.
@@ -355,7 +355,7 @@ export default function ForumsPage() {
                   className="mt-4"
                   onClick={() => openNewThread()}
                 >
-                  Start a Discussion
+                  Start a Forum Post
                 </Button>
               )}
             </Card>

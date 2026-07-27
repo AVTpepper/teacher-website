@@ -149,7 +149,7 @@ async function fetchSuggestions(term: string): Promise<SuggestionItem[]> {
       key: `thr-${t.id}`,
       icon: "💬",
       title: t.title,
-      pathLabel: `/communities / ${t.title}`,
+      pathLabel: `/forum / ${t.title}`,
       href: `/forums/${threadSlug(t.title, t.id)}`,
     });
   });
@@ -189,7 +189,7 @@ interface NavSearchBarProps {
 
 export default function NavSearchBar({
   onNavigate,
-  placeholder = "Search educators, resources, communities...",
+  placeholder = "Search educators, resources, forum posts...",
 }: NavSearchBarProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);

@@ -31,7 +31,7 @@ export default function AboutPage() {
           <h2 className="text-lg font-semibold text-foreground">What members can do</h2>
           <ul className="space-y-3 text-sm text-muted">
             <li>Build a visible educator profile with subject, grade-level, and professional context.</li>
-            <li>Discover peer educators, lesson plans, resources, discussions, and inspiration.</li>
+            <li>Discover peer educators, lesson plans, resources, forum posts, and inspiration.</li>
             <li>Connect, message, and grow a professional network around real practice.</li>
             <li>Use AI-supported lesson workflows and stronger network tools with Plus.</li>
           </ul>
@@ -53,7 +53,7 @@ export default function AboutPage() {
         </Card>
         <Card padding="lg">
           <h3 className="text-base font-semibold text-foreground">Forums</h3>
-          <p className="mt-2 text-sm text-muted">Join topic-focused discussions organised around real educator needs.</p>
+          <p className="mt-2 text-sm text-muted">Join topic-focused forum posts organised around real educator needs.</p>
         </Card>
         <Card padding="lg">
           <h3 className="text-base font-semibold text-foreground">Job Board</h3>

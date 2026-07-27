@@ -36,12 +36,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
   useEffect(() => {
     getPosts()
       .then((result) => {
-        const discussions = result.posts
-          .filter((p) => p.type === "discussion")
-          .slice(0, 5);
-        setTrendingPosts(
-          discussions.length > 0 ? discussions : result.posts.slice(0, 5)
-        );
+        setTrendingPosts(result.posts.slice(0, 5));
       })
       .catch(() => {})
       .finally(() => setLoadedTrending(true));
@@ -64,10 +59,10 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
 
   return (
     <div className="space-y-4">
-      {/* Trending Discussions */}
+      {/* Trending Feed Posts */}
       <Card padding="md">
         <h3 className="text-sm font-semibold text-foreground mb-3">
-          🔥 Trending Discussions
+          🔥 Trending Feed Posts
         </h3>
         {!loadedTrending ? (
           <div className="space-y-2">
@@ -76,7 +71,7 @@ function SidebarContents({ onClose }: SidebarContentsProps) {
             ))}
           </div>
         ) : trendingPosts.length === 0 ? (
-          <p className="text-xs text-muted">No discussions yet.</p>
+          <p className="text-xs text-muted">No feed posts yet.</p>
         ) : (
           <ul className="space-y-2">
             {trendingPosts.map((post) => (

@@ -18,7 +18,7 @@ const authenticatedNavLinks = [
   { href: "/discover", label: "Discover" },
   { href: "/network", label: "Network" },
   { href: "/messages", label: "Messages" },
-  { href: "/forums", label: "Communities" },
+  { href: "/forums", label: "Forum" },
   { href: "/resources", label: "Resources" },
   { href: "/lesson-builder", label: "Lesson Builder" },
   { href: "/inspiration", label: "Inspiration" },
@@ -113,7 +113,7 @@ export default function Navbar() {
           </Link>
 
           <div className="mx-4 hidden max-w-xl flex-1 md:block">
-            <NavSearchBar placeholder="Search educators, resources, communities..." />
+            <NavSearchBar placeholder="Search educators, resources, forum posts..." />
           </div>
 
           {/* Right actions */}
@@ -124,7 +124,7 @@ export default function Navbar() {
             <div className="hidden h-6 w-px bg-white/20 sm:block" aria-hidden="true" />
 
             {/* User menu */}
-            {!loading && (
+            {!loading && user && (
               <>
                 <Dropdown
                   align="right"

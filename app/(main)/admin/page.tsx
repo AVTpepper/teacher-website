@@ -91,9 +91,9 @@ const SHOWCASE_SECTIONS: Array<{ key: ShowcaseKey; title: string; description: s
   },
   {
     key: "discussionIds",
-    title: "Featured discussions",
-    description: "Guest-visible forum discussion detail pages.",
-    placeholder: "Paste discussion URL or thread ID",
+    title: "Featured forum posts",
+    description: "Guest-visible forum post detail pages.",
+    placeholder: "Paste forum URL or thread ID",
     hint: "Example: /forums/topic-title--ELVTFTxRhJ11pgEEWAoA",
   },
   {

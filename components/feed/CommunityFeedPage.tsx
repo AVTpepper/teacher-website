@@ -155,7 +155,7 @@ function CommunityFeedPageInner() {
     <div className="space-y-6">
       <DiscoveryShell
         title="Community Feed"
-        subtitle="Posts, ideas, resources, and educator discussions from across VistaTeacher."
+        subtitle="Feed posts, ideas, resources, and educator updates from across VistaTeacher."
         eyebrow="Feed"
         controls={
           <div className="space-y-4">

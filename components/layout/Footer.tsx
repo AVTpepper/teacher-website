@@ -5,7 +5,7 @@ const footerLinks = [
     title: "Explore",
     links: [
       { href: "/educators", label: "Discover Educators" },
-      { href: "/forums", label: "Communities" },
+      { href: "/forums", label: "Forum" },
       { href: "/resources", label: "Resources" },
       { href: "/lesson-builder", label: "Lesson Builder" },
       { href: "/jobs", label: "Jobs" },

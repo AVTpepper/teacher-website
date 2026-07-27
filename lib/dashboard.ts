@@ -208,10 +208,10 @@ export function buildActivationTasks(input: {
     },
     {
       id: "community",
-      label: "Explore a community discussion",
+      label: "Explore the forum",
       completed: input.hasCommunities,
       href: "/forums",
-      cta: "Explore Communities",
+      cta: "Open Forum",
     },
   ];
 }

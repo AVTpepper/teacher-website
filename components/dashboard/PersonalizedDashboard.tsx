@@ -624,7 +624,7 @@ export default function PersonalizedDashboard() {
     { href: "/discover", label: "Discover Educators" },
     { href: "/messages", label: "Open Messages" },
     { href: "/network", label: "Open Network" },
-    { href: "/forums", label: "Explore Communities" },
+    { href: "/forums", label: "Open Forum" },
   ].slice(0, 3);
 
   const resourceState = resolveModuleState({ loading: resourcesLoading, error: resourcesError, items: resources.length });
@@ -927,20 +927,20 @@ export default function PersonalizedDashboard() {
           )}
 
           {showExploreModule && (
-            <Section id="explore" title="Explore" subtitle="A calmer view of communities, resources, and opportunities matched to your current profile.">
+            <Section id="explore" title="Explore" subtitle="A calmer view of the forum, resources, and opportunities matched to your current profile.">
               <div className="grid gap-4 xl:grid-cols-3">
                 <div className="rounded-2xl border border-border bg-surface-subtle p-4">
                   <div className="border-b border-border/70 pb-3">
-                    <h3 className="text-base font-semibold text-foreground">Communities</h3>
-                    <p className="mt-1 text-sm text-text-secondary">Relevant discussions and educator conversation spaces.</p>
+                    <h3 className="text-base font-semibold text-foreground">Forum</h3>
+                    <p className="mt-1 text-sm text-text-secondary">Relevant forum posts and educator conversation spaces.</p>
                   </div>
                   <div className="mt-4 space-y-3">
                     {communityState === "loading" ? (
                       Array.from({ length: 2 }).map((_, index) => <Skeleton key={index} className="h-18 rounded-2xl" />)
                     ) : communityState === "error" ? (
-                      <p className="text-sm text-text-secondary">Communities are temporarily unavailable.</p>
+                      <p className="text-sm text-text-secondary">The forum is temporarily unavailable.</p>
                     ) : communityThreads.length === 0 ? (
-                      <p className="text-sm text-text-secondary">No relevant discussions yet.</p>
+                      <p className="text-sm text-text-secondary">No relevant forum posts yet.</p>
                     ) : (
                       communityThreads.slice(0, 2).map(({ category, thread }) => (
                         <Link
@@ -950,14 +950,14 @@ export default function PersonalizedDashboard() {
                         >
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant="primary">{category.name}</Badge>
-                            <Badge variant="default">{thread.subject || thread.gradeLevel || "Discussion"}</Badge>
+                            <Badge variant="default">{thread.subject || thread.gradeLevel || "Forum"}</Badge>
                           </div>
                           <p className="mt-2 line-clamp-2 text-sm font-semibold text-foreground">{thread.title}</p>
                           <p className="mt-1 text-xs text-text-secondary">{thread.commentCount} replies · {timeAgo(thread.createdAt as { seconds: number } | null)}</p>
                         </Link>
                       ))
                     )}
-                    <SectionLink href="/forums" label="Explore Communities" />
+                    <SectionLink href="/forums" label="Open Forum" />
                   </div>
                 </div>
 

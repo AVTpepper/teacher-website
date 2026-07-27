@@ -44,7 +44,7 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: "all", label: "All", icon: "🔍" },
   { id: "educators", label: "Educators", icon: "👩‍🏫" },
   { id: "resources", label: "Resources", icon: "📂" },
-  { id: "discussions", label: "Discussions", icon: "💬" },
+  { id: "discussions", label: "Forum", icon: "💬" },
   { id: "lessons", label: "Lessons", icon: "📝" },
   { id: "jobs", label: "Jobs", icon: "💼" },
 ];
@@ -301,7 +301,7 @@ function SearchInner() {
             <Input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Search educators, resources, communities, lessons, jobs…"
+              placeholder="Search educators, resources, forum posts, lessons, jobs…"
             />
           </div>
           <Button type="submit" variant="primary" disabled={loading}>
@@ -315,7 +315,7 @@ function SearchInner() {
         <EmptyState
           icon="🔍"
           title="What are you looking for?"
-          description="Search across educators, resources, communities discussions, lesson plans, and jobs."
+          description="Search across educators, resources, forum posts, lesson plans, and jobs."
           actionLabel="Create Account"
           onAction={() => router.push("/auth/signup?redirect=/search")}
         />
@@ -407,10 +407,10 @@ function SearchInner() {
               </Section>
             )}
 
-            {/* Discussions */}
+            {/* Forum */}
             {showDiscussions && results.discussions.length > 0 && (
               <Section>
-                <SectionHeader title="Discussions" description={`${results.discussions.length} results`} />
+                <SectionHeader title="Forum" description={`${results.discussions.length} results`} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {results.discussions.map((t) => (
                     <DiscussionResult key={t.id} thread={t} />
